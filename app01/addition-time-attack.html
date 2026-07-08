@@ -34,12 +34,12 @@
     touch-action:manipulation;
   }
   body{
-    display:flex; align-items:center; justify-content:center;
     min-height:100dvh;
     padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   }
   .frame{
     width:min(480px, 100%);
+    margin:0 auto;
     background:linear-gradient(180deg, var(--frame), var(--frame-dark));
     border-radius:22px;
     padding:14px;
@@ -78,7 +78,7 @@
     margin:0 0 14px;
     letter-spacing:.02em;
   }
-  .screen{ display:none; flex:1; flex-direction:column; }
+  .screen{ display:none; flex:1; flex-direction:column; min-height:0; }
   .screen.active{ display:flex; }
 
   /* ---- start screen ---- */
@@ -275,7 +275,31 @@
     margin:8px 0 0;
   }
 
-  #screen-titles{ gap:10px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  #screen-titles{ gap:10px; }
+  .titles-header{ flex-shrink:0; }
+  .tab-row{ display:flex; gap:6px; margin-top:6px; }
+  .tab-btn{
+    flex:1;
+    font-family:var(--font-display); font-size:15px;
+    color:var(--chalk-dim);
+    background:rgba(245,243,231,.06);
+    border:1px solid rgba(245,243,231,.18);
+    border-radius:10px 10px 0 0;
+    padding:10px 4px;
+  }
+  .tab-btn.active{
+    color:var(--board);
+    background:var(--chalk-yellow);
+    border-color:var(--chalk-yellow);
+  }
+  .titles-scroll{
+    flex:1; min-height:0;
+    overflow-y:auto; -webkit-overflow-scrolling:touch;
+    padding-top:2px;
+  }
+  .titles-tab-panel{ display:none; }
+  .titles-tab-panel.active{ display:block; }
+  .titles-actions{ flex-shrink:0; }
   .titles-list{
     list-style:none; margin:0 0 4px; padding:0;
     display:flex; flex-direction:column; gap:6px;
@@ -473,13 +497,24 @@
 
     <!-- TITLES LIST -->
     <section id="screen-titles" class="screen">
-      <p class="board-panel-title" style="margin-top:0;">せいかい称号(累計正解数)</p>
-      <ol class="titles-list" id="titles-list-correct"></ol>
+      <div class="titles-header">
+        <p class="board-panel-title" style="margin-top:0;">称号いちらん</p>
+        <div class="tab-row">
+          <button type="button" class="tab-btn active" id="tab-btn-correct" data-tab="correct">せいかい称号</button>
+          <button type="button" class="tab-btn" id="tab-btn-speed" data-tab="speed">スピード称号</button>
+        </div>
+      </div>
 
-      <p class="board-panel-title">スピード称号(クリアタイム)</p>
-      <ol class="titles-list" id="titles-list-speed"></ol>
+      <div class="titles-scroll" id="titles-scroll">
+        <div class="titles-tab-panel active" id="tab-panel-correct">
+          <ol class="titles-list" id="titles-list-correct"></ol>
+        </div>
+        <div class="titles-tab-panel" id="tab-panel-speed">
+          <ol class="titles-list" id="titles-list-speed"></ol>
+        </div>
+      </div>
 
-      <div class="actions">
+      <div class="actions titles-actions">
         <button class="chalk-btn" id="btn-titles-back">もどる</button>
       </div>
     </section>
@@ -910,9 +945,19 @@
   }
 
   var titlesReturnScreen = "start";
+  function switchTitlesTab(tab){
+    var isCorrect = tab === "correct";
+    document.getElementById("tab-btn-correct").classList.toggle("active", isCorrect);
+    document.getElementById("tab-btn-speed").classList.toggle("active", !isCorrect);
+    document.getElementById("tab-panel-correct").classList.toggle("active", isCorrect);
+    document.getElementById("tab-panel-speed").classList.toggle("active", !isCorrect);
+    document.getElementById("titles-scroll").scrollTop = 0;
+  }
+
   function openTitlesScreen(fromScreen){
     titlesReturnScreen = fromScreen;
     renderTitlesScreen();
+    switchTitlesTab("correct");
     showScreen("titles");
   }
 
@@ -1032,6 +1077,12 @@
   });
   document.getElementById("btn-titles-back").addEventListener("click", function(){
     showScreen(titlesReturnScreen);
+  });
+  document.getElementById("tab-btn-correct").addEventListener("click", function(){
+    switchTitlesTab("correct");
+  });
+  document.getElementById("tab-btn-speed").addEventListener("click", function(){
+    switchTitlesTab("speed");
   });
   document.getElementById("btn-modal-close").addEventListener("click", hideTitleModal);
 
