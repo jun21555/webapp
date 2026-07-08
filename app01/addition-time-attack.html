@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>たしざんタイムアタック</title>
+<style>
+  :root{
+    --board:#1E3D32;
+    --board-edge:#152A22;
+    --frame:#8B5E3C;
+    --frame-dark:#6B4423;
+    --chalk:#F5F3E7;
+    --chalk-dim:#CFCBB8;
+    --chalk-yellow:#F2C744;
+    --chalk-red:#E8604C;
+    --chalk-blue:#6FB1D6;
+    --paper:#EDE6D6;
+    --paper-line:#C9BFA0;
+    --font-display:'Chalkboard SE','Comic Sans MS','Klee One',sans-serif;
+    --font-body:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic',sans-serif;
+    --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--board-edge);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+    touch-action:manipulation;
+  }
+  body{
+    display:flex; align-items:center; justify-content:center;
+    min-height:100dvh;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  }
+  .frame{
+    width:min(480px, 100%);
+    background:linear-gradient(180deg, var(--frame), var(--frame-dark));
+    border-radius:22px;
+    padding:14px;
+    box-shadow:0 20px 50px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.06);
+  }
+  .board{
+    position:relative;
+    background:
+      radial-gradient(ellipse at 20% 10%, rgba(255,255,255,.05), transparent 40%),
+      radial-gradient(ellipse at 80% 90%, rgba(255,255,255,.04), transparent 45%),
+      var(--board);
+    border-radius:14px;
+    min-height:520px;
+    padding:22px 20px 18px;
+    display:flex; flex-direction:column;
+    color:var(--chalk);
+    overflow:hidden;
+  }
+  .board::after{
+    content:"";
+    position:absolute; left:0; right:0; bottom:0; height:10px;
+    background:linear-gradient(180deg, transparent, rgba(255,255,255,.08));
+    pointer-events:none;
+  }
+  .eyebrow{
+    font-family:var(--font-display);
+    font-size:13px; letter-spacing:.14em;
+    color:var(--chalk-dim); text-align:center;
+    margin:0 0 2px;
+  }
+  h1{
+    font-family:var(--font-display);
+    font-weight:400;
+    text-align:center;
+    font-size:clamp(24px,7vw,32px);
+    margin:0 0 14px;
+    letter-spacing:.02em;
+  }
+  .screen{ display:none; flex:1; flex-direction:column; }
+  .screen.active{ display:flex; }
+
+  /* ---- start screen ---- */
+  #screen-start{ align-items:center; justify-content:center; text-align:center; gap:18px; }
+  .lead{ font-size:15px; color:var(--chalk-dim); line-height:1.7; margin:0; max-width:340px; }
+  .best-badge{
+    font-family:var(--font-mono); font-size:14px; color:var(--chalk-yellow);
+    border:1px dashed rgba(242,199,68,.5); border-radius:10px;
+    padding:8px 14px;
+  }
+  .title-badge{
+    font-family:var(--font-display); font-size:16px; color:var(--chalk);
+    background:rgba(111,177,214,.14);
+    border:1px solid rgba(111,177,214,.4);
+    border-radius:10px;
+    padding:8px 16px;
+    text-align:center;
+  }
+  .title-badge .sub{
+    display:block; font-family:var(--font-body); font-size:11px; color:var(--chalk-dim);
+    margin-top:2px;
+  }
+  .speed-badge{
+    font-family:var(--font-display); font-size:16px; color:var(--chalk);
+    background:rgba(232,96,76,.1);
+    border:1px solid rgba(232,96,76,.4);
+    border-radius:10px;
+    padding:8px 16px;
+    text-align:center;
+  }
+  .chalk-btn{
+    font-family:var(--font-display);
+    font-size:20px; color:var(--board);
+    background:var(--chalk);
+    border:none; border-radius:14px;
+    padding:16px 34px;
+    box-shadow:0 4px 0 rgba(0,0,0,.25), 0 8px 18px rgba(0,0,0,.3);
+    cursor:pointer;
+  }
+  .chalk-btn:active{ transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.25); }
+  .chalk-btn.secondary{
+    background:transparent; color:var(--chalk); font-size:15px;
+    border:1px solid rgba(245,243,231,.35); box-shadow:none; padding:10px 18px;
+    font-family:var(--font-body);
+  }
+
+  /* ---- play screen ---- */
+  #screen-play{ justify-content:space-between; gap:18px; }
+  .tally{ display:flex; justify-content:center; gap:7px; flex-wrap:wrap; }
+  .tally .mark{
+    width:9px; height:22px; border-radius:2px;
+    background:rgba(245,243,231,.18);
+    transform:rotate(6deg);
+  }
+  .tally .mark.done{ background:var(--chalk-yellow); }
+  .problem-wrap{ flex:1; display:flex; align-items:center; justify-content:center; }
+  .problem{
+    font-family:var(--font-display);
+    font-size:clamp(48px,15vw,72px);
+    letter-spacing:.03em;
+    display:flex; align-items:baseline; gap:.3em;
+  }
+  .problem .op{ color:var(--chalk-blue); }
+  .answer-row{ display:flex; justify-content:center; align-items:center; gap:12px; }
+  #answer-input{
+    width:120px; text-align:center;
+    font-family:var(--font-mono);
+    font-size:34px; color:var(--board);
+    background:var(--chalk);
+    border:none; border-radius:12px;
+    padding:10px 6px;
+    caret-color:var(--chalk-red);
+  }
+  #answer-input:focus{ outline:3px solid var(--chalk-yellow); }
+  .go-btn{
+    font-family:var(--font-display);
+    font-size:18px; color:var(--board);
+    background:var(--chalk-yellow);
+    border:none; border-radius:12px;
+    padding:14px 20px;
+    box-shadow:0 4px 0 rgba(0,0,0,.2);
+  }
+  .go-btn:active{ transform:translateY(3px); box-shadow:none; }
+  .go-btn:disabled{ opacity:.35; }
+  .hint{ text-align:center; font-size:12px; color:var(--chalk-dim); margin:0; }
+
+  .keypad{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:8px;
+    max-width:280px;
+    margin:0 auto;
+    width:100%;
+  }
+  .key{
+    font-family:var(--font-mono);
+    font-size:22px;
+    color:var(--chalk);
+    background:rgba(245,243,231,.08);
+    border:1px solid rgba(245,243,231,.18);
+    border-radius:10px;
+    padding:14px 0;
+    line-height:1;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+  .key:active{ background:rgba(245,243,231,.22); }
+  .key.wide{ grid-column:span 1; }
+  .key.func{
+    font-family:var(--font-body);
+    font-size:14px;
+    color:var(--chalk-red);
+  }
+
+  /* ---- result screen ---- */
+  #screen-result{ gap:14px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .time-hero{ text-align:center; }
+  .time-hero .label{ font-size:12px; color:var(--chalk-dim); letter-spacing:.1em; }
+  .time-hero .value{
+    font-family:var(--font-mono); font-size:clamp(38px,11vw,52px); color:var(--chalk-yellow);
+  }
+  .time-hero .penalty{ font-size:12px; color:var(--chalk-red); }
+  .review-list{
+    list-style:none; margin:0; padding:0;
+    display:grid; grid-template-columns:1fr 1fr; gap:6px;
+    background:rgba(0,0,0,.15); border-radius:10px; padding:10px;
+  }
+  .review-list li{
+    font-family:var(--font-mono); font-size:13px;
+    background:rgba(245,243,231,.06);
+    border-radius:6px; padding:6px 8px;
+    display:flex; justify-content:space-between; gap:6px;
+  }
+  .review-list li.wrong{ color:var(--chalk-red); background:rgba(232,96,76,.12); }
+  .review-list li.correct{ color:var(--chalk); }
+  .review-list .mark-ico{ font-family:var(--font-body); }
+
+  .title-panel{
+    background:rgba(111,177,214,.1);
+    border:1px solid rgba(111,177,214,.35);
+    border-radius:10px;
+    padding:10px 14px;
+    text-align:center;
+  }
+  .title-up{
+    font-family:var(--font-display); font-size:18px; color:var(--chalk-yellow);
+    margin-bottom:4px;
+  }
+  .title-current{
+    font-family:var(--font-display); font-size:16px; color:var(--chalk);
+  }
+  .title-progress{
+    font-family:var(--font-body); font-size:11px; color:var(--chalk-dim);
+    margin-top:3px;
+  }
+  .speed-panel{
+    background:rgba(232,96,76,.08);
+    border:1px solid rgba(232,96,76,.3);
+    border-radius:10px;
+    padding:10px 14px;
+    text-align:center;
+  }
+  .speed-current{
+    font-family:var(--font-display); font-size:16px; color:var(--chalk);
+  }
+  .speed-progress{
+    font-family:var(--font-body); font-size:11px; color:var(--chalk-dim);
+    margin-top:3px;
+  }
+
+  .board-panel-title{
+    font-family:var(--font-display); font-size:16px; color:var(--chalk-dim);
+    text-align:center; margin:6px 0 0;
+  }
+  .leaderboard{
+    background:var(--paper); color:#3A3226; border-radius:10px;
+    padding:10px 14px; font-family:var(--font-mono); font-size:13px;
+  }
+  .leaderboard table{ width:100%; border-collapse:collapse; }
+  .leaderboard th{
+    font-family:var(--font-body); font-weight:600; font-size:11px;
+    text-align:left; color:#7A6E54; padding-bottom:4px;
+    border-bottom:1px solid var(--paper-line);
+  }
+  .leaderboard td{ padding:4px 0; border-bottom:1px dashed var(--paper-line); }
+  .leaderboard tr.new-row td{ color:var(--frame-dark); font-weight:700; }
+  .leaderboard .rank{ width:1.6em; color:#A79A78; }
+  .leaderboard .empty{ text-align:center; color:#A79A78; padding:8px 0; }
+
+  .actions{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap; padding-top:2px; }
+
+  .footnote{
+    text-align:center; font-size:10px; color:rgba(245,243,231,.35);
+    margin:8px 0 0;
+  }
+
+  #screen-titles{ gap:10px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .titles-list{
+    list-style:none; margin:0 0 4px; padding:0;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .titles-list li{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:10px;
+    background:rgba(245,243,231,.05);
+    border:1px solid rgba(245,243,231,.12);
+    border-radius:8px;
+    padding:8px 12px;
+    font-family:var(--font-body);
+    font-size:13px;
+    color:var(--chalk-dim);
+  }
+  .titles-list li .t-name{ font-family:var(--font-display); font-size:15px; }
+  .titles-list li .t-cond{ font-family:var(--font-mono); font-size:11px; flex-shrink:0; }
+  .titles-list li.unlocked{ color:var(--chalk); border-color:rgba(111,177,214,.3); }
+  .titles-list li.current{
+    color:var(--board);
+    background:var(--chalk-yellow);
+    border-color:var(--chalk-yellow);
+  }
+  .titles-list li.current .t-cond{ color:var(--frame-dark); }
+  .titles-list li.locked{ opacity:.45; }
+  .titles-list li .t-tag{
+    font-family:var(--font-body); font-size:10px;
+    background:rgba(0,0,0,.2); border-radius:5px; padding:2px 6px;
+  }
+  .titles-list li.current .t-tag{ background:rgba(0,0,0,.15); }
+
+  /* ---- title celebration modal ---- */
+  .modal-overlay{
+    position:fixed; inset:0;
+    background:rgba(10,20,15,.72);
+    display:flex; align-items:center; justify-content:center;
+    z-index:100;
+    padding:20px;
+    animation:overlayFadeIn .25s ease-out;
+  }
+  @keyframes overlayFadeIn{ from{ opacity:0; } to{ opacity:1; } }
+
+  .confetti-layer{
+    position:absolute; inset:0; overflow:hidden; pointer-events:none;
+  }
+  .confetti-piece{
+    position:absolute; top:-10px;
+    width:8px; height:14px;
+    opacity:.9;
+    animation-name:confettiFall;
+    animation-timing-function:linear;
+    animation-iteration-count:1;
+    animation-fill-mode:forwards;
+    border-radius:2px;
+  }
+  @keyframes confettiFall{
+    0%{ transform:translateY(0) rotate(0deg); opacity:1; }
+    100%{ transform:translateY(115vh) rotate(360deg); opacity:.85; }
+  }
+
+  .modal-card{
+    position:relative;
+    width:min(360px, 100%);
+    background:linear-gradient(180deg, var(--frame), var(--frame-dark));
+    border-radius:20px;
+    padding:6px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+    animation:modalPop .38s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes modalPop{
+    0%{ transform:scale(.7); opacity:0; }
+    100%{ transform:scale(1); opacity:1; }
+  }
+  .modal-card::before{
+    content:"";
+    position:absolute; inset:0;
+    border-radius:20px;
+  }
+  .modal-card > *{ position:relative; }
+  .modal-card{
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    text-align:center;
+  }
+  .modal-card{ padding:26px 22px 22px; }
+  .modal-kicker{
+    font-family:var(--font-display); font-size:14px;
+    letter-spacing:.14em;
+    color:var(--chalk-yellow);
+    margin:0;
+  }
+  .modal-congrats{
+    font-family:var(--font-display); font-size:26px; color:var(--chalk);
+    margin:0;
+  }
+  .modal-titles{
+    display:flex; flex-direction:column; gap:8px;
+    width:100%;
+  }
+  .modal-title-item{
+    background:rgba(245,243,231,.1);
+    border:1px solid rgba(242,199,68,.5);
+    border-radius:12px;
+    padding:10px 14px;
+  }
+  .modal-title-item .kind{
+    font-family:var(--font-body); font-size:11px; color:var(--chalk-dim);
+    display:block; margin-bottom:2px;
+  }
+  .modal-title-item .name{
+    font-family:var(--font-display); font-size:20px; color:var(--chalk-yellow);
+  }
+</style>
+</head>
+<body>
+
+<div class="frame">
+  <div class="board">
+    <p class="eyebrow">ADDITION TIME ATTACK</p>
+    <h1>たしざんタイムアタック</h1>
+
+    <!-- START -->
+    <section id="screen-start" class="screen active">
+      <p class="lead">1けた + 1けたのたしざんが 10もん でるよ。<br>ぜんぶ答えおわるまでの タイムをはかります。<br>まちがえると 1もんにつき +2びょう!</p>
+      <div class="best-badge" id="best-badge">きろくはまだありません</div>
+      <div class="title-badge" id="title-badge">称号:はじめまして</div>
+      <div class="speed-badge" id="speed-badge">スピード称号:まだなし</div>
+      <button class="chalk-btn" id="btn-start">はじめる</button>
+      <button class="chalk-btn secondary" id="btn-show-titles-start">称号いちらん</button>
+    </section>
+
+    <!-- PLAY -->
+    <section id="screen-play" class="screen">
+      <div class="tally" id="tally"></div>
+      <div class="problem-wrap">
+        <div class="problem">
+          <span id="p-a">0</span><span class="op">+</span><span id="p-b">0</span><span>=</span>
+        </div>
+      </div>
+      <div class="answer-row">
+        <input id="answer-input" type="text" inputmode="none" pattern="[0-9]*" maxlength="2" autocomplete="off" autocorrect="off" spellcheck="false" readonly>
+      </div>
+      <div class="keypad" id="keypad">
+        <button type="button" class="key" data-key="1">1</button>
+        <button type="button" class="key" data-key="2">2</button>
+        <button type="button" class="key" data-key="3">3</button>
+        <button type="button" class="key" data-key="4">4</button>
+        <button type="button" class="key" data-key="5">5</button>
+        <button type="button" class="key" data-key="6">6</button>
+        <button type="button" class="key" data-key="7">7</button>
+        <button type="button" class="key" data-key="8">8</button>
+        <button type="button" class="key" data-key="9">9</button>
+        <button type="button" class="key func" data-key="del">けす</button>
+        <button type="button" class="key" data-key="0">0</button>
+        <button type="button" class="go-btn" id="btn-go" disabled>こたえる</button>
+      </div>
+      <p class="hint">数字ボタンで入力してね</p>
+    </section>
+
+    <!-- RESULT -->
+    <section id="screen-result" class="screen">
+      <div class="time-hero">
+        <div class="label">きろくタイム</div>
+        <div class="value" id="final-time">0:00.00</div>
+        <div class="penalty" id="final-penalty"></div>
+      </div>
+
+      <div class="title-panel" id="title-panel">
+        <div class="title-up" id="title-up" style="display:none;">称号アップ!</div>
+        <div class="title-current" id="title-current">称号:はじめまして</div>
+        <div class="title-progress" id="title-progress"></div>
+      </div>
+
+      <div class="speed-panel" id="speed-panel">
+        <div class="speed-current" id="speed-current">スピード称号:まだなし</div>
+        <div class="speed-progress" id="speed-progress"></div>
+      </div>
+
+      <ul class="review-list" id="review-list"></ul>
+
+      <p class="board-panel-title">トップ10</p>
+      <div class="leaderboard">
+        <table>
+          <thead><tr><th class="rank">順</th><th>タイム</th><th>日付</th></tr></thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table>
+      </div>
+
+      <div class="actions">
+        <button class="chalk-btn" id="btn-retry">もういちど</button>
+        <button class="chalk-btn secondary" id="btn-show-titles-result">称号いちらん</button>
+        <button class="chalk-btn secondary" id="btn-reset">きろくをリセット</button>
+      </div>
+      <p class="footnote">タイムは端末に保存されます</p>
+    </section>
+
+    <!-- TITLES LIST -->
+    <section id="screen-titles" class="screen">
+      <p class="board-panel-title" style="margin-top:0;">せいかい称号(累計正解数)</p>
+      <ol class="titles-list" id="titles-list-correct"></ol>
+
+      <p class="board-panel-title">スピード称号(クリアタイム)</p>
+      <ol class="titles-list" id="titles-list-speed"></ol>
+
+      <div class="actions">
+        <button class="chalk-btn" id="btn-titles-back">もどる</button>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- NEW TITLE CELEBRATION MODAL -->
+<div id="title-modal-overlay" class="modal-overlay" style="display:none;">
+  <div class="confetti-layer" id="confetti-layer"></div>
+  <div class="modal-card">
+    <p class="modal-kicker">称号アップ!</p>
+    <p class="modal-congrats" id="modal-congrats">やったね!</p>
+    <div class="modal-titles" id="modal-titles"></div>
+    <button class="chalk-btn" id="btn-modal-close">とじる</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "addition_time_attack_leaderboard_v1";
+  var TOTAL_CORRECT_KEY = "addition_time_attack_total_correct_v1";
+  var TOTAL_QUESTIONS = 10;
+  var PENALTY_MS = 2000;
+
+  // 20段階の称号。しきい値は100問〜10000問まで、対数的にバランスよく配分。
+  var TITLES = [
+    { threshold: 100,   name: "けいさんのたまご" },
+    { threshold: 130,   name: "チョークみならい" },
+    { threshold: 160,   name: "たしざんビギナー" },
+    { threshold: 210,   name: "すう字となかよし" },
+    { threshold: 260,   name: "くり返しチャレンジャー" },
+    { threshold: 340,   name: "けいさんドリラー" },
+    { threshold: 430,   name: "チョークしょくにん" },
+    { threshold: 550,   name: "たしざんマスターみならい" },
+    { threshold: 700,   name: "こくばんレンジャー" },
+    { threshold: 890,   name: "スピードけいさんし" },
+    { threshold: 1130,  name: "たしざんエキスパート" },
+    { threshold: 1440,  name: "こくばんの達人" },
+    { threshold: 1830,  name: "けいさんはかせ" },
+    { threshold: 2330,  name: "チョークマイスター" },
+    { threshold: 2960,  name: "たしざんチャンピオン" },
+    { threshold: 3770,  name: "こくばんの賢者" },
+    { threshold: 4790,  name: "スーパーけいさんにん" },
+    { threshold: 6090,  name: "たしざんグランドマスター" },
+    { threshold: 7750,  name: "こくばんの伝説" },
+    { threshold: 10000, name: "チョークキング" }
+  ];
+
+  // ---- storage: works inside Claude artifact sandbox (window.storage) and as a plain
+  // ---- standalone page opened directly in a browser (falls back to localStorage) ----
+  var Storage = {
+    get: function(key){
+      if (window.storage && typeof window.storage.get === "function"){
+        return window.storage.get(key, false).then(function(r){ return r ? r.value : null; }).catch(function(){ return null; });
+      }
+      try { return Promise.resolve(localStorage.getItem(key)); } catch(e){ return Promise.resolve(null); }
+    },
+    set: function(key, value){
+      if (window.storage && typeof window.storage.set === "function"){
+        return window.storage.set(key, value, false).catch(function(){});
+      }
+      try { localStorage.setItem(key, value); } catch(e){}
+      return Promise.resolve();
+    }
+  };
+
+  // ---- state ----
+  var problems = [];
+  var current = 0;
+  var wrongCount = 0;
+  var startTime = 0;
+  var answers = []; // {a,b,correctAnswer,userAnswer,correct}
+  // 10段階のスピード称号。しきい値は「このタイム以下でクリア」の秒数。
+  // 20秒以下(いちばん下)〜8秒以下(いちばん上)まで均等に配分。
+  var SPEED_TITLES = [
+    { thresholdSec: 20.0, name: "のんびりスタート" },
+    { thresholdSec: 18.7, name: "ゆっくり確実" },
+    { thresholdSec: 17.3, name: "なれてきたね" },
+    { thresholdSec: 16.0, name: "きようなゆび" },
+    { thresholdSec: 14.7, name: "スピードアップ" },
+    { thresholdSec: 13.3, name: "はやわざけいさん" },
+    { thresholdSec: 12.0, name: "こくばんの疾風" },
+    { thresholdSec: 10.7, name: "ちょう速のて" },
+    { thresholdSec: 9.3,  name: "いなずまけいさん" },
+    { thresholdSec: 8.0,  name: "タイムアタックマスター" }
+  ];
+
+  var leaderboard = [];
+  var totalCorrect = 0;
+
+  // ---- elements ----
+  var screens = {
+    start: document.getElementById("screen-start"),
+    play: document.getElementById("screen-play"),
+    result: document.getElementById("screen-result"),
+    titles: document.getElementById("screen-titles")
+  };
+  var bestBadge = document.getElementById("best-badge");
+  var titleBadge = document.getElementById("title-badge");
+  var titlePanel = document.getElementById("title-panel");
+  var titleUpEl = document.getElementById("title-up");
+  var titleCurrentEl = document.getElementById("title-current");
+  var titleProgressEl = document.getElementById("title-progress");
+  var speedBadge = document.getElementById("speed-badge");
+  var speedCurrentEl = document.getElementById("speed-current");
+  var speedProgressEl = document.getElementById("speed-progress");
+  var btnStart = document.getElementById("btn-start");
+  var tallyEl = document.getElementById("tally");
+  var pA = document.getElementById("p-a");
+  var pB = document.getElementById("p-b");
+  var answerInput = document.getElementById("answer-input");
+  var btnGo = document.getElementById("btn-go");
+  var finalTimeEl = document.getElementById("final-time");
+  var finalPenaltyEl = document.getElementById("final-penalty");
+  var reviewList = document.getElementById("review-list");
+  var leaderboardBody = document.getElementById("leaderboard-body");
+  var btnRetry = document.getElementById("btn-retry");
+  var btnReset = document.getElementById("btn-reset");
+
+  function showScreen(name){
+    Object.keys(screens).forEach(function(k){
+      screens[k].classList.toggle("active", k === name);
+    });
+  }
+
+  function formatTime(ms){
+    var centis = Math.round(ms / 10);
+    var mm = Math.floor(centis / 6000);
+    var ss = Math.floor((centis % 6000) / 100);
+    var cc = centis % 100;
+    function pad(n){ return (n < 10 ? "0" : "") + n; }
+    return mm + ":" + pad(ss) + "." + pad(cc);
+  }
+
+  function randDigit(){ return 1 + Math.floor(Math.random() * 9); } // 1〜9
+
+  function buildProblems(){
+    problems = [];
+    var prevKey = "";
+    for (var i = 0; i < TOTAL_QUESTIONS; i++){
+      var a, b, key;
+      do {
+        a = randDigit(); b = randDigit();
+        key = a + "+" + b;
+      } while (key === prevKey);
+      prevKey = key;
+      problems.push({ a: a, b: b });
+    }
+  }
+
+  function buildTally(){
+    tallyEl.innerHTML = "";
+    for (var i = 0; i < TOTAL_QUESTIONS; i++){
+      var d = document.createElement("div");
+      d.className = "mark";
+      tallyEl.appendChild(d);
+    }
+  }
+
+  function updateTally(){
+    var marks = tallyEl.querySelectorAll(".mark");
+    for (var i = 0; i < marks.length; i++){
+      marks[i].classList.toggle("done", i < current);
+    }
+  }
+
+  function showProblem(){
+    var p = problems[current];
+    pA.textContent = p.a;
+    pB.textContent = p.b;
+    answerInput.value = "";
+    btnGo.disabled = true;
+    updateTally();
+  }
+
+  function appendDigit(d){
+    if (current >= TOTAL_QUESTIONS) return; // 結果画面へ切り替わる直前の連打を無視
+    if (answerInput.value.length >= 2) return;
+    answerInput.value += d;
+    btnGo.disabled = answerInput.value === "";
+  }
+
+  function deleteDigit(){
+    if (current >= TOTAL_QUESTIONS) return;
+    answerInput.value = answerInput.value.slice(0, -1);
+    btnGo.disabled = answerInput.value === "";
+  }
+
+  function startGame(){
+    buildProblems();
+    buildTally();
+    current = 0;
+    wrongCount = 0;
+    answers = [];
+    startTime = performance.now();
+    showScreen("play");
+    showProblem();
+  }
+
+  function submitAnswer(){
+    if (btnGo.disabled) return; // 処理中または未入力なら何もしない(連打対策)
+    var raw = answerInput.value.trim();
+    if (raw === "") return;
+    btnGo.disabled = true; // 二重送信を防ぐため即座にロック
+    var userAnswer = parseInt(raw, 10);
+    var p = problems[current];
+    var correctAnswer = p.a + p.b;
+    var correct = userAnswer === correctAnswer;
+    if (!correct) wrongCount++;
+    answers.push({ a: p.a, b: p.b, correctAnswer: correctAnswer, userAnswer: raw, correct: correct });
+    current++;
+    if (current < TOTAL_QUESTIONS){
+      showProblem();
+    } else {
+      finishGame();
+    }
+  }
+
+  function finishGame(){
+    var elapsed = performance.now() - startTime;
+    var finalMs = elapsed + wrongCount * PENALTY_MS;
+    var correctThisGame = answers.filter(function(a){ return a.correct; }).length;
+    var beforeIdx = getTitleIndex(totalCorrect);
+    totalCorrect += correctThisGame;
+    var afterIdx = getTitleIndex(totalCorrect);
+
+    var prevBestMs = leaderboard.length > 0 ? leaderboard[0].ms : null;
+    var speedBeforeIdx = prevBestMs === null ? -1 : getSpeedTitleIndex(prevBestMs / 1000);
+
+    renderResult(finalMs);
+    renderTitlePanelOnResult(beforeIdx, afterIdx);
+    renderSpeedTitleOnResult(finalMs);
+
+    Promise.all([
+      updateLeaderboard(finalMs),
+      Storage.set(TOTAL_CORRECT_KEY, String(totalCorrect))
+    ]).then(function(){
+      renderLeaderboard(finalMs);
+      renderTitleBadgeOnStart();
+      showScreen("result");
+
+      var newBestMs = leaderboard.length > 0 ? leaderboard[0].ms : finalMs;
+      var speedAfterIdx = getSpeedTitleIndex(newBestMs / 1000);
+
+      var newlyAchieved = [];
+      if (afterIdx > beforeIdx){
+        newlyAchieved.push({ kind: "せいかい称号", name: TITLES[afterIdx].name });
+      }
+      if (speedAfterIdx > speedBeforeIdx){
+        newlyAchieved.push({ kind: "スピード称号", name: SPEED_TITLES[speedAfterIdx].name });
+      }
+      if (newlyAchieved.length > 0){
+        showTitleModal(newlyAchieved);
+      }
+    });
+  }
+
+  function renderResult(finalMs){
+    finalTimeEl.textContent = formatTime(finalMs);
+    finalPenaltyEl.textContent = wrongCount > 0
+      ? "まちがい " + wrongCount + "もん (+" + (wrongCount * PENALTY_MS / 1000).toFixed(0) + "びょう)"
+      : "ぜんもんせいかい!";
+
+    reviewList.innerHTML = "";
+    answers.forEach(function(a, i){
+      var li = document.createElement("li");
+      li.className = a.correct ? "correct" : "wrong";
+      var text = (i + 1) + ". " + a.a + "+" + a.b + "=" + a.correctAnswer;
+      var mark = document.createElement("span");
+      mark.className = "mark-ico";
+      if (a.correct){
+        mark.textContent = "○";
+      } else {
+        mark.textContent = "✕ (" + (a.userAnswer === "" ? "-" : a.userAnswer) + ")";
+      }
+      var span = document.createElement("span");
+      span.textContent = text;
+      li.appendChild(span);
+      li.appendChild(mark);
+      reviewList.appendChild(li);
+    });
+  }
+
+  function getTitleIndex(count){
+    // count以下のしきい値のうち、最も高いものの index を返す (未到達なら -1)
+    var idx = -1;
+    for (var i = 0; i < TITLES.length; i++){
+      if (count >= TITLES[i].threshold) idx = i;
+    }
+    return idx;
+  }
+
+  function renderTitleBadgeOnStart(){
+    var idx = getTitleIndex(totalCorrect);
+    if (idx === -1){
+      var toFirst = TITLES[0].threshold - totalCorrect;
+      titleBadge.innerHTML = "称号:まだなし<span class=\"sub\">つぎの称号まであと " + toFirst + "問(累計 " + totalCorrect + "問正解)</span>";
+    } else {
+      var name = TITLES[idx].name;
+      var sub;
+      if (idx === TITLES.length - 1){
+        sub = "さいこう称号!(累計 " + totalCorrect + "問正解)";
+      } else {
+        var toNext = TITLES[idx + 1].threshold - totalCorrect;
+        sub = "つぎの称号まであと " + toNext + "問(累計 " + totalCorrect + "問正解)";
+      }
+      titleBadge.innerHTML = "称号:" + name + "<span class=\"sub\">" + sub + "</span>";
+    }
+  }
+
+  function renderTitlePanelOnResult(beforeIdx, afterIdx){
+    var afterName = afterIdx === -1 ? "まだなし" : TITLES[afterIdx].name;
+    titleCurrentEl.textContent = "称号:" + afterName;
+
+    if (afterIdx > beforeIdx){
+      titleUpEl.textContent = "称号アップ! → " + TITLES[afterIdx].name;
+      titleUpEl.style.display = "block";
+    } else {
+      titleUpEl.style.display = "none";
+    }
+
+    if (afterIdx === TITLES.length - 1){
+      titleProgressEl.textContent = "さいこう称号に到達!(累計 " + totalCorrect + "問正解)";
+    } else {
+      var nextThreshold = TITLES[afterIdx + 1].threshold;
+      var toNext = nextThreshold - totalCorrect;
+      titleProgressEl.textContent = "つぎの称号「" + TITLES[afterIdx + 1].name + "」まであと " + toNext + "問(累計 " + totalCorrect + "問正解)";
+    }
+  }
+  function getSpeedTitleIndex(seconds){
+    // seconds以内でクリアできた、いちばん上のスピード称号のindexを返す(未到達なら-1)
+    for (var i = SPEED_TITLES.length - 1; i >= 0; i--){
+      if (seconds <= SPEED_TITLES[i].thresholdSec) return i;
+    }
+    return -1;
+  }
+
+  function renderSpeedTitleOnResult(finalMs){
+    var seconds = finalMs / 1000;
+    var idx = getSpeedTitleIndex(seconds);
+    if (idx === -1){
+      speedCurrentEl.textContent = "スピード称号:まだなし";
+      var toFirst = (seconds - SPEED_TITLES[0].thresholdSec).toFixed(1);
+      speedProgressEl.textContent = "あと " + toFirst + "びょう ちぢめると「" + SPEED_TITLES[0].name + "」!";
+    } else {
+      speedCurrentEl.textContent = "スピード称号:" + SPEED_TITLES[idx].name;
+      if (idx === SPEED_TITLES.length - 1){
+        speedProgressEl.textContent = "さいそくスピード称号に到達!";
+      } else {
+        var toNext = (seconds - SPEED_TITLES[idx + 1].thresholdSec).toFixed(1);
+        speedProgressEl.textContent = "あと " + toNext + "びょう ちぢめると「" + SPEED_TITLES[idx + 1].name + "」!";
+      }
+    }
+  }
+
+  function renderSpeedBadgeOnStart(){
+    if (leaderboard.length === 0){
+      speedBadge.textContent = "スピード称号:まだなし";
+      return;
+    }
+    var bestSeconds = leaderboard[0].ms / 1000;
+    var idx = getSpeedTitleIndex(bestSeconds);
+    speedBadge.textContent = idx === -1
+      ? "スピード称号:まだなし(ベスト " + formatTime(leaderboard[0].ms) + ")"
+      : "スピード称号:" + SPEED_TITLES[idx].name;
+  }
+
+  function renderTitlesScreen(){
+    var correctIdx = getTitleIndex(totalCorrect);
+    var listCorrect = document.getElementById("titles-list-correct");
+    listCorrect.innerHTML = "";
+    TITLES.forEach(function(t, i){
+      var li = document.createElement("li");
+      li.className = i < correctIdx ? "unlocked" : (i === correctIdx ? "current" : "locked");
+      var nameSpan = document.createElement("span");
+      nameSpan.className = "t-name";
+      nameSpan.textContent = t.name;
+      var condWrap = document.createElement("span");
+      condWrap.style.display = "flex";
+      condWrap.style.alignItems = "center";
+      condWrap.style.gap = "6px";
+      var cond = document.createElement("span");
+      cond.className = "t-cond";
+      cond.textContent = t.threshold + "問";
+      condWrap.appendChild(cond);
+      if (i === correctIdx){
+        var tag = document.createElement("span");
+        tag.className = "t-tag";
+        tag.textContent = "いまここ";
+        condWrap.appendChild(tag);
+      }
+      li.appendChild(nameSpan);
+      li.appendChild(condWrap);
+      listCorrect.appendChild(li);
+    });
+
+    var bestMs = leaderboard.length > 0 ? leaderboard[0].ms : null;
+    var speedIdx = bestMs === null ? -1 : getSpeedTitleIndex(bestMs / 1000);
+    var listSpeed = document.getElementById("titles-list-speed");
+    listSpeed.innerHTML = "";
+    SPEED_TITLES.forEach(function(t, i){
+      var li = document.createElement("li");
+      li.className = i < speedIdx ? "unlocked" : (i === speedIdx ? "current" : "locked");
+      var nameSpan = document.createElement("span");
+      nameSpan.className = "t-name";
+      nameSpan.textContent = t.name;
+      var condWrap = document.createElement("span");
+      condWrap.style.display = "flex";
+      condWrap.style.alignItems = "center";
+      condWrap.style.gap = "6px";
+      var cond = document.createElement("span");
+      cond.className = "t-cond";
+      cond.textContent = t.thresholdSec.toFixed(1) + "秒以下";
+      condWrap.appendChild(cond);
+      if (i === speedIdx){
+        var tag = document.createElement("span");
+        tag.className = "t-tag";
+        tag.textContent = "いまここ";
+        condWrap.appendChild(tag);
+      }
+      li.appendChild(nameSpan);
+      li.appendChild(condWrap);
+      listSpeed.appendChild(li);
+    });
+  }
+
+  var titlesReturnScreen = "start";
+  function openTitlesScreen(fromScreen){
+    titlesReturnScreen = fromScreen;
+    renderTitlesScreen();
+    showScreen("titles");
+  }
+
+  var CONGRATS_MESSAGES = ["やったね!", "すごい!", "おめでとう!", "よくがんばったね!"];
+  var CONFETTI_COLORS = ["#F5F3E7", "#F2C744", "#E8604C", "#6FB1D6"];
+
+  function spawnConfetti(){
+    var layer = document.getElementById("confetti-layer");
+    layer.innerHTML = "";
+    var count = 26;
+    for (var i = 0; i < count; i++){
+      var piece = document.createElement("div");
+      piece.className = "confetti-piece";
+      piece.style.left = (Math.random() * 100) + "%";
+      piece.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      piece.style.animationDuration = (1.6 + Math.random() * 1.2) + "s";
+      piece.style.animationDelay = (Math.random() * 0.5) + "s";
+      layer.appendChild(piece);
+    }
+  }
+
+  function showTitleModal(newlyAchieved){
+    var congrats = document.getElementById("modal-congrats");
+    congrats.textContent = CONGRATS_MESSAGES[Math.floor(Math.random() * CONGRATS_MESSAGES.length)];
+
+    var titlesWrap = document.getElementById("modal-titles");
+    titlesWrap.innerHTML = "";
+    newlyAchieved.forEach(function(t){
+      var item = document.createElement("div");
+      item.className = "modal-title-item";
+      var kind = document.createElement("span");
+      kind.className = "kind";
+      kind.textContent = t.kind + "を獲得!";
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = t.name;
+      item.appendChild(kind);
+      item.appendChild(name);
+      titlesWrap.appendChild(item);
+    });
+
+    spawnConfetti();
+    document.getElementById("title-modal-overlay").style.display = "flex";
+  }
+
+  function hideTitleModal(){
+    document.getElementById("title-modal-overlay").style.display = "none";
+    document.getElementById("confetti-layer").innerHTML = "";
+  }
+
+  function loadTotalCorrect(){
+    return Storage.get(TOTAL_CORRECT_KEY).then(function(val){
+      var n = parseInt(val, 10);
+      totalCorrect = isNaN(n) ? 0 : n;
+      renderTitleBadgeOnStart();
+    });
+  }
+
+  function loadLeaderboard(){
+    return Storage.get(STORAGE_KEY).then(function(val){
+      try {
+        leaderboard = val ? JSON.parse(val) : [];
+      } catch(e){
+        leaderboard = [];
+      }
+      renderBestBadge();
+    });
+  }
+
+  function renderBestBadge(){
+    if (leaderboard.length > 0){
+      bestBadge.textContent = "ベストタイム " + formatTime(leaderboard[0].ms);
+    } else {
+      bestBadge.textContent = "きろくはまだありません";
+    }
+    renderSpeedBadgeOnStart();
+  }
+
+  function updateLeaderboard(finalMs){
+    var entry = { ms: finalMs, date: new Date().toLocaleDateString("ja-JP"), isNew: true };
+    leaderboard.push(entry);
+    leaderboard.sort(function(a, b){ return a.ms - b.ms; });
+    leaderboard = leaderboard.slice(0, 10);
+    var toSave = leaderboard.map(function(e){ return { ms: e.ms, date: e.date }; });
+    return Storage.set(STORAGE_KEY, JSON.stringify(toSave));
+  }
+
+  function renderLeaderboard(finalMs){
+    leaderboardBody.innerHTML = "";
+    if (leaderboard.length === 0){
+      var tr = document.createElement("tr");
+      tr.innerHTML = '<td colspan="3" class="empty">きろくがありません</td>';
+      leaderboardBody.appendChild(tr);
+      return;
+    }
+    leaderboard.forEach(function(entry, i){
+      var tr = document.createElement("tr");
+      if (entry.isNew) tr.classList.add("new-row");
+      tr.innerHTML =
+        '<td class="rank">' + (i + 1) + '</td>' +
+        '<td>' + formatTime(entry.ms) + '</td>' +
+        '<td>' + entry.date + '</td>';
+      leaderboardBody.appendChild(tr);
+    });
+    renderBestBadge();
+  }
+
+  // ---- events ----
+  btnStart.addEventListener("click", startGame);
+  btnRetry.addEventListener("click", startGame);
+
+  document.getElementById("btn-show-titles-start").addEventListener("click", function(){
+    openTitlesScreen("start");
+  });
+  document.getElementById("btn-show-titles-result").addEventListener("click", function(){
+    openTitlesScreen("result");
+  });
+  document.getElementById("btn-titles-back").addEventListener("click", function(){
+    showScreen(titlesReturnScreen);
+  });
+  document.getElementById("btn-modal-close").addEventListener("click", hideTitleModal);
+
+  document.getElementById("keypad").addEventListener("click", function(e){
+    var btn = e.target.closest(".key");
+    if (!btn) return;
+    var key = btn.getAttribute("data-key");
+    if (key === "del"){
+      deleteDigit();
+    } else {
+      appendDigit(key);
+    }
+  });
+
+  // 物理キーボードにも対応(PCやBluetoothキーボード接続時)
+  document.addEventListener("keydown", function(e){
+    if (!screens.play.classList.contains("active")) return;
+    if (e.key >= "0" && e.key <= "9"){
+      e.preventDefault();
+      appendDigit(e.key);
+    } else if (e.key === "Backspace"){
+      e.preventDefault();
+      deleteDigit();
+    } else if (e.key === "Enter"){
+      e.preventDefault();
+      submitAnswer();
+    }
+  });
+
+  btnGo.addEventListener("click", submitAnswer);
+
+  btnReset.addEventListener("click", function(){
+    leaderboard = [];
+    Storage.set(STORAGE_KEY, JSON.stringify([])).then(function(){
+      renderBestBadge();
+    });
+  });
+
+  // ---- init ----
+  loadLeaderboard();
+  loadTotalCorrect();
+})();
+</script>
+
+</body>
+</html>
