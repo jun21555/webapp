@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ことのはコレクション</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&family=Zen+Maru+Gothic:wght@400;500;700;900&family=Kiwi+Maru:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFF8F4;
+    --paper:#FFFDFB;
+    --pink-soft:#FFE1EA;
+    --pink-mid:#FFB3C7;
+    --pink-deep:#FF7FA0;
+    --mint-soft:#DCF3EC;
+    --mint-mid:#A7E0CE;
+    --mint-deep:#4FB89C;
+    --lavender:#E9DCF7;
+    --lavender-deep:#B79AE0;
+    --gold:#FFCF6B;
+    --text:#6B4A52;
+    --text-soft:#A78A90;
+    --shadow: 0 8px 24px rgba(255,143,171,0.18);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 12% 8%, #FFEAF0 0%, transparent 40%),
+      radial-gradient(circle at 88% 92%, #E4F7F1 0%, transparent 45%),
+      var(--bg);
+    font-family:'Zen Maru Gothic', sans-serif;
+    color:var(--text);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  #app{
+    max-width:480px;
+    margin:0 auto;
+    min-height:100vh;
+    position:relative;
+    padding-bottom:40px;
+  }
+  /* ambient floating decorations */
+  .float-deco{
+    position:fixed; pointer-events:none; z-index:0; opacity:0.55;
+    font-size:22px; filter:blur(0.2px);
+    animation:floaty 9s ease-in-out infinite;
+  }
+  @keyframes floaty{
+    0%,100%{transform:translateY(0) rotate(0deg);}
+    50%{transform:translateY(-18px) rotate(12deg);}
+  }
+  .deco1{top:6%; left:6%; animation-delay:0s; font-size:26px;}
+  .deco2{top:18%; right:8%; animation-delay:2s; font-size:18px;}
+  .deco3{bottom:12%; left:10%; animation-delay:4s; font-size:20px;}
+  .deco4{bottom:30%; right:6%; animation-delay:1.2s; font-size:16px;}
+
+  header.top{
+    position:relative; z-index:1;
+    text-align:center;
+    padding:28px 20px 14px;
+  }
+  header.top .logo{
+    font-family:'Yomogi', cursive;
+    font-size:32px;
+    color:var(--pink-deep);
+    letter-spacing:1px;
+    text-shadow: 2px 2px 0 #fff;
+  }
+  header.top .sub{
+    font-size:12.5px;
+    color:var(--text-soft);
+    margin-top:4px;
+    letter-spacing:0.5px;
+  }
+
+  .screen{ position:relative; z-index:1; padding:6px 18px 18px; animation:fadein .35s ease; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  /* ---- Home category notebooks ---- */
+  .home-cards{ display:flex; flex-direction:column; gap:18px; margin-top:10px; }
+  .notebook{
+    position:relative;
+    border-radius:22px;
+    padding:22px 20px 20px;
+    box-shadow:var(--shadow);
+    cursor:pointer;
+    border:2px solid #fff;
+    transition:transform .18s ease;
+    overflow:hidden;
+  }
+  .notebook:active{ transform:scale(0.97); }
+  .notebook.kotowaza{ background:linear-gradient(145deg, var(--pink-soft), var(--pink-mid)); }
+  .notebook.yoji{ background:linear-gradient(145deg, var(--mint-soft), var(--mint-mid)); }
+  .notebook .ribbon{
+    position:absolute; top:0; right:22px;
+    width:26px; height:52px;
+    background:var(--gold);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+    box-shadow:0 3px 6px rgba(0,0,0,0.08);
+  }
+  .notebook h2{
+    font-family:'Yomogi', cursive;
+    font-size:24px;
+    margin:0 0 4px;
+    color:var(--text);
+  }
+  .notebook p.desc{ margin:0 0 12px; font-size:12.5px; color:var(--text); opacity:0.75; }
+  .notebook .progress-row{ display:flex; align-items:center; gap:10px; }
+  .bar-track{ flex:1; height:10px; border-radius:6px; background:rgba(255,255,255,0.6); overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:6px; background:var(--pink-deep); transition:width .4s ease; }
+  .notebook.yoji .bar-fill{ background:var(--mint-deep); }
+  .progress-num{ font-size:11.5px; font-weight:700; white-space:nowrap; }
+
+  .album-btn{
+    margin-top:6px;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    background:var(--paper); border:2px dashed var(--lavender-deep);
+    color:var(--lavender-deep); font-weight:700; font-size:13.5px;
+    border-radius:16px; padding:12px; cursor:pointer;
+  }
+  .album-btn:active{ transform:scale(0.97); }
+
+  /* ---- Buttons generic ---- */
+  .btn{
+    border:none; border-radius:16px; padding:14px 18px; font-size:14.5px;
+    font-family:'Zen Maru Gothic', sans-serif; font-weight:700; cursor:pointer;
+    box-shadow:0 4px 0 rgba(0,0,0,0.08);
+  }
+  .btn:active{ transform:translateY(2px); box-shadow:0 2px 0 rgba(0,0,0,0.08); }
+  .btn-back{
+    background:none; box-shadow:none; color:var(--text-soft); font-size:13px;
+    padding:6px 4px; display:inline-flex; align-items:center; gap:4px;
+  }
+
+  /* ---- Category detail ---- */
+  .cat-title{
+    font-family:'Yomogi', cursive; font-size:26px; text-align:center; margin:6px 0 2px;
+  }
+  .cat-sub{ text-align:center; font-size:12px; color:var(--text-soft); margin-bottom:18px;}
+  .mode-grid{ display:flex; flex-direction:column; gap:14px; }
+  .mode-card{
+    border-radius:18px; padding:18px; text-align:center; box-shadow:var(--shadow);
+    border:2px solid #fff; cursor:pointer;
+  }
+  .mode-card:active{ transform:scale(0.97); }
+  .mode-card h3{ font-family:'Yomogi', cursive; font-size:19px; margin:4px 0 4px;}
+  .mode-card p{ font-size:12px; color:var(--text-soft); margin:0;}
+
+  /* ---- Flashcard ---- */
+  .fc-progress{ text-align:center; font-size:12px; color:var(--text-soft); margin-bottom:10px; font-weight:700;}
+  .fc-wrap{ perspective:1400px; height:340px; margin:6px 0 20px; }
+  .fc-card{
+    position:relative; width:100%; height:100%; transition:transform .5s cubic-bezier(.2,.9,.3,1);
+    transform-style:preserve-3d; cursor:pointer;
+  }
+  .fc-card.flipped{ transform:rotateY(180deg); }
+  .fc-face{
+    position:absolute; inset:0; backface-visibility:hidden;
+    border-radius:24px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:22px; text-align:center; box-shadow:var(--shadow); border:2px solid #fff;
+  }
+  .fc-face.front{ background:var(--paper); }
+  .fc-face.back{ transform:rotateY(180deg); }
+  .kotowaza-theme .fc-face.front{ background:linear-gradient(160deg,#fff,var(--pink-soft)); }
+  .kotowaza-theme .fc-face.back{ background:linear-gradient(160deg,var(--pink-mid),var(--pink-deep)); color:#fff; }
+  .yoji-theme .fc-face.front{ background:linear-gradient(160deg,#fff,var(--mint-soft)); }
+  .yoji-theme .fc-face.back{ background:linear-gradient(160deg,var(--mint-mid),var(--mint-deep)); color:#fff; }
+  .fc-tape{
+    position:absolute; top:-10px; left:50%; transform:translateX(-50%) rotate(-2deg);
+    width:70px; height:22px; background:rgba(255,207,107,0.85); border-radius:3px;
+    box-shadow:0 2px 4px rgba(0,0,0,0.1);
+  }
+  .fc-word{ font-family:'Yomogi', cursive; font-size:30px; line-height:1.3; }
+  .fc-hint{ margin-top:14px; font-size:11.5px; color:var(--text-soft); }
+  .kotowaza-theme .fc-face.front .fc-hint, .yoji-theme .fc-face.front .fc-hint{ color:var(--text-soft); }
+  .fc-reading{ font-size:13px; opacity:0.9; margin-bottom:8px; font-family:'Kiwi Maru', serif; }
+  .fc-meaning{ font-size:21px; line-height:1.8; font-weight:700; }
+  .fc-star{ position:absolute; top:14px; right:16px; font-size:20px; }
+
+  .fc-controls{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .fc-nav{ background:var(--paper); border:2px solid var(--pink-mid); color:var(--pink-deep); border-radius:50%; width:44px; height:44px; font-size:18px; box-shadow:none; }
+  .yoji-theme .fc-nav{ border-color:var(--mint-deep); color:var(--mint-deep); }
+  .fc-master{ flex:1; background:var(--gold); color:#7a5300; }
+  .fc-master.done{ background:#fff; border:2px solid var(--gold); color:#b8860b; }
+
+  /* ---- Quiz ---- */
+  .quiz-top{ display:flex; justify-content:space-between; align-items:center; font-size:12.5px; font-weight:700; color:var(--text-soft); margin-bottom:10px;}
+  .quiz-card{
+    background:var(--paper); border-radius:22px; padding:26px 20px; text-align:center; box-shadow:var(--shadow);
+    border:2px solid #fff; margin-bottom:16px;
+  }
+  .quiz-card .qlabel{ font-size:11.5px; color:var(--text-soft); margin-bottom:6px;}
+  .quiz-card .qword{ font-family:'Yomogi', cursive; font-size:28px; }
+  .quiz-options{ display:flex; flex-direction:column; gap:10px; }
+  .opt-btn{
+    background:var(--paper); border:2px solid #f0d9de; border-radius:14px; padding:15px 16px; text-align:left;
+    font-size:17.5px; line-height:1.55; font-family:'Zen Maru Gothic',sans-serif; cursor:pointer; box-shadow:none; color:var(--text);
+  }
+  .opt-btn:active{ transform:scale(0.98); }
+  .opt-btn.correct{ background:#E4F8EC; border-color:#7BC99A; color:#2f7a4d; font-weight:700; }
+  .opt-btn.wrong{ background:#FDE9EA; border-color:#EFA0A6; color:#a13d43; }
+  .opt-btn[disabled]{ pointer-events:none; }
+  .quiz-next{ margin-top:14px; width:100%; background:var(--pink-deep); color:#fff; }
+  .yoji-mode .quiz-next{ background:var(--mint-deep); }
+
+  .quiz-result{ text-align:center; padding:20px 10px; }
+  .quiz-result .emoji{ font-size:52px; }
+  .quiz-result h2{ font-family:'Yomogi', cursive; font-size:24px; margin:10px 0 6px; }
+  .quiz-result p{ color:var(--text-soft); font-size:13px; margin-bottom:20px;}
+
+  /* ---- Album ---- */
+  .album-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:14px; }
+  .sticker{
+    aspect-ratio:1; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:10.5px; text-align:center; padding:4px; font-weight:700; line-height:1.15;
+    box-shadow:0 3px 8px rgba(0,0,0,0.08);
+  }
+  .sticker.locked{ background:#F1E9E5; color:#C9B8B2; border:2px dashed #DCCFC9; box-shadow:none; }
+  .sticker.mastered.kotowaza{ background:radial-gradient(circle at 30% 25%, #fff, var(--pink-mid)); color:#8a2f47; border:2px solid #fff; transform:rotate(-3deg); }
+  .sticker.mastered.yoji{ background:radial-gradient(circle at 30% 25%, #fff, var(--mint-mid)); color:#1f6b54; border:2px solid #fff; transform:rotate(3deg); }
+  .album-tabs{ display:flex; gap:8px; margin-top:16px; }
+  .tab-btn{ flex:1; background:var(--paper); border:2px solid #eee; border-radius:12px; padding:9px; font-size:12.5px; font-weight:700; box-shadow:none; color:var(--text-soft); }
+  .tab-btn.active.kotowaza{ background:var(--pink-mid); color:#fff; border-color:var(--pink-mid); }
+  .tab-btn.active.yoji{ background:var(--mint-deep); color:#fff; border-color:var(--mint-deep); }
+  .album-count{ text-align:center; font-size:12.5px; color:var(--text-soft); margin-top:14px; font-weight:700;}
+</style>
+</head>
+<body>
+<div class="float-deco deco1">🌸</div>
+<div class="float-deco deco2">⭐</div>
+<div class="float-deco deco3">🎀</div>
+<div class="float-deco deco4">🌸</div>
+<div id="app"></div>
+
+<script>
+/* ============ データ ============ */
+const WORDS = [
+  // ことわざ
+  {id:'k1',cat:'kotowaza',text:'猿も木から落ちる',reading:'さるもきからおちる',meaning:'どんなに上手な人でも、時には失敗することがあるというたとえ。'},
+  {id:'k2',cat:'kotowaza',text:'石の上にも三年',reading:'いしのうえにもさんねん',meaning:'辛くても我慢強く続ければ、いつか必ず成功するということ。'},
+  {id:'k3',cat:'kotowaza',text:'塵も積もれば山となる',reading:'ちりもつもればやまとなる',meaning:'わずかなものでも、積み重なれば大きなものになるということ。'},
+  {id:'k4',cat:'kotowaza',text:'七転び八起き',reading:'ななころびやおき',meaning:'何度失敗しても、そのたびに立ち上がってくじけないこと。'},
+  {id:'k5',cat:'kotowaza',text:'早起きは三文の徳',reading:'はやおきはさんもんのとく',meaning:'朝早く起きると、何か良いことがあるということ。'},
+  {id:'k6',cat:'kotowaza',text:'二階から目薬',reading:'にかいからめぐすり',meaning:'思うようにいかず、効き目がほとんどないことのたとえ。'},
+  {id:'k7',cat:'kotowaza',text:'花より団子',reading:'はなよりだんご',meaning:'見た目の美しさより、実際に役立つものの方がよいということ。'},
+  {id:'k8',cat:'kotowaza',text:'猫に小判',reading:'ねこにこばん',meaning:'価値のわからない者に貴重な物を与えても、何の役にも立たないこと。'},
+  {id:'k9',cat:'kotowaza',text:'井の中の蛙大海を知らず',reading:'いのなかのかわずたいかいをしらず',meaning:'狭い世界しか知らず、その外に広い世界があることに気づかないこと。'},
+  {id:'k10',cat:'kotowaza',text:'灯台下暗し',reading:'とうだいもとくらし',meaning:'身近なことは、かえって気づきにくいということ。'},
+  {id:'k11',cat:'kotowaza',text:'継続は力なり',reading:'けいぞくはちからなり',meaning:'物事をあきらめずに続けることが、やがて大きな力になるということ。'},
+  {id:'k12',cat:'kotowaza',text:'石橋を叩いて渡る',reading:'いしばしをたたいてわたる',meaning:'丈夫な石橋でさえ確かめてから渡るように、用心の上にも用心を重ねること。'},
+  {id:'k13',cat:'kotowaza',text:'急がば回れ',reading:'いそがばまわれ',meaning:'急いでいる時ほど、危険な近道より安全な道を選ぶべきだということ。'},
+  {id:'k14',cat:'kotowaza',text:'光陰矢の如し',reading:'こういんやのごとし',meaning:'月日が経つのは、矢が飛ぶようにとても早いということ。'},
+  {id:'k15',cat:'kotowaza',text:'千里の道も一歩から',reading:'せんりのみちもいっぽから',meaning:'どんなに大きなことでも、まず小さな一歩から始まるということ。'},
+  {id:'k16',cat:'kotowaza',text:'蒔かぬ種は生えぬ',reading:'まかぬたねははえぬ',meaning:'何も行動しなければ、良い結果は得られないということ。'},
+  {id:'k17',cat:'kotowaza',text:'覆水盆に返らず',reading:'ふくすいぼんにかえらず',meaning:'一度してしまったことは、もう取り返しがつかないということ。'},
+  {id:'k18',cat:'kotowaza',text:'三人寄れば文殊の知恵',reading:'さんにんよればもんじゅのちえ',meaning:'ふつうの人でも三人集まって考えれば、良い知恵が浮かぶということ。'},
+  {id:'k19',cat:'kotowaza',text:'論より証拠',reading:'ろんよりしょうこ',meaning:'あれこれ議論するより、証拠を示す方が物事がはっきりするということ。'},
+  {id:'k20',cat:'kotowaza',text:'案ずるより産むが易し',reading:'あんずるよりうむがやすし',meaning:'あれこれ心配するより、実際にやってみると意外と簡単だということ。'},
+  {id:'k21',cat:'kotowaza',text:'転ばぬ先の杖',reading:'ころばぬさきのつえ',meaning:'失敗しないように、前もってしっかり準備しておくこと。'},
+  {id:'k22',cat:'kotowaza',text:'人の振り見て我が振り直せ',reading:'ひとのふりみてわがふりなおせ',meaning:'他人の行動を見て、自分の行いを反省し正すこと。'},
+  {id:'k23',cat:'kotowaza',text:'好きこそ物の上手なれ',reading:'すきこそもののじょうずなれ',meaning:'好きなことは熱心に取り組むので、自然と上達しやすいということ。'},
+  {id:'k24',cat:'kotowaza',text:'果報は寝て待て',reading:'かほうはねてまて',meaning:'幸運は焦らず、じっくり気長に待つのがよいということ。'},
+  {id:'k25',cat:'kotowaza',text:'弘法にも筆の誤り',reading:'こうぼうにもふでのあやまり',meaning:'その道の名人でも、時には失敗することがあるというたとえ。'},
+  {id:'k26',cat:'kotowaza',text:'蓼食う虫も好き好き',reading:'たでくうむしもすきずき',meaning:'人の好みはさまざまで、他人にはなかなか理解できないということ。'},
+  {id:'k27',cat:'kotowaza',text:'馬の耳に念仏',reading:'うまのみみにねんぶつ',meaning:'いくら意見をしても、まったく効き目がないことのたとえ。'},
+  {id:'k28',cat:'kotowaza',text:'目は口ほどに物を言う',reading:'めはくちほどにものをいう',meaning:'目つきは、言葉以上に相手に気持ちを伝えるということ。'},
+  {id:'k29',cat:'kotowaza',text:'泣き面に蜂',reading:'なきつらにはち',meaning:'不幸の上に、さらに不幸が重なることのたとえ。'},
+  {id:'k30',cat:'kotowaza',text:'棚から牡丹餅',reading:'たなからぼたもち',meaning:'思いがけない幸運が、労せずに舞い込むことのたとえ。'},
+  {id:'k31',cat:'kotowaza',text:'河童の川流れ',reading:'かっぱのかわながれ',meaning:'どんなに得意な人でも、時には失敗することがあるというたとえ。'},
+  {id:'k32',cat:'kotowaza',text:'雨降って地固まる',reading:'あめふってじかたまる',meaning:'もめごとの後は、かえって物事がうまく収まるということ。'},
+  {id:'k33',cat:'kotowaza',text:'情けは人の為ならず',reading:'なさけはひとのためならず',meaning:'人に親切にしておけば、いずれ良い報いが自分に返ってくるということ。'},
+  {id:'k34',cat:'kotowaza',text:'苦は楽の種',reading:'くはらくのたね',meaning:'今の苦労は、将来の楽しみのもとになるということ。'},
+  {id:'k35',cat:'kotowaza',text:'備えあれば憂いなし',reading:'そなえあればうれいなし',meaning:'普段から準備をしておけば、いざという時に心配がないということ。'},
+  {id:'k36',cat:'kotowaza',text:'立つ鳥跡を濁さず',reading:'たつとりあとをにごさず',meaning:'去る者は、後始末をきちんとしてから去るべきだということ。'},
+  {id:'k37',cat:'kotowaza',text:'出る杭は打たれる',reading:'でるくいはうたれる',meaning:'人よりも目立って優れている者は、とかく人からねたまれたり非難されたりするということ。'},
+  {id:'k38',cat:'kotowaza',text:'火のない所に煙は立たぬ',reading:'ひのないところにけむりはたたぬ',meaning:'根拠がまったくなければ、うわさは立たないということ。'},
+  {id:'k39',cat:'kotowaza',text:'犬も歩けば棒に当たる',reading:'いぬもあるけばぼうにあたる',meaning:'何かをしようとすると、思いがけない幸運や災難に出会うことがあるということ。'},
+  {id:'k40',cat:'kotowaza',text:'蛙の子は蛙',reading:'かえるのこはかえる',meaning:'子は結局、親に似た平凡な人間になるものだということ。'},
+  {id:'k41',cat:'kotowaza',text:'柳に雪折れなし',reading:'やなぎにゆきおれなし',meaning:'しなやかなものは、かたいものよりかえって物事に耐えられるということ。'},
+  {id:'k42',cat:'kotowaza',text:'一寸の虫にも五分の魂',reading:'いっすんのむしにもごぶのたましい',meaning:'どんなに小さく弱い者にも、それなりの意地や考えがあるということ。'},
+  {id:'k43',cat:'kotowaza',text:'鬼に金棒',reading:'おににかなぼう',meaning:'もともと強い者が、さらに強い力を得ることのたとえ。'},
+  {id:'k44',cat:'kotowaza',text:'三日坊主',reading:'みっかぼうず',meaning:'飽きっぽくて、物事が長く続かないことのたとえ。'},
+  {id:'k45',cat:'kotowaza',text:'待てば海路の日和あり',reading:'まてばかいろのひよりあり',meaning:'焦らず待っていれば、いつかは良い機会がめぐってくるということ。'},
+  {id:'k46',cat:'kotowaza',text:'良薬は口に苦し',reading:'りょうやくはくちににがし',meaning:'効き目のある忠告は聞くのがつらいが、自分のためになるということ。'},
+  {id:'k47',cat:'kotowaza',text:'口は災いの元',reading:'くちはわざわいのもと',meaning:'不用意な発言が、思わぬ災難を招くことがあるということ。'},
+  {id:'k48',cat:'kotowaza',text:'習うより慣れよ',reading:'ならうよりなれよ',meaning:'人から教わるより、実際にやって慣れる方が身につくということ。'},
+  {id:'k49',cat:'kotowaza',text:'帯に短し襷に長し',reading:'おびにみじかしたすきにながし',meaning:'中途半端で、どちらの役にも立たないことのたとえ。'},
+  {id:'k50',cat:'kotowaza',text:'三つ子の魂百まで',reading:'みつごのたましいひゃくまで',meaning:'幼い頃の性格は、年をとっても変わらないということ。'},
+  // 四字熟語
+  {id:'y1',cat:'yoji',text:'一石二鳥',reading:'いっせきにちょう',meaning:'一つのことをして、同時に二つの利益を得ること。'},
+  {id:'y2',cat:'yoji',text:'十人十色',reading:'じゅうにんといろ',meaning:'人によって、考え方や好みがそれぞれ違うこと。'},
+  {id:'y3',cat:'yoji',text:'温故知新',reading:'おんこちしん',meaning:'昔のことを研究して、新しい知識や考えを見つけること。'},
+  {id:'y4',cat:'yoji',text:'一期一会',reading:'いちごいちえ',meaning:'一生に一度だけの出会いだと思って、大切にするという考え方。'},
+  {id:'y5',cat:'yoji',text:'完全無欠',reading:'かんぜんむけつ',meaning:'欠点がまったくなく、完璧であること。'},
+  {id:'y6',cat:'yoji',text:'五里霧中',reading:'ごりむちゅう',meaning:'物事の様子がわからず、どうしてよいか方針が立てられないこと。'},
+  {id:'y7',cat:'yoji',text:'自業自得',reading:'じごうじとく',meaning:'自分がした行いの報いを、自分自身が受けること。'},
+  {id:'y8',cat:'yoji',text:'大器晩成',reading:'たいきばんせい',meaning:'大人物は若いうちは目立たず、年をとってから実力を発揮するということ。'},
+  {id:'y9',cat:'yoji',text:'電光石火',reading:'でんこうせっか',meaning:'稲妻や火花のように、動きが非常に素早いことのたとえ。'},
+  {id:'y10',cat:'yoji',text:'有言実行',reading:'ゆうげんじっこう',meaning:'口に出して言ったことを、必ず実行すること。'},
+  {id:'y11',cat:'yoji',text:'臨機応変',reading:'りんきおうへん',meaning:'その場の状況に応じて、適切な対応をすること。'},
+  {id:'y12',cat:'yoji',text:'一朝一夕',reading:'いっちょういっせき',meaning:'わずかな時間、短い期間のこと。'},
+  {id:'y13',cat:'yoji',text:'起死回生',reading:'きしかいせい',meaning:'絶望的な状況を、一気に良い方向へ立て直すこと。'},
+  {id:'y14',cat:'yoji',text:'千差万別',reading:'せんさばんべつ',meaning:'物事には、それぞれさまざまな違いがあるということ。'},
+  {id:'y15',cat:'yoji',text:'東奔西走',reading:'とうほんせいそう',meaning:'あちらこちらを、忙しく走り回ること。'},
+  {id:'y16',cat:'yoji',text:'半信半疑',reading:'はんしんはんぎ',meaning:'半分は信じ、半分は疑っている状態のこと。'},
+  {id:'y17',cat:'yoji',text:'油断大敵',reading:'ゆだんたいてき',meaning:'気を緩めることが、失敗を招く大きな原因になるということ。'},
+  {id:'y18',cat:'yoji',text:'我田引水',reading:'がでんいんすい',meaning:'自分の都合のよいように、物事を進めること。'},
+  {id:'y19',cat:'yoji',text:'空前絶後',reading:'くうぜんぜつご',meaning:'過去にも未来にも例がないほど、非常に珍しいこと。'},
+  {id:'y20',cat:'yoji',text:'質実剛健',reading:'しつじつごうけん',meaning:'飾り気がなく真面目で、たくましいこと。'},
+  {id:'y21',cat:'yoji',text:'針小棒大',reading:'しんしょうぼうだい',meaning:'小さなことを、大げさに言うこと。'},
+  {id:'y22',cat:'yoji',text:'泰然自若',reading:'たいぜんじじゃく',meaning:'落ち着いていて、物事に動じない様子。'},
+  {id:'y23',cat:'yoji',text:'百花繚乱',reading:'ひゃっかりょうらん',meaning:'優れたものや美しいものが、一斉に現れ並ぶこと。'},
+  {id:'y24',cat:'yoji',text:'誠心誠意',reading:'せいしんせいい',meaning:'偽りのない真心を持って、物事に取り組むこと。'},
+  {id:'y25',cat:'yoji',text:'一心不乱',reading:'いっしんふらん',meaning:'一つのことに集中して、他のことに気を取られないこと。'},
+  {id:'y26',cat:'yoji',text:'温厚篤実',reading:'おんこうとくじつ',meaning:'性格が穏やかで、情に厚く誠実なこと。'},
+  {id:'y27',cat:'yoji',text:'危機一髪',reading:'ききいっぱつ',meaning:'非常に危険な瞬間、あぶないところのこと。'},
+  {id:'y28',cat:'yoji',text:'喜怒哀楽',reading:'きどあいらく',meaning:'喜び・怒り・悲しみ・楽しみなど、人のさまざまな感情。'},
+  {id:'y29',cat:'yoji',text:'議論百出',reading:'ぎろんひゃくしゅつ',meaning:'多くの意見が次々と出て、議論が盛んに行われること。'},
+  {id:'y30',cat:'yoji',text:'言語道断',reading:'ごんごどうだん',meaning:'あきれてものが言えないほど、ひどいこと。'},
+  {id:'y31',cat:'yoji',text:'自画自賛',reading:'じがじさん',meaning:'自分で自分のことをほめること。'},
+  {id:'y32',cat:'yoji',text:'試行錯誤',reading:'しこうさくご',meaning:'何度も試みと失敗を繰り返しながら、目的に近づいていくこと。'},
+  {id:'y33',cat:'yoji',text:'支離滅裂',reading:'しりめつれつ',meaning:'物事の筋道が通っておらず、ばらばらでまとまりがないこと。'},
+  {id:'y34',cat:'yoji',text:'心機一転',reading:'しんきいってん',meaning:'あることをきっかけに、気持ちをすっかり入れ替えること。'},
+  {id:'y35',cat:'yoji',text:'森羅万象',reading:'しんらばんしょう',meaning:'宇宙に存在する、すべてのものごと。'},
+  {id:'y36',cat:'yoji',text:'晴耕雨読',reading:'せいこううどく',meaning:'晴れた日は畑を耕し、雨の日は読書をするような、のんびりとした生活。'},
+  {id:'y37',cat:'yoji',text:'前代未聞',reading:'ぜんだいみもん',meaning:'今まで一度も聞いたことがないような、めずらしいこと。'},
+  {id:'y38',cat:'yoji',text:'大同小異',reading:'だいどうしょうい',meaning:'細かい点は違っても、だいたいは同じであること。'},
+  {id:'y39',cat:'yoji',text:'単刀直入',reading:'たんとうちょくにゅう',meaning:'前置きなしに、いきなり本題に入ること。'},
+  {id:'y40',cat:'yoji',text:'徹頭徹尾',reading:'てっとうてつび',meaning:'最初から最後まで、一貫して同じ態度であること。'},
+  {id:'y41',cat:'yoji',text:'二束三文',reading:'にそくさんもん',meaning:'数量は多くても、値段が非常に安いこと。'},
+  {id:'y42',cat:'yoji',text:'八方美人',reading:'はっぽうびじん',meaning:'誰に対しても愛想よくふるまい、うまく調子を合わせる人のこと。'},
+  {id:'y43',cat:'yoji',text:'付和雷同',reading:'ふわらいどう',meaning:'自分の考えを持たず、他人の意見にすぐ同調すること。'},
+  {id:'y44',cat:'yoji',text:'竜頭蛇尾',reading:'りゅうとうだび',meaning:'最初は勢いが良いが、終わりに近づくにつれて勢いがなくなること。'},
+  {id:'y45',cat:'yoji',text:'意気消沈',reading:'いきしょうちん',meaning:'元気をなくして、しょげてしまうこと。'},
+  {id:'y46',cat:'yoji',text:'意気投合',reading:'いきとうごう',meaning:'互いの気持ちや考えが、ぴったり合うこと。'},
+  {id:'y47',cat:'yoji',text:'一喜一憂',reading:'いっきいちゆう',meaning:'状況が変わるたびに、喜んだり心配したりすること。'},
+  {id:'y48',cat:'yoji',text:'一長一短',reading:'いっちょういったん',meaning:'良いところもあれば、悪いところもあること。'},
+  {id:'y49',cat:'yoji',text:'花鳥風月',reading:'かちょうふうげつ',meaning:'自然の美しい景色や、風流な趣のこと。'},
+  {id:'y50',cat:'yoji',text:'一意専心',reading:'いちいせんしん',meaning:'他のことを考えず、一つのことだけに心を集中すること。'},
+];
+
+const CAT_LABEL = { kotowaza:'ことわざ', yoji:'四字熟語' };
+
+/* ============ 進捗の保存 ============ */
+let progress = { mastered: [], quizCorrect:0, quizTotal:0 };
+let storageOK = true;       // このブラウザで保存機能が使えるか
+let lastErrorMsg = '';      // 直近の保存エラー内容（表示用）
+let saveTimer = null;       // 連続保存をまとめるためのタイマー
+let savePending = false;    // 保存待ちがあるか
+
+function hasStorage(){
+  return typeof window !== 'undefined' && window.storage &&
+    typeof window.storage.get === 'function' && typeof window.storage.set === 'function';
+}
+
+async function loadProgress(){
+  if(!hasStorage()){ storageOK = false; lastErrorMsg = 'window.storage が見つかりません'; return; }
+  try{
+    const res = await window.storage.get('app-data', false);
+    if(res && res.value){ progress = JSON.parse(res.value); }
+  }catch(e){
+    // キーがまだ存在しない場合もここに来る（初回起動）ので、これは正常
+  }
+}
+
+// 短時間に何度も呼ばれても、実際の保存は少しまとめて1回にする
+function saveProgress(){
+  savePending = true;
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(doSave, 350);
+}
+
+async function doSave(){
+  if(!savePending) return;
+  savePending = false;
+  if(!hasStorage()){ storageOK = false; lastErrorMsg = 'window.storage が見つかりません'; render(); return; }
+
+  const maxAttempts = 3;
+  for(let attempt=0; attempt<maxAttempts; attempt++){
+    try{
+      const result = await window.storage.set('app-data', JSON.stringify(progress), false);
+      if(result){
+        const changed = !storageOK;
+        storageOK = true; lastErrorMsg = '';
+        if(changed) render();
+        return;
+      }
+      lastErrorMsg = '保存結果が空でした（result=null）';
+    }catch(e){
+      lastErrorMsg = (e && (e.message || e.toString())) || '不明なエラー';
+      console.error('保存に失敗しました（試行' + (attempt+1) + '回目）', e);
+    }
+    if(attempt < maxAttempts-1){ await new Promise(r=>setTimeout(r, 400 * (attempt+1))); }
+  }
+  storageOK = false;
+  render();
+}
+function isMastered(id){ return progress.mastered.includes(id); }
+function toggleMastered(id){
+  if(isMastered(id)) progress.mastered = progress.mastered.filter(x=>x!==id);
+  else progress.mastered.push(id);
+  saveProgress();
+}
+
+/* ============ 状態 ============ */
+let state = { screen:'home', cat:null, flashIndex:0, flashFlipped:false,
+  quiz:{ questions:[], index:0, score:0, answered:false }, albumTab:'kotowaza' };
+
+function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+/* ============ 画面遷移 ============ */
+function goHome(){ state.screen='home'; render(); }
+function openCategory(cat){ state.cat=cat; state.screen='category'; render(); }
+function openAlbum(tab){ state.albumTab = tab || state.cat || 'kotowaza'; state.screen='album'; render(); }
+
+function startFlash(){
+  state.screen='flash'; state.flashIndex=0; state.flashFlipped=false; render();
+}
+function flipCard(){ state.flashFlipped = !state.flashFlipped; render(); }
+function nextCard(dir){
+  const list = WORDS.filter(w=>w.cat===state.cat);
+  state.flashIndex = (state.flashIndex + dir + list.length) % list.length;
+  state.flashFlipped = false; render();
+}
+function markMastered(id){ toggleMastered(id); render(); }
+
+function startQuiz(){
+  const pool = shuffle(WORDS.filter(w=>w.cat===state.cat)).slice(0, 8);
+  const questions = pool.map(w=>{
+    const others = shuffle(WORDS.filter(x=>x.cat===state.cat && x.id!==w.id)).slice(0,3).map(x=>x.meaning);
+    const options = shuffle([w.meaning, ...others]);
+    return { word:w, options, correct:w.meaning };
+  });
+  state.quiz = { questions, index:0, score:0, answered:false, picked:null };
+  state.screen='quiz'; render();
+}
+function pickAnswerAt(i){
+  const q = state.quiz.questions[state.quiz.index];
+  pickAnswer(q.options[i]);
+}
+function pickAnswer(opt){
+  if(state.quiz.answered) return;
+  state.quiz.answered = true;
+  state.quiz.picked = opt;
+  if(opt === state.quiz.questions[state.quiz.index].correct){
+    state.quiz.score++;
+    toggleMasteredSafe(state.quiz.questions[state.quiz.index].word.id, true);
+  }
+  progress.quizTotal++;
+  if(opt === state.quiz.questions[state.quiz.index].correct) progress.quizCorrect++;
+  saveProgress();
+  render();
+}
+function toggleMasteredSafe(id, forceOn){
+  if(forceOn && !isMastered(id)){ progress.mastered.push(id); }
+}
+function nextQuestion(){
+  if(state.quiz.index < state.quiz.questions.length - 1){
+    state.quiz.index++; state.quiz.answered=false; state.quiz.picked=null; render();
+  } else {
+    state.screen='quizResult'; render();
+  }
+}
+
+/* ============ レンダリング ============ */
+function catCounts(cat){
+  const total = WORDS.filter(w=>w.cat===cat).length;
+  const done = WORDS.filter(w=>w.cat===cat && isMastered(w.id)).length;
+  return {total, done};
+}
+
+function render(){
+  const app = document.getElementById('app');
+  let html = `<header class="top">
+    <div class="logo">ことのはコレクション</div>
+    <div class="sub">中学受験 ことわざ・四字熟語ノート</div>
+  </header>`;
+
+  if(!storageOK){
+    html += `<div style="margin:0 18px 4px; background:#FFF3D6; border:2px solid #FFD873; border-radius:14px; padding:10px 14px; font-size:11.5px; color:#8a6a10; text-align:center;">
+      ⚠️ この画面では記録を保存できません。今開いているあいだだけ記録されます。
+      ${lastErrorMsg ? `<div style="margin-top:4px; font-size:10.5px; opacity:0.85;">（詳細: ${lastErrorMsg}）</div>` : ''}
+    </div>`;
+  }
+
+  if(state.screen==='home'){
+    const kc = catCounts('kotowaza'), yc = catCounts('yoji');
+    html += `<div class="screen">
+      <div class="home-cards">
+        <div class="notebook kotowaza" onclick="openCategory('kotowaza')">
+          <div class="ribbon"></div>
+          <h2>ことわざノート</h2>
+          <p class="desc">昔から伝わる、知恵のことば集</p>
+          <div class="progress-row">
+            <div class="bar-track"><div class="bar-fill" style="width:${kc.total? (kc.done/kc.total*100):0}%"></div></div>
+            <div class="progress-num">${kc.done}/${kc.total}こ</div>
+          </div>
+        </div>
+        <div class="notebook yoji" onclick="openCategory('yoji')">
+          <div class="ribbon"></div>
+          <h2>四字熟語ノート</h2>
+          <p class="desc">漢字4つで意味をあらわすことば集</p>
+          <div class="progress-row">
+            <div class="bar-track"><div class="bar-fill" style="width:${yc.total? (yc.done/yc.total*100):0}%"></div></div>
+            <div class="progress-num">${yc.done}/${yc.total}こ</div>
+          </div>
+        </div>
+        <div class="album-btn" onclick="openAlbum('kotowaza')">🎀 シールアルバムを見る</div>
+      </div>
+    </div>`;
+  }
+
+  else if(state.screen==='category'){
+    const c = state.cat;
+    html += `<div class="screen">
+      <button class="btn btn-back" onclick="goHome()">← もどる</button>
+      <div class="cat-title">${CAT_LABEL[c]}</div>
+      <div class="cat-sub">どちらのモードで勉強する？</div>
+      <div class="mode-grid">
+        <div class="mode-card" style="background:linear-gradient(160deg,#fff,${c==='kotowaza'?'var(--pink-soft)':'var(--mint-soft)'})" onclick="startFlash()">
+          <h3>📖 カードでおぼえる</h3>
+          <p>カードをめくって意味をチェック</p>
+        </div>
+        <div class="mode-card" style="background:linear-gradient(160deg,#fff,${c==='kotowaza'?'var(--pink-soft)':'var(--mint-soft)'})" onclick="startQuiz()">
+          <h3>✏️ クイズに挑戦</h3>
+          <p>4択クイズで力だめし（全8問）</p>
+        </div>
+        <div class="mode-card" style="background:var(--paper)" onclick="openAlbum('${c}')">
+          <h3>🎀 コレクションを見る</h3>
+          <p>集めたシールをチェック</p>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  else if(state.screen==='flash'){
+    const list = WORDS.filter(w=>w.cat===state.cat);
+    const w = list[state.flashIndex];
+    const theme = state.cat==='kotowaza' ? 'kotowaza-theme' : 'yoji-theme';
+    const mastered = isMastered(w.id);
+    html += `<div class="screen">
+      <button class="btn btn-back" onclick="openCategory('${state.cat}')">← もどる</button>
+      <div class="fc-progress">${state.flashIndex+1} / ${list.length}</div>
+      <div class="fc-wrap ${theme}">
+        <div class="fc-card ${state.flashFlipped?'flipped':''}" onclick="flipCard()">
+          <div class="fc-face front">
+            <div class="fc-tape"></div>
+            ${mastered?'<div class="fc-star">⭐</div>':''}
+            <div class="fc-word">${w.text}</div>
+            <div class="fc-hint">タップして意味を見る</div>
+          </div>
+          <div class="fc-face back">
+            <div class="fc-reading">${w.reading}</div>
+            <div class="fc-meaning">${w.meaning}</div>
+          </div>
+        </div>
+      </div>
+      <div class="fc-controls">
+        <button class="btn fc-nav" onclick="nextCard(-1)">‹</button>
+        <button class="btn fc-master ${mastered?'done':''}" onclick="markMastered('${w.id}')">${mastered?'⭐ おぼえた！':'☆ おぼえたにする'}</button>
+        <button class="btn fc-nav" onclick="nextCard(1)">›</button>
+      </div>
+    </div>`;
+  }
+
+  else if(state.screen==='quiz'){
+    const q = state.quiz.questions[state.quiz.index];
+    const modeClass = state.cat==='yoji' ? 'yoji-mode' : '';
+    html += `<div class="screen ${modeClass}">
+      <button class="btn btn-back" onclick="openCategory('${state.cat}')">← やめる</button>
+      <div class="quiz-top"><span>問題 ${state.quiz.index+1} / ${state.quiz.questions.length}</span><span>正解 ${state.quiz.score}こ</span></div>
+      <div class="quiz-card">
+        <div class="qlabel">この言葉の意味は？</div>
+        <div class="qword">${q.word.text}</div>
+      </div>
+      <div class="quiz-options">
+        ${q.options.map((opt,i)=>{
+          let cls='opt-btn';
+          if(state.quiz.answered){
+            if(opt===q.correct) cls+=' correct';
+            else if(opt===state.quiz.picked) cls+=' wrong';
+          }
+          return `<button class="${cls}" ${state.quiz.answered?'disabled':''} onclick="pickAnswerAt(${i})">${opt}</button>`;
+        }).join('')}
+      </div>
+      ${state.quiz.answered?`<button class="btn quiz-next" onclick="nextQuestion()">${state.quiz.index<state.quiz.questions.length-1?'つぎの問題へ →':'けっかを見る →'}</button>`:''}
+    </div>`;
+  }
+
+  else if(state.screen==='quizResult'){
+    const q = state.quiz;
+    const rate = Math.round(q.score/q.questions.length*100);
+    let emoji='🌱', msg='つぎはもっとがんばろう！';
+    if(rate===100){ emoji='👑'; msg='パーフェクト！すごい！'; }
+    else if(rate>=75){ emoji='🌸'; msg='とてもよくできました！'; }
+    else if(rate>=50){ emoji='🎀'; msg='いいちょうし！その調子！'; }
+    html += `<div class="screen">
+      <div class="quiz-result">
+        <div class="emoji">${emoji}</div>
+        <h2>${q.score} / ${q.questions.length} 問正解</h2>
+        <p>${msg}</p>
+        <button class="btn" style="background:var(--pink-deep);color:#fff;width:100%;margin-bottom:10px;" onclick="startQuiz()">もう一度挑戦する</button>
+        <button class="btn" style="background:var(--paper);border:2px solid #eee;width:100%;" onclick="openCategory(state_cat_helper())">カテゴリーにもどる</button>
+      </div>
+    </div>`;
+  }
+
+  else if(state.screen==='album'){
+    const tab = state.albumTab;
+    const list = WORDS.filter(w=>w.cat===tab);
+    const doneCount = list.filter(w=>isMastered(w.id)).length;
+    html += `<div class="screen">
+      <button class="btn btn-back" onclick="goHome()">← もどる</button>
+      <div class="cat-title">🎀 シールアルバム</div>
+      <div class="album-tabs">
+        <button class="btn tab-btn ${tab==='kotowaza'?'active kotowaza':''}" onclick="openAlbum('kotowaza')">ことわざ</button>
+        <button class="btn tab-btn ${tab==='yoji'?'active yoji':''}" onclick="openAlbum('yoji')">四字熟語</button>
+      </div>
+      <div class="album-grid">
+        ${list.map(w=>{
+          if(isMastered(w.id)){
+            return `<div class="sticker mastered ${tab}">${w.text}</div>`;
+          }
+          return `<div class="sticker locked">？</div>`;
+        }).join('')}
+      </div>
+      <div class="album-count">${doneCount} / ${list.length} まいゲット中！</div>
+    </div>`;
+  }
+
+  app.innerHTML = html;
+}
+function state_cat_helper(){ return state.cat; }
+
+/* ============ 起動 ============ */
+(async function init(){
+  await loadProgress();
+  render();
+})();
+</script>
+</body>
+</html>
