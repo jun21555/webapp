@@ -345,58 +345,33 @@ const WORDS = [
 const CAT_LABEL = { kotowaza:'ことわざ', yoji:'四字熟語' };
 
 /* ============ 進捗の保存 ============ */
+const STORAGE_KEY = 'kotonoha-collection-progress';
 let progress = { mastered: [], quizCorrect:0, quizTotal:0 };
 let storageOK = true;       // このブラウザで保存機能が使えるか
 let lastErrorMsg = '';      // 直近の保存エラー内容（表示用）
-let saveTimer = null;       // 連続保存をまとめるためのタイマー
-let savePending = false;    // 保存待ちがあるか
 
-function hasStorage(){
-  return typeof window !== 'undefined' && window.storage &&
-    typeof window.storage.get === 'function' && typeof window.storage.set === 'function';
-}
-
-async function loadProgress(){
-  if(!hasStorage()){ storageOK = false; lastErrorMsg = 'window.storage が見つかりません'; return; }
+function loadProgress(){
   try{
-    const res = await window.storage.get('app-data', false);
-    if(res && res.value){ progress = JSON.parse(res.value); }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) progress = JSON.parse(raw);
   }catch(e){
-    // キーがまだ存在しない場合もここに来る（初回起動）ので、これは正常
+    storageOK = false;
+    lastErrorMsg = (e && (e.message || e.toString())) || '不明なエラー';
   }
 }
 
-// 短時間に何度も呼ばれても、実際の保存は少しまとめて1回にする
 function saveProgress(){
-  savePending = true;
-  if(saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(doSave, 350);
-}
-
-async function doSave(){
-  if(!savePending) return;
-  savePending = false;
-  if(!hasStorage()){ storageOK = false; lastErrorMsg = 'window.storage が見つかりません'; render(); return; }
-
-  const maxAttempts = 3;
-  for(let attempt=0; attempt<maxAttempts; attempt++){
-    try{
-      const result = await window.storage.set('app-data', JSON.stringify(progress), false);
-      if(result){
-        const changed = !storageOK;
-        storageOK = true; lastErrorMsg = '';
-        if(changed) render();
-        return;
-      }
-      lastErrorMsg = '保存結果が空でした（result=null）';
-    }catch(e){
-      lastErrorMsg = (e && (e.message || e.toString())) || '不明なエラー';
-      console.error('保存に失敗しました（試行' + (attempt+1) + '回目）', e);
-    }
-    if(attempt < maxAttempts-1){ await new Promise(r=>setTimeout(r, 400 * (attempt+1))); }
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    const changed = !storageOK;
+    storageOK = true; lastErrorMsg = '';
+    if(changed) render();
+  }catch(e){
+    storageOK = false;
+    lastErrorMsg = (e && (e.message || e.toString())) || '不明なエラー';
+    console.error('保存に失敗しました', e);
+    render();
   }
-  storageOK = false;
-  render();
 }
 function isMastered(id){ return progress.mastered.includes(id); }
 function toggleMastered(id){
@@ -636,8 +611,8 @@ function render(){
 function state_cat_helper(){ return state.cat; }
 
 /* ============ 起動 ============ */
-(async function init(){
-  await loadProgress();
+(function init(){
+  loadProgress();
   render();
 })();
 </script>
