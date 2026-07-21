@@ -16,10 +16,20 @@
   }
   h1 {
     color: #1f2937;
+    cursor: pointer;
+    user-select: none;
   }
 </style>
 </head>
 <body>
-<h1>Hello World!</h1>
+<h1 id="title">Hello World!</h1>
+<script>
+  document.getElementById('title').addEventListener('click', () => {
+    const r = Math.floor(Math.random() * 256);
+    const g = Math.floor(Math.random() * 256);
+    const b = Math.floor(Math.random() * 256);
+    document.getElementById('title').style.color = `rgb(${r}, ${g}, ${b})`;
+  });
+</script>
 </body>
 </html>
