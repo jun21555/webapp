@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>車しゅチェッカー</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+<style>
+  :root{
+    --bg:#F2F6FB;
+    --paper:#FFFFFF;
+    --blue-soft:#DCEBFA;
+    --blue-mid:#8FB8E6;
+    --blue-deep:#3E6FB0;
+    --text:#28323C;
+    --text-soft:#7C8896;
+    --danger:#C0524A;
+    --shadow: 0 8px 24px rgba(62,111,176,0.16);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    font-family:'Hiragino Sans','Yu Gothic',sans-serif;
+    color:var(--text);
+    min-height:100vh;
+  }
+  #app{ max-width:480px; margin:0 auto; min-height:100vh; padding-bottom:40px; }
+  header.top{ text-align:center; padding:26px 20px 12px; }
+  header.top .logo{ font-size:26px; font-weight:900; color:var(--blue-deep); }
+  header.top .sub{ font-size:12.5px; color:var(--text-soft); margin-top:4px; }
+
+  .screen{ padding:6px 18px 18px; animation:fadein .3s ease; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .btn{
+    border:none; border-radius:16px; padding:16px 18px; font-size:15px;
+    font-family:inherit; font-weight:700; cursor:pointer;
+    box-shadow:0 4px 0 rgba(0,0,0,0.08); width:100%;
+  }
+  .btn:active{ transform:translateY(2px); box-shadow:0 2px 0 rgba(0,0,0,0.08); }
+  .btn-primary{ background:var(--blue-deep); color:#fff; }
+  .btn-secondary{ background:var(--paper); color:var(--blue-deep); border:2px solid var(--blue-mid); }
+  .btn-back{
+    background:none; box-shadow:none; color:var(--text-soft); font-size:13px;
+    padding:6px 4px; display:inline-flex; align-items:center; gap:4px; width:auto;
+  }
+
+  .home-cards{ display:flex; flex-direction:column; gap:14px; margin-top:16px; }
+  .hint-box{
+    margin-top:18px; background:var(--paper); border-radius:16px; padding:14px 16px;
+    font-size:12px; color:var(--text-soft); line-height:1.7; box-shadow:var(--shadow);
+  }
+
+  .cam-wrap{
+    position:relative; width:100%; aspect-ratio:3/4; border-radius:20px; overflow:hidden;
+    background:#000; box-shadow:var(--shadow); margin-top:10px;
+  }
+  #camVideo{ width:100%; height:100%; object-fit:cover; display:block; }
+  .shutter-btn{ margin-top:16px; background:var(--blue-deep); color:#fff; font-size:16px; }
+
+  .photo-frame{
+    width:100%; border-radius:20px; overflow:hidden; box-shadow:var(--shadow); margin-top:10px;
+    background:#000;
+  }
+  .photo-frame img{ width:100%; display:block; max-height:420px; object-fit:contain; background:#000; }
+
+  .loading{ text-align:center; margin-top:18px; font-size:13.5px; color:var(--text-soft); font-weight:700; }
+  .error-box{
+    margin-top:16px; background:#FBE6E4; border:2px solid #EFA9A2; color:var(--danger);
+    border-radius:14px; padding:12px 14px; font-size:12.5px; line-height:1.6;
+  }
+
+  .result-headline{ font-size:20px; font-weight:900; text-align:center; margin-top:18px; }
+  .result-note{ font-size:11.5px; color:var(--text-soft); text-align:center; margin-top:6px; line-height:1.6; padding:0 6px; }
+
+  .pred-list{ margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+  .pred-row{ display:flex; align-items:center; gap:10px; }
+  .pred-label{ flex:0 0 34%; font-size:12px; font-weight:700; }
+  .pred-bar-track{ flex:1; height:10px; border-radius:6px; background:var(--blue-soft); overflow:hidden; }
+  .pred-bar-fill{ height:100%; border-radius:6px; background:var(--blue-deep); }
+  .pred-pct{ flex:0 0 34px; font-size:11.5px; font-weight:700; text-align:right; color:var(--text-soft); }
+
+  .retry-row{ display:flex; gap:10px; margin-top:20px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ============ 状態 ============ */
+let state = { screen:'home', imageSrc:null, predictions:null, analyzing:false, error:null, cameraError:null };
+let model = null;
+let modelLoading = false;
+let cameraStream = null;
+
+/* ============ 車の種類の日本語ラベル ============ */
+const VEHICLE_DICT = [
+  [/sports? car/i, 'スポーツカー'],
+  [/convertible/i, 'オープンカー（コンバーチブル）'],
+  [/jeep|landrover/i, 'ジープ／SUV'],
+  [/limousine/i, 'リムジン'],
+  [/minivan/i, 'ミニバン'],
+  [/pickup/i, 'ピックアップトラック'],
+  [/racer|racing car|race car/i, 'レーシングカー'],
+  [/cab, hack|taxi/i, 'タクシー'],
+  [/police van|patrol wagon/i, 'パトカー（バン）'],
+  [/beach wagon|station wagon/i, 'ステーションワゴン'],
+  [/moving van/i, '引っ越しトラック'],
+  [/ambulance/i, '救急車'],
+  [/fire engine|fire truck/i, '消防車'],
+  [/garbage truck/i, 'ゴミ収集車'],
+  [/tow truck|wrecker/i, 'レッカー車'],
+  [/trailer truck|semi|tractor trailer/i, 'トレーラートラック'],
+  [/school bus/i, 'スクールバス'],
+  [/minibus/i, 'マイクロバス'],
+  [/trolleybus/i, 'トロリーバス'],
+  [/streetcar|tram/i, '路面電車'],
+  [/golfcart|golf cart/i, 'ゴルフカート'],
+  [/snowplow/i, '除雪車'],
+  [/amphibian/i, '水陸両用車'],
+  [/go-kart/i, 'ゴーカート'],
+  [/moped/i, 'モペット'],
+  [/motor scooter|scooter/i, 'スクーター'],
+  [/car wheel/i, '車のホイール'],
+  [/grille/i, '車のフロントグリル'],
+  [/disk brake|disc brake/i, 'ディスクブレーキ'],
+  [/recreational vehicle|\bRV\b/i, 'キャンピングカー'],
+];
+const VEHICLE_KEYWORDS = /car|truck|van|wagon|bus|jeep|cab|trailer|vehicle|scooter|kart/i;
+
+function translateLabel(className){
+  for(const [re, ja] of VEHICLE_DICT){ if(re.test(className)) return ja; }
+  return className.split(',')[0].trim();
+}
+function looksLikeVehicle(className){
+  return VEHICLE_DICT.some(([re]) => re.test(className)) || VEHICLE_KEYWORDS.test(className);
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ============ AIモデル ============ */
+async function ensureModel(){
+  if(model) return model;
+  if(!modelLoading){
+    modelLoading = true;
+    try{ model = await mobilenet.load(); }
+    finally{ modelLoading = false; }
+  }
+  return model;
+}
+
+/* ============ 画面遷移 ============ */
+function goHome(){
+  stopCameraStream();
+  state = { screen:'home', imageSrc:null, predictions:null, analyzing:false, error:null, cameraError:null };
+  render();
+}
+
+function pickLocalPhoto(){
+  document.getElementById('fileInput').click();
+}
+function onFileChosen(evt){
+  const file = evt.target.files && evt.target.files[0];
+  evt.target.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => handleImageReady(reader.result);
+  reader.readAsDataURL(file);
+}
+
+async function openCamera(){
+  state.screen = 'camera'; state.cameraError = null; render();
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    state.cameraError = 'このブラウザではカメラ撮影に対応していません。「写真を選ぶ」からお試しください。';
+    render();
+    return;
+  }
+  try{
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false });
+    const video = document.getElementById('camVideo');
+    if(video) video.srcObject = cameraStream;
+  }catch(e){
+    state.cameraError = 'カメラを起動できませんでした。カメラの利用を許可しているかご確認いただくか、「写真を選ぶ」からお試しください。';
+    render();
+  }
+}
+function stopCameraStream(){
+  if(cameraStream){ cameraStream.getTracks().forEach(t=>t.stop()); cameraStream=null; }
+}
+function capturePhoto(){
+  const video = document.getElementById('camVideo');
+  if(!video || !video.videoWidth) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+  stopCameraStream();
+  handleImageReady(dataUrl);
+}
+
+function loadImageFromDataUrl(dataUrl){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('画像を読み込めませんでした'));
+    img.src = dataUrl;
+  });
+}
+
+async function handleImageReady(dataUrl){
+  state.imageSrc = dataUrl;
+  state.screen = 'result';
+  state.predictions = null;
+  state.error = null;
+  state.analyzing = true;
+  render();
+  try{
+    const imgEl = await loadImageFromDataUrl(dataUrl);
+    await ensureModel();
+    state.predictions = await model.classify(imgEl, 5);
+  }catch(e){
+    state.error = 'うまく解析できませんでした。もう一度お試しください。（' + ((e && (e.message || e.toString())) || '不明なエラー') + '）';
+  }
+  state.analyzing = false;
+  render();
+}
+
+/* ============ レンダリング ============ */
+function renderPredictions(preds){
+  const top = preds[0];
+  const isCar = looksLikeVehicle(top.className);
+  const rows = preds.map(p => {
+    const label = translateLabel(p.className);
+    const pct = Math.round(p.probability * 100);
+    return `<div class="pred-row">
+      <div class="pred-label">${escapeHtml(label)}</div>
+      <div class="pred-bar-track"><div class="pred-bar-fill" style="width:${pct}%"></div></div>
+      <div class="pred-pct">${pct}%</div>
+    </div>`;
+  }).join('');
+  return `
+    <div class="result-headline">${isCar ? '🚗 ' + escapeHtml(translateLabel(top.className)) : '🤔 車として特定できませんでした'}</div>
+    <div class="result-note">${isCar
+      ? 'これはAIによる大まかな種類（形）の判定です。メーカー名や具体的な車種名までは分かりません。'
+      : '写真の中に車がはっきり写っていないか、判定が難しいようです。別の写真でもお試しください。'}</div>
+    <div class="pred-list">${rows}</div>
+  `;
+}
+
+function render(){
+  const app = document.getElementById('app');
+  let html = `<header class="top">
+    <div class="logo">🚗 車しゅチェッカー</div>
+    <div class="sub">写真から車の種類をAIが判定します</div>
+  </header>`;
+
+  if(state.screen === 'home'){
+    html += `<div class="screen">
+      <div class="home-cards">
+        <button class="btn btn-primary" onclick="pickLocalPhoto()">📁 写真を選ぶ</button>
+        <button class="btn btn-secondary" onclick="openCamera()">📷 カメラで撮影する</button>
+      </div>
+      <div class="hint-box">
+        ・車が大きく写っている写真ほど判定しやすくなります。<br>
+        ・判定できるのは「スポーツカー」「SUV」「トラック」など大まかな車の種類までで、メーカーや具体的な車種名（例：〇〇社の△△）までは分かりません。<br>
+        ・写真データは外部に送信されず、この端末（ブラウザ）の中だけで解析されます。
+      </div>
+    </div>`;
+  }
+
+  else if(state.screen === 'camera'){
+    html += `<div class="screen">
+      <button class="btn btn-back" onclick="goHome()">← もどる</button>
+      <div class="cam-wrap">
+        <video id="camVideo" autoplay playsinline muted></video>
+      </div>
+      ${state.cameraError
+        ? `<div class="error-box">${escapeHtml(state.cameraError)}</div>`
+        : `<button class="btn shutter-btn" onclick="capturePhoto()">📸 撮影する</button>`}
+    </div>`;
+  }
+
+  else if(state.screen === 'result'){
+    html += `<div class="screen">
+      <button class="btn btn-back" onclick="goHome()">← もどる</button>
+      <div class="photo-frame"><img src="${state.imageSrc}" alt="解析中の写真"></div>
+      ${state.analyzing ? `<div class="loading">🔍 解析中です…（はじめての解析はAIの読み込みに少し時間がかかります）</div>` : ''}
+      ${state.error ? `<div class="error-box">${escapeHtml(state.error)}</div>` : ''}
+      ${state.predictions ? renderPredictions(state.predictions) : ''}
+      ${(!state.analyzing) ? `<div class="retry-row">
+        <button class="btn btn-secondary" onclick="pickLocalPhoto()">📁 別の写真を選ぶ</button>
+        <button class="btn btn-secondary" onclick="openCamera()">📷 もう一度撮影</button>
+      </div>` : ''}
+    </div>`;
+  }
+
+  app.innerHTML = html;
+}
+
+/* ============ 起動 ============ */
+(function init(){
+  render();
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.id = 'fileInput';
+  input.style.display = 'none';
+  input.addEventListener('change', onFileChosen);
+  document.body.appendChild(input);
+  // 初回の待ち時間を減らすため、裏側で先にAIモデルを読み込んでおく
+  ensureModel().catch(() => {});
+})();
+</script>
+</body>
+</html>
