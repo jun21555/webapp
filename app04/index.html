@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mix">
+<meta name="theme-color" content="#0e0f13">
+<title>Mix — YouTubeプレイリストプレーヤー</title>
+<style>
+  :root{
+    --bg:#0e0f13; --panel:#171920; --panel2:#1f222b; --line:#2a2e39;
+    --text:#f1f2f5; --sub:#9aa0ad; --accent:#ff4d5e; --accent2:#ff7a59;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+    -webkit-text-size-adjust:100%}
+  body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+  .wrap{max-width:640px;margin:0 auto;padding:12px 14px 40px}
+  header{display:flex;align-items:center;justify-content:space-between;margin:4px 2px 12px}
+  header h1{font-size:22px;margin:0;letter-spacing:.5px}
+  header h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .player-box{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:var(--radius);overflow:hidden;min-height:200px}
+  .player-box iframe,#player{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:14px;text-align:center;padding:20px}
+  .now{margin:12px 2px 4px;min-height:44px}
+  .now .t{font-size:17px;font-weight:700;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .now .a{font-size:13px;color:var(--sub);margin-top:2px}
+  .controls{display:flex;align-items:center;justify-content:space-between;margin:10px 0 18px;padding:0 6px}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  .ic{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text)}
+  .ic svg{width:26px;height:26px;fill:currentColor}
+  .ic.small svg{width:22px;height:22px}
+  .ic.toggle{color:var(--sub);position:relative}
+  .ic.toggle.on{color:var(--accent)}
+  .ic.toggle .badge{position:absolute;bottom:8px;right:8px;font-size:9px;font-weight:800}
+  .ic.play{width:66px;height:66px;background:var(--text);color:var(--bg)}
+  .ic.play svg{width:32px;height:32px}
+  .ic:active{transform:scale(.93)}
+  .card{background:var(--panel);border-radius:var(--radius);padding:12px;margin-bottom:14px}
+  .row{display:flex;gap:8px;align-items:center}
+  select,input,textarea{font:inherit;font-size:16px;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;outline:none}
+  select{appearance:none;-webkit-appearance:none;font-weight:700;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%239aa0ad'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 8px center;background-size:22px;padding-right:34px}
+  textarea{resize:vertical;min-height:44px}
+  input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+  .btn{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;white-space:nowrap;font-weight:600}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn:active{opacity:.75}
+  .btn:disabled{opacity:.4}
+  .mini{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .mini .btn{padding:7px 10px;font-size:13px;font-weight:500;color:var(--sub)}
+  .hint{font-size:12px;color:var(--sub);margin-top:6px;line-height:1.5}
+  .msg{font-size:13px;margin-top:6px;min-height:1em;color:var(--accent2)}
+  .listhead{display:flex;justify-content:space-between;align-items:baseline;margin:2px 4px 8px;color:var(--sub);font-size:13px}
+  .listhead .edit{color:var(--accent);font-weight:600;font-size:14px}
+  ul.tracks{list-style:none;margin:0;padding:0}
+  .tr{display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px}
+  .tr.active{background:var(--panel2)}
+  .tr.active .tt{color:var(--accent)}
+  .tr .thumb{width:64px;height:36px;border-radius:6px;background:#000 center/cover no-repeat;flex:none;position:relative}
+  .tr.active .thumb::after{content:"";position:absolute;inset:0;border-radius:6px;background:rgba(0,0,0,.45) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ff4d5e'%3E%3Cpath d='M3 10h3v4H3zm5-4h3v12H8zm5 2h3v8h-3zm5-3h3v14h-3z'/%3E%3C/svg%3E") center/20px no-repeat}
+  .tr .meta{flex:1;min-width:0}
+  .tr .tt{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tr .ta{font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .tr .ops{display:none;gap:2px}
+  .editing .tr .ops{display:flex}
+  .tr .ops button{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--sub)}
+  .tr .ops button svg{width:20px;height:20px;fill:currentColor}
+  .tr .ops button.del{color:var(--accent)}
+  .empty{color:var(--sub);text-align:center;padding:24px 10px;font-size:14px;line-height:1.6}
+  details summary{cursor:pointer;color:var(--sub);font-size:13px;padding:4px 2px;list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details[open] summary{margin-bottom:8px}
+  .backup textarea{font-size:12px;font-family:ui-monospace,Menlo,monospace;min-height:90px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1><span>Mix</span></h1></header>
+
+  <div class="player-box">
+    <div id="player"></div>
+    <div class="placeholder" id="ph">曲を追加して、リストの曲をタップすると再生が始まります</div>
+  </div>
+
+  <div class="now">
+    <div class="t" id="nowTitle">再生していません</div>
+    <div class="a" id="nowAuthor"></div>
+  </div>
+
+  <div class="controls">
+    <button class="ic toggle small" id="btnShuffle" aria-label="シャッフル" title="シャッフル">
+      <svg viewBox="0 0 24 24"><path d="M10.6 9.2 5.4 4 4 5.4l5.2 5.2 1.4-1.4zM14.5 4l2 2L4 18.6 5.4 20 18 7.5l2 2V4h-5.5zm.3 9.4-1.4 1.4 3.1 3.1-2 2H20v-5.5l-2 2-3.2-3z"/></svg>
+    </button>
+    <button class="ic" id="btnPrev" aria-label="前の曲"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+    <button class="ic play" id="btnPlay" aria-label="再生/一時停止">
+      <svg viewBox="0 0 24 24" id="icoPlay"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <button class="ic" id="btnNext" aria-label="次の曲"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+    <button class="ic toggle small" id="btnRepeat" aria-label="リピート" title="リピート">
+      <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+      <span class="badge" id="repBadge"></span>
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <select id="listSel" aria-label="プレイリスト"></select>
+    </div>
+    <div class="mini">
+      <button class="btn" id="btnNewList">＋ 新規リスト</button>
+      <button class="btn" id="btnRename">名前変更</button>
+      <button class="btn" id="btnDelList">リスト削除</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <textarea id="addInput" rows="1" placeholder="YouTube / YouTube Music のURLを貼り付け" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+      <button class="btn primary" id="btnAdd">追加</button>
+    </div>
+    <div class="hint">改行で区切れば複数まとめて追加できます。公開プレイリストのURL（list=…）なら中の曲をまとめて取り込みます。</div>
+    <div class="msg" id="addMsg"></div>
+  </div>
+
+  <div id="listArea">
+    <div class="listhead"><span id="countLbl"></span><button class="edit" id="btnEdit">編集</button></div>
+    <ul class="tracks" id="tracks"></ul>
+  </div>
+
+  <div class="card backup" style="margin-top:18px">
+    <details>
+      <summary>バックアップ / 復元 ▸</summary>
+      <div class="hint" style="margin-top:0">プレイリストはこの端末のブラウザに保存されます。Safariの履歴やWebサイトデータを消すと消えてしまうので、時々ここでバックアップを取っておくと安心です。</div>
+      <div class="mini">
+        <button class="btn" id="btnExport">バックアップを表示してコピー</button>
+        <button class="btn" id="btnImport">貼り付けた内容で復元</button>
+      </div>
+      <textarea id="backupText" style="margin-top:8px" placeholder="ここにバックアップのテキストが表示されます。復元するときは、ここに貼り付けてから「復元」を押してください。"></textarea>
+      <div class="msg" id="backupMsg"></div>
+    </details>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var KEY = "mix-player-v1";
+  var $ = function(id){ return document.getElementById(id); };
+
+  // ---------- 保存 ----------
+  function uid(){ return Math.random().toString(36).slice(2,10); }
+  function defaultState(){
+    var id = uid();
+    return { lists:[{id:id,name:"マイプレイリスト",tracks:[]}], current:id, shuffle:false, repeat:"all" };
+  }
+  var S;
+  try { S = JSON.parse(localStorage.getItem(KEY)); } catch(e) { S = null; }
+  if (!S || !Array.isArray(S.lists) || !S.lists.length) S = defaultState();
+  if (!S.lists.some(function(l){return l.id===S.current;})) S.current = S.lists[0].id;
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
+
+  function curList(){ return S.lists.find(function(l){return l.id===S.current;}); }
+  function listById(id){ return S.lists.find(function(l){return l.id===id;}); }
+
+  // ---------- 再生状態 ----------
+  var P = { listId:null, index:-1, history:[] };
+  var player = null, playerReady = false, pendingId = null, isPlaying = false;
+  var importing = null; // 公開プレイリスト取り込み中の情報
+
+  // ---------- URL解析 ----------
+  function parseInput(text){
+    var out = [];
+    text.split(/[\s,]+/).forEach(function(s){
+      s = s.trim(); if (!s) return;
+      if (/^[A-Za-z0-9_-]{11}$/.test(s)) { out.push({type:"video",id:s}); return; }
+      var u;
+      try { u = new URL(/^https?:\/\//.test(s) ? s : "https://"+s); } catch(e){ return; }
+      var host = u.hostname.replace(/^www\.|^m\./,"");
+      var v = null;
+      if (host === "youtu.be") v = u.pathname.slice(1).split("/")[0];
+      else if (/youtube\.com$|youtube-nocookie\.com$/.test(host)) {
+        v = u.searchParams.get("v");
+        if (!v) { var m = u.pathname.match(/^\/(?:shorts|embed|live|v)\/([A-Za-z0-9_-]{11})/); if (m) v = m[1]; }
+      }
+      var list = u.searchParams.get("list");
+      if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) out.push({type:"video",id:v});
+      else if (list) out.push({type:"list",id:list});
+    });
+    return out;
+  }
+
+  // ---------- タイトル取得 ----------
+  function fetchMeta(id){
+    var watch = "https://www.youtube.com/watch?v="+id;
+    var urls = [
+      "https://www.youtube.com/oembed?format=json&url="+encodeURIComponent(watch),
+      "https://noembed.com/embed?url="+encodeURIComponent(watch)
+    ];
+    var i = 0;
+    function tryNext(){
+      if (i >= urls.length) return Promise.resolve(null);
+      return fetch(urls[i++]).then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ return (j && j.title) ? {title:j.title, author:j.author_name||""} : tryNext(); })
+        .catch(function(){ return tryNext(); });
+    }
+    return tryNext();
+  }
+  function fillMeta(track){
+    fetchMeta(track.id).then(function(m){
+      if (!m) return;
+      S.lists.forEach(function(l){ l.tracks.forEach(function(t){
+        if (t.id===track.id && !t.title){ t.title=m.title; t.author=m.author; }
+      });});
+      save(); render();
+    });
+  }
+
+  // ---------- 描画 ----------
+  function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+  var editing = false;
+
+  function renderLists(){
+    var sel = $("listSel");
+    sel.innerHTML = S.lists.map(function(l){
+      return '<option value="'+l.id+'"'+(l.id===S.current?" selected":"")+'>'+esc(l.name)+'（'+l.tracks.length+'曲）</option>';
+    }).join("");
+    $("btnDelList").disabled = S.lists.length <= 1;
+  }
+
+  function render(){
+    renderLists();
+    var l = curList();
+    $("countLbl").textContent = l.tracks.length + " 曲";
+    $("btnEdit").textContent = editing ? "完了" : "編集";
+    $("btnEdit").style.visibility = l.tracks.length ? "visible" : "hidden";
+    $("listArea").classList.toggle("editing", editing);
+    var ul = $("tracks");
+    if (!l.tracks.length){
+      ul.innerHTML = '<li class="empty">まだ曲がありません。<br>上の欄にYouTubeのURLを貼り付けて追加してください。</li>';
+      return;
+    }
+    ul.innerHTML = l.tracks.map(function(t,i){
+      var active = (P.listId===l.id && P.index===i);
+      return '<li class="tr'+(active?" active":"")+'" data-i="'+i+'">'+
+        '<div class="thumb" style="background-image:url(https://i.ytimg.com/vi/'+t.id+'/mqdefault.jpg)"></div>'+
+        '<div class="meta"><div class="tt">'+esc(t.title||"（タイトル取得中…）")+'</div>'+
+        '<div class="ta">'+esc(t.author||t.id)+'</div></div>'+
+        '<div class="ops">'+
+          '<button data-op="up" aria-label="上へ"><svg viewBox="0 0 24 24"><path d="M7 14l5-5 5 5z"/></svg></button>'+
+          '<button data-op="down" aria-label="下へ"><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg></button>'+
+          '<button data-op="del" class="del" aria-label="削除"><svg viewBox="0 0 24 24"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></button>'+
+        '</div></li>';
+    }).join("");
+  }
+
+  function renderNow(){
+    var l = listById(P.listId), t = l && l.tracks[P.index];
+    $("nowTitle").textContent = t ? (t.title || "読み込み中…") : "再生していません";
+    $("nowAuthor").textContent = t ? (t.author || "") : "";
+    $("icoPlay").innerHTML = isPlaying ? '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+    $("btnShuffle").classList.toggle("on", S.shuffle);
+    $("btnRepeat").classList.toggle("on", S.repeat!=="off");
+    $("repBadge").textContent = S.repeat==="one" ? "1" : "";
+  }
+
+  // ---------- YouTube IFrame API ----------
+  window.onYouTubeIframeAPIReady = function(){
+    player = new YT.Player("player", {
+      width:"100%", height:"100%",
+      playerVars:{ playsinline:1, rel:0, modestbranding:1 },
+      events:{
+        onReady:function(){ playerReady = true; if (pendingId){ player.loadVideoById(pendingId); pendingId=null; } },
+        onStateChange:onState,
+        onError:function(e){
+          // 埋め込み不可・削除済みの動画などは飛ばす
+          if (importing){ finishImport([]); return; }
+          setMsg("addMsg","この曲は埋め込み再生できないため、スキップしました");
+          setTimeout(function(){ next(true); }, 800);
+        }
+      }
+    });
+  };
+  (function(){ var s=document.createElement("script"); s.src="https://www.youtube.com/iframe_api"; document.head.appendChild(s); })();
+
+  function onState(e){
+    if (importing && e.data === YT.PlayerState.CUED){
+      var ids = player.getPlaylist() || [];
+      finishImport(ids); return;
+    }
+    if (e.data === YT.PlayerState.PLAYING){
+      isPlaying = true; $("ph").style.display="none";
+      // タイトルがまだなら、プレーヤーから取得
+      try {
+        var d = player.getVideoData(), l = listById(P.listId), t = l && l.tracks[P.index];
+        if (t && d && d.video_id===t.id && !t.title && d.title){ t.title=d.title; t.author=d.author||""; save(); render(); }
+      } catch(err){}
+    } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED){
+      isPlaying = false;
+    }
+    if (e.data === YT.PlayerState.ENDED){
+      if (S.repeat==="one"){ player.seekTo(0); player.playVideo(); }
+      else next(true);
+    }
+    renderNow();
+  }
+
+  function loadVideo(id){
+    $("ph").style.display="none";
+    if (playerReady) player.loadVideoById(id); else pendingId = id;
+  }
+
+  // ---------- 再生操作 ----------
+  function playAt(listId, i, pushHistory){
+    var l = listById(listId); if (!l || !l.tracks[i]) return;
+    if (pushHistory !== false && P.listId===listId && P.index>=0) P.history.push(P.index);
+    if (P.history.length > 200) P.history.shift();
+    P.listId = listId; P.index = i;
+    loadVideo(l.tracks[i].id);
+    render(); renderNow();
+  }
+
+  function next(auto){
+    var l = listById(P.listId);
+    if (!l || !l.tracks.length){ l = curList(); if (!l.tracks.length) return; P.listId=l.id; P.index=-1; }
+    var n = l.tracks.length, i;
+    if (S.shuffle && n > 1){
+      do { i = Math.floor(Math.random()*n); } while (i === P.index);
+    } else {
+      i = P.index + 1;
+      if (i >= n){
+        if (auto && S.repeat==="off"){ isPlaying=false; renderNow(); return; }
+        i = 0;
+      }
+    }
+    playAt(l.id, i);
+  }
+
+  function prev(){
+    var l = listById(P.listId); if (!l || !l.tracks.length) return;
+    try { if (playerReady && player.getCurrentTime() > 3){ player.seekTo(0); return; } } catch(e){}
+    var i;
+    if (S.shuffle && P.history.length) i = P.history.pop();
+    else { i = P.index - 1; if (i < 0) i = l.tracks.length - 1; }
+    playAt(l.id, Math.min(i, l.tracks.length-1), false);
+  }
+
+  function togglePlay(){
+    if (P.index < 0 || !listById(P.listId)){
+      var l = curList(); if (!l.tracks.length) return;
+      playAt(l.id, S.shuffle ? Math.floor(Math.random()*l.tracks.length) : 0); return;
+    }
+    if (!playerReady) return;
+    if (isPlaying) player.pauseVideo(); else player.playVideo();
+  }
+
+  // ---------- 追加 ----------
+  function setMsg(id, text){ $(id).textContent = text; if (text) setTimeout(function(){ if ($(id).textContent===text) $(id).textContent=""; }, 5000); }
+
+  function addTracks(ids){
+    var l = curList(), have = {}, added = 0;
+    l.tracks.forEach(function(t){ have[t.id]=1; });
+    ids.forEach(function(id){
+      if (have[id]) return; have[id]=1;
+      var t = {id:id,title:"",author:""}; l.tracks.push(t); added++; fillMeta(t);
+    });
+    save(); render();
+    return added;
+  }
+
+  function startImport(listId, rest){
+    if (!playerReady){ setMsg("addMsg","プレーヤーの準備中です。少し待ってからもう一度お試しください"); return; }
+    if (isPlaying){ setMsg("addMsg","プレイリストの取り込みは、再生を止めてから行ってください"); return; }
+    importing = {rest:rest};
+    setMsg("addMsg","プレイリストを読み込み中…");
+    player.cuePlaylist({listType:"playlist", list:listId});
+    importing.timer = setTimeout(function(){ if (importing) finishImport([]); }, 12000);
+  }
+  function finishImport(ids){
+    clearTimeout(importing.timer);
+    var rest = importing.rest; importing = null;
+    var n = addTracks(ids.concat(rest));
+    setMsg("addMsg", ids.length ? n+" 曲を追加しました" : "プレイリストを読み込めませんでした（非公開・限定公開・自動生成のミックスなどは取り込めません）");
+    try { player.stopVideo(); } catch(e){}
+    $("ph").style.display = P.index>=0 ? "none" : "flex";
+  }
+
+  $("btnAdd").onclick = function(){
+    var items = parseInput($("addInput").value);
+    if (!items.length){ setMsg("addMsg","YouTubeのURLが見つかりませんでした"); return; }
+    var vids = items.filter(function(x){return x.type==="video";}).map(function(x){return x.id;});
+    var list = items.find(function(x){return x.type==="list";});
+    $("addInput").value = ""; $("addInput").style.height = "";
+    if (list){ startImport(list.id, vids); return; }
+    var n = addTracks(vids);
+    setMsg("addMsg", n ? n+" 曲を追加しました" : "すでにリストにある曲です");
+  };
+
+  // ---------- リスト操作 ----------
+  $("listSel").onchange = function(){ S.current = this.value; editing=false; save(); render(); };
+  $("btnNewList").onclick = function(){
+    var name = prompt("新しいプレイリストの名前", "プレイリスト "+(S.lists.length+1));
+    if (name===null) return; name = name.trim() || "新しいリスト";
+    var id = uid(); S.lists.push({id:id,name:name,tracks:[]}); S.current=id; save(); render();
+  };
+  $("btnRename").onclick = function(){
+    var l = curList(), name = prompt("プレイリスト名", l.name);
+    if (name===null || !name.trim()) return; l.name = name.trim(); save(); render();
+  };
+  $("btnDelList").onclick = function(){
+    if (S.lists.length<=1) return;
+    var l = curList();
+    if (!confirm("「"+l.name+"」を削除しますか？")) return;
+    S.lists = S.lists.filter(function(x){return x.id!==l.id;});
+    if (P.listId===l.id){ P.listId=null; P.index=-1; P.history=[]; }
+    S.current = S.lists[0].id; save(); render(); renderNow();
+  };
+  $("btnEdit").onclick = function(){ editing=!editing; render(); };
+
+  $("tracks").onclick = function(e){
+    var li = e.target.closest(".tr"); if (!li) return;
+    var i = +li.dataset.i, l = curList(), op = e.target.closest("button");
+    if (op){
+      var o = op.dataset.op, playingHere = (P.listId===l.id);
+      if (o==="del"){
+        l.tracks.splice(i,1);
+        if (playingHere){ if (P.index===i) P.index=i-1; else if (P.index>i) P.index--; P.history=[]; }
+      } else {
+        var j = o==="up" ? i-1 : i+1;
+        if (j<0 || j>=l.tracks.length) return;
+        var tmp=l.tracks[i]; l.tracks[i]=l.tracks[j]; l.tracks[j]=tmp;
+        if (playingHere){ if (P.index===i) P.index=j; else if (P.index===j) P.index=i; P.history=[]; }
+      }
+      save(); render(); return;
+    }
+    if (editing) return;
+    playAt(l.id, i);
+  };
+
+  // ---------- 操作ボタン ----------
+  $("btnPlay").onclick = togglePlay;
+  $("btnNext").onclick = function(){ next(false); };
+  $("btnPrev").onclick = prev;
+  $("btnShuffle").onclick = function(){ S.shuffle=!S.shuffle; P.history=[]; save(); renderNow(); };
+  $("btnRepeat").onclick = function(){ S.repeat = {off:"all",all:"one",one:"off"}[S.repeat]||"all"; save(); renderNow(); };
+
+  // ---------- バックアップ ----------
+  $("btnExport").onclick = function(){
+    var txt = JSON.stringify({app:"mix",v:1,lists:S.lists});
+    $("backupText").value = txt;
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(function(){ setMsg("backupMsg","コピーしました。メモアプリなどに保存しておいてください"); },
+        function(){ setMsg("backupMsg","下のテキストを長押ししてコピーしてください"); });
+    } else setMsg("backupMsg","下のテキストを長押ししてコピーしてください");
+  };
+  $("btnImport").onclick = function(){
+    var d; try { d = JSON.parse($("backupText").value); } catch(e){ setMsg("backupMsg","読み込めませんでした。テキストが正しいか確認してください"); return; }
+    if (!d || !Array.isArray(d.lists) || !d.lists.length){ setMsg("backupMsg","プレイリストが見つかりませんでした"); return; }
+    if (!confirm("今のプレイリストをバックアップの内容で置き換えますか？")) return;
+    S.lists = d.lists.map(function(l){ return {id:l.id||uid(), name:String(l.name||"リスト"), tracks:(l.tracks||[]).filter(function(t){return t&&/^[A-Za-z0-9_-]{11}$/.test(t.id);}).map(function(t){return {id:t.id,title:t.title||"",author:t.author||""};})}; });
+    S.current = S.lists[0].id; P = {listId:null,index:-1,history:[]};
+    save(); render(); renderNow(); setMsg("backupMsg","復元しました");
+  };
+
+  // 入力欄の高さを自動調整
+  $("addInput").addEventListener("input", function(){ this.style.height="auto"; this.style.height=Math.min(this.scrollHeight,160)+"px"; });
+
+  // 起動時にタイトル未取得の曲を補完
+  S.lists.forEach(function(l){ l.tracks.forEach(function(t){ if (!t.title) fillMeta(t); }); });
+  render(); renderNow();
+})();
+</script>
+</body>
+</html>
