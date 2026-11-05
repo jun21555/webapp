@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b1220">
+<title>Glass of Water</title>
+<style>
+  :root { --fg: #e8f1ff; --dim: rgba(232,241,255,.55); --accent: #5fb4ff; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1220; color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    -webkit-user-select: none; user-select: none; overscroll-behavior: none; touch-action: none; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+  .hud { position: fixed; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top) + 12px) 18px 0;
+    display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
+  .meter { font-size: 12px; letter-spacing: .08em; color: var(--dim); }
+  .meter b { display: block; font-size: 28px; font-weight: 600; color: var(--fg); letter-spacing: 0; font-variant-numeric: tabular-nums; }
+  .tilt { text-align: right; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 0 16px calc(env(safe-area-inset-bottom) + 16px);
+    display: flex; gap: 10px; justify-content: center; }
+  button { font: inherit; font-size: 15px; color: var(--fg); background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: 12px 16px; white-space: nowrap;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); touch-action: manipulation; }
+  button:active, button.on { background: rgba(95,180,255,.28); border-color: rgba(95,180,255,.6); }
+  #intro { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; padding: 32px; text-align: center; background: radial-gradient(ellipse at 50% 40%, rgba(20,40,80,.85), rgba(6,10,20,.96)); z-index: 5; }
+  #intro h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: .02em; }
+  #intro p { margin: 0; color: var(--dim); line-height: 1.7; font-size: 14px; max-width: 320px; }
+  #start { font-size: 17px; padding: 14px 34px; background: var(--accent); color: #04121f; border: 0; font-weight: 600; }
+  #toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 78px); transform: translateX(-50%);
+    background: rgba(0,0,0,.6); padding: 8px 14px; border-radius: 10px; font-size: 13px; color: var(--fg);
+    opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud">
+  <div class="meter">残量<b id="level">100%</b></div>
+  <div class="meter tilt">傾き<b id="tilt">0°</b></div>
+</div>
+
+<div class="bar">
+  <button id="pour">💧 注ぐ</button>
+  <button id="reset">リセット</button>
+  <button id="flip" title="センサーの向きが逆のとき">⇅ 軸反転</button>
+</div>
+
+<div id="toast"></div>
+
+<div id="intro">
+  <h1>Glass of Water</h1>
+  <p>スマホを縦に持って傾けたり揺らしたりすると、コップの水が揺れて溢れます。<br>画面を指でなぞると水をかき混ぜられます。</p>
+  <button id="start">はじめる</button>
+  <p style="font-size:12px">センサーが使えない環境では、ドラッグで傾き・フリックで揺れを操作できます。</p>
+</div>
+
+<script>
+// 2D particle fluid (Clavet et al. 2005 double-density relaxation), units: h = 1
+function createSim(opts) {
+  const P = Object.assign({
+    max: 1400,
+    h: 1.0,
+    rho0: 3.0,
+    k: 0.03,
+    kNear: 0.08,
+    sigma: 0.5,
+    beta: 0.3,
+    g: 0.005,
+    r: 0.22,
+    damping: 1.0,
+    maxV: 0.4,
+  }, opts || {});
+
+  const N = P.max;
+  const x = new Float32Array(N), y = new Float32Array(N);
+  const px = new Float32Array(N), py = new Float32Array(N);
+  const vx = new Float32Array(N), vy = new Float32Array(N);
+  const rho = new Float32Array(N), rhoN = new Float32Array(N);
+  const alive = new Uint8Array(N);
+  let count = 0;
+
+  // spatial hash
+  const cellNext = new Int32Array(N);
+  let gridW = 0, gridH = 0, gridX0 = 0, gridY0 = 0, cellHead = new Int32Array(1);
+  const nbr = new Int32Array(N * 64);
+  const nbrQ = new Float32Array(N * 64);
+  const nbrCnt = new Int32Array(N);
+
+  const walls = []; // capsules {ax,ay,bx,by,rad}
+  const bounds = { x0: -40, y0: -40, x1: 40, y1: 40 };
+
+  function setBounds(x0, y0, x1, y1) { bounds.x0 = x0; bounds.y0 = y0; bounds.x1 = x1; bounds.y1 = y1; }
+
+  function add(ax, ay) {
+    if (count >= N) return;
+    const i = count++;
+    x[i] = px[i] = ax; y[i] = py[i] = ay; vx[i] = vy[i] = 0; alive[i] = 1;
+  }
+
+  function compact() {
+    let j = 0;
+    for (let i = 0; i < count; i++) {
+      if (!alive[i]) continue;
+      if (i !== j) { x[j] = x[i]; y[j] = y[i]; px[j] = px[i]; py[j] = py[i]; vx[j] = vx[i]; vy[j] = vy[i]; alive[j] = 1; }
+      j++;
+    }
+    for (let i = j; i < count; i++) alive[i] = 0;
+    const removed = count - j;
+    count = j;
+    return removed;
+  }
+
+  function buildGrid() {
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (let i = 0; i < count; i++) {
+      if (x[i] < minx) minx = x[i]; if (x[i] > maxx) maxx = x[i];
+      if (y[i] < miny) miny = y[i]; if (y[i] > maxy) maxy = y[i];
+    }
+    gridX0 = Math.floor(minx) - 1; gridY0 = Math.floor(miny) - 1;
+    gridW = Math.max(1, Math.floor(maxx) - gridX0 + 2);
+    gridH = Math.max(1, Math.floor(maxy) - gridY0 + 2);
+    const sz = gridW * gridH;
+    if (cellHead.length < sz) cellHead = new Int32Array(sz * 2);
+    cellHead.fill(-1, 0, sz);
+    for (let i = 0; i < count; i++) {
+      const c = ((y[i] - gridY0) | 0) * gridW + ((x[i] - gridX0) | 0);
+      cellNext[i] = cellHead[c]; cellHead[c] = i;
+    }
+  }
+
+  function findNeighbors() {
+    for (let i = 0; i < count; i++) {
+      nbrCnt[i] = 0;
+      const cx = (x[i] - gridX0) | 0, cy = (y[i] - gridY0) | 0;
+      const base = i * 64;
+      let n = 0;
+      for (let oy = -1; oy <= 1; oy++) {
+        const yy = cy + oy; if (yy < 0 || yy >= gridH) continue;
+        for (let ox = -1; ox <= 1; ox++) {
+          const xx = cx + ox; if (xx < 0 || xx >= gridW) continue;
+          let j = cellHead[yy * gridW + xx];
+          while (j !== -1) {
+            if (j > i) {
+              const dx = x[j] - x[i], dy = y[j] - y[i];
+              const d2 = dx * dx + dy * dy;
+              if (d2 < 1 && n < 64) { nbr[base + n] = j; nbrQ[base + n] = Math.sqrt(d2); n++; }
+            }
+            j = cellNext[j];
+          }
+        }
+      }
+      nbrCnt[i] = n;
+    }
+  }
+
+  function collide() {
+    const r = P.r;
+    for (let w = 0; w < walls.length; w++) {
+      const W = walls[w];
+      const ex = W.bx - W.ax, ey = W.by - W.ay;
+      const len2 = ex * ex + ey * ey;
+      const R = W.rad + r;
+      for (let i = 0; i < count; i++) {
+        let t = ((x[i] - W.ax) * ex + (y[i] - W.ay) * ey) / len2;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+        const cx = W.ax + ex * t, cy = W.ay + ey * t;
+        let dx = x[i] - cx, dy = y[i] - cy;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= R * R) continue;
+        // side from previous position to avoid tunnelling
+        let qx = px[i] - cx, qy = py[i] - cy;
+        let d = Math.sqrt(d2);
+        let nx, ny;
+        if (dx * qx + dy * qy < 0 && (qx * qx + qy * qy) > 1e-8) {
+          const ql = Math.sqrt(qx * qx + qy * qy); nx = qx / ql; ny = qy / ql; d = -d;
+        } else if (d > 1e-6) { nx = dx / d; ny = dy / d; }
+        else { nx = -ey; ny = ex; const l = Math.sqrt(nx * nx + ny * ny); nx /= l; ny /= l; }
+        const push = R - d;
+        x[i] += nx * push; y[i] += ny * push;
+        // friction: reduce tangential motion relative to prev
+        const mvx = x[i] - px[i], mvy = y[i] - py[i];
+        const vn = mvx * nx + mvy * ny;
+        const tx = mvx - vn * nx, ty = mvy - vn * ny;
+        x[i] -= tx * 0.08; y[i] -= ty * 0.08;
+      }
+    }
+  }
+
+  function step(gx, gy) {
+    const n = count;
+    if (!n) return 0;
+    for (let i = 0; i < n; i++) {
+      vx[i] = vx[i] * P.damping + gx * P.g;
+      vy[i] = vy[i] * P.damping + gy * P.g;
+    }
+    buildGrid();
+    findNeighbors();
+    // viscosity
+    if (P.beta > 0 || P.sigma > 0) {
+      for (let i = 0; i < n; i++) {
+        const base = i * 64, m = nbrCnt[i];
+        for (let k = 0; k < m; k++) {
+          const j = nbr[base + k], d = nbrQ[base + k];
+          if (d < 1e-6) continue;
+          const rx = (x[j] - x[i]) / d, ry = (y[j] - y[i]) / d;
+          const u = (vx[i] - vx[j]) * rx + (vy[i] - vy[j]) * ry;
+          if (u > 0) {
+            const q = 1 - d;
+            const I = 0.5 * q * (P.sigma * u + P.beta * u * u);
+            vx[i] -= I * rx; vy[i] -= I * ry; vx[j] += I * rx; vy[j] += I * ry;
+          }
+        }
+      }
+    }
+    const mv = P.maxV;
+    for (let i = 0; i < n; i++) {
+      let sx = vx[i], sy = vy[i];
+      const s2 = sx * sx + sy * sy;
+      if (s2 > mv * mv) { const s = mv / Math.sqrt(s2); sx *= s; sy *= s; }
+      px[i] = x[i]; py[i] = y[i];
+      x[i] += sx; y[i] += sy;
+    }
+    // recompute neighbor distances after advection (reuse lists)
+    for (let i = 0; i < n; i++) { rho[i] = 0; rhoN[i] = 0; }
+    for (let i = 0; i < n; i++) {
+      const base = i * 64, m = nbrCnt[i];
+      for (let k = 0; k < m; k++) {
+        const j = nbr[base + k];
+        const dx = x[j] - x[i], dy = y[j] - y[i];
+        const d = Math.sqrt(dx * dx + dy * dy);
+        nbrQ[base + k] = d;
+        if (d < 1) { const q = 1 - d, q2 = q * q; rho[i] += q2; rho[j] += q2; rhoN[i] += q2 * q; rhoN[j] += q2 * q; }
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      const Pi = P.k * (rho[i] - P.rho0), PNi = P.kNear * rhoN[i];
+      const base = i * 64, m = nbrCnt[i];
+      let dxi = 0, dyi = 0;
+      for (let k = 0; k < m; k++) {
+        const j = nbr[base + k], d = nbrQ[base + k];
+        if (d >= 1 || d < 1e-6) continue;
+        const q = 1 - d;
+        const Pj = P.k * (rho[j] - P.rho0), PNj = P.kNear * rhoN[j];
+        const D = 0.5 * ((Pi + Pj) * 0.5 * q + (PNi + PNj) * 0.5 * q * q);
+        const ux = (x[j] - x[i]) / d * D, uy = (y[j] - y[i]) / d * D;
+        x[j] += ux; y[j] += uy; dxi -= ux; dyi -= uy;
+      }
+      x[i] += dxi; y[i] += dyi;
+    }
+    collide();
+    let removed = 0;
+    const b = bounds;
+    for (let i = 0; i < n; i++) {
+      vx[i] = x[i] - px[i]; vy[i] = y[i] - py[i];
+      if (x[i] < b.x0 || x[i] > b.x1 || y[i] < b.y0 || y[i] > b.y1 || x[i] !== x[i]) { alive[i] = 0; removed++; }
+    }
+    if (removed) compact();
+    return removed;
+  }
+
+  function impulse(cx, cy, dvx, dvy, rad) {
+    const r2 = rad * rad;
+    for (let i = 0; i < count; i++) {
+      const dx = x[i] - cx, dy = y[i] - cy, d2 = dx * dx + dy * dy;
+      if (d2 < r2) { const w = 1 - d2 / r2; vx[i] += dvx * w; vy[i] += dvy * w; }
+    }
+  }
+
+  return {
+    P, x, y, vx, vy, walls, add, step, setBounds, impulse,
+    get count() { return count; },
+    clear() { count = 0; alive.fill(0); },
+  };
+}
+if (typeof module !== 'undefined') module.exports = { createSim };
+
+</script>
+<script>
+(() => {
+'use strict';
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const fieldCanvas = document.createElement('canvas');
+const fctx = fieldCanvas.getContext('2d');
+
+// ---------- Cup geometry (sim units, y down, rim at y=0) ----------
+const Wb = 10, Wt = 12.5, H = 14, T = 0.5, BASE = 1.8;
+const FILL = 0.70, SP = 0.38;
+const SUB_PER_FRAME = 5;           // physics substeps per 60 Hz frame
+const STEP_DT = 1 / (60 * SUB_PER_FRAME);
+
+const sim = createSim({ max: 1500 });
+sim.walls.push({ ax: -Wb / 2 - T, ay: H + T, bx: -Wt / 2 - T, by: 0, rad: T });
+sim.walls.push({ ax: Wb / 2 + T, ay: H + T, bx: Wt / 2 + T, by: 0, rad: T });
+sim.walls.push({ ax: -Wb / 2 - T, ay: H + T, bx: Wb / 2 + T, by: H + T, rad: T });
+
+let fullCount = 1;
+function refill() {
+  sim.clear();
+  const top = H * (1 - FILL);
+  for (let yy = H - SP / 2; yy > top; yy -= SP) {
+    const t = yy / H, half = (Wt + (Wb - Wt) * t) / 2 - 0.2;
+    for (let xx = -half + SP / 2; xx < half; xx += SP) sim.add(xx + (Math.random() - .5) * .04, yy);
+  }
+  fullCount = sim.count;
+}
+refill();
+
+// ---------- Layout ----------
+let W = 0, Hs = 0, dpr = 1, S = 16, cx = 0, cy = 0;
+const CELL = 3;                   // field resolution in CSS px
+let fw = 0, fh = 0, field, foam, img;
+const KR = 0.78;                  // render kernel radius (sim units)
+
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; Hs = window.innerHeight;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(Hs * dpr);
+  S = Math.min(W * 0.62 / (Wt + 2 * T), Hs * 0.52 / (H + BASE + T));
+  cx = W / 2; cy = Hs * 0.52;
+  fw = Math.ceil(W / CELL); fh = Math.ceil(Hs / CELL);
+  fieldCanvas.width = fw; fieldCanvas.height = fh;
+  field = new Float32Array(fw * fh); foam = new Float32Array(fw * fh);
+  img = fctx.createImageData(fw, fh);
+  const m = 3;
+  sim.setBounds(-cx / S - m, (0 - cy) / S + H / 2 - m, cx / S + m, (Hs - cy) / S + H / 2 + m);
+  buildGlassCache();
+}
+const toScreenX = X => cx + X * S;
+const toScreenY = Y => cy + (Y - H / 2) * S;
+const toSimX = sx => (sx - cx) / S;
+const toSimY = sy => (sy - cy) / S + H / 2;
+
+// ---------- Gravity input ----------
+// Effective gravity in screen space, in units of g (includes shake acceleration).
+const grav = { x: 0, y: 1 };
+let target = { x: 0, y: 1 };
+let mode = 'none';                // 'sensor' | 'pointer'
+let signFix = -1;                 // spec: accelerationIncludingGravity points UP -> down = -a
+let signVote = 0, manualFlip = 1;
+let lastOrient = null, lastDir = { x: 0, y: 1 }, motionSeen = false;
+
+function screenAngle() {
+  if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+  return typeof window.orientation === 'number' ? window.orientation : 0;
+}
+
+function onOrientation(e) {
+  if (e.beta == null) return;
+  lastOrient = { b: e.beta * Math.PI / 180, g: (e.gamma || 0) * Math.PI / 180 };
+}
+
+function onMotion(e) {
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.x == null) return;
+  motionSeen = true;
+  // Auto-detect sign convention using orientation-derived "down" vector.
+  if (lastOrient && Math.abs(signVote) < 60) {
+    const { b, g } = lastOrient;
+    const dx = Math.cos(b) * Math.sin(g), dy = -Math.sin(b), dz = -Math.cos(b) * Math.cos(g);
+    const dot = (a.x * dx + a.y * dy + a.z * dz) / 9.81;
+    if (Math.abs(dot) > 0.5) { signVote += dot > 0 ? 1 : -1; signFix = signVote > 0 ? 1 : -1; }
+  }
+  const s = signFix * manualFlip / 9.81;
+  const devX = a.x * s, devY = a.y * s;        // device frame: x right, y up
+  const th = screenAngle() * Math.PI / 180;
+  const sx = devX * Math.cos(th) - devY * Math.sin(th);
+  const sUp = devX * Math.sin(th) + devY * Math.cos(th);
+  target = { x: sx, y: -sUp };
+}
+
+// Pointer fallback / stirring
+let ptr = null, ptrTilt = 0, ptrShake = { x: 0, y: 0 };
+canvas.addEventListener('pointerdown', e => {
+  ptr = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now(), sx: e.clientX, tilt0: ptrTilt };
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => {
+  if (!ptr || e.pointerId !== ptr.id) return;
+  const now = performance.now(), dt = Math.max(8, now - ptr.t);
+  const vxp = (e.clientX - ptr.x) / dt, vyp = (e.clientY - ptr.y) / dt; // px/ms
+  if (mode === 'pointer') {
+    ptrTilt = Math.max(-Math.PI * 0.95, Math.min(Math.PI * 0.95, ptr.tilt0 + (e.clientX - ptr.sx) / (W * 0.45) * Math.PI / 2));
+    ptrShake.x = Math.max(-3, Math.min(3, ptrShake.x - vxp * 0.9));
+    ptrShake.y = Math.max(-3, Math.min(3, ptrShake.y - vyp * 0.9));
+  } else {
+    // stir the water with the finger
+    const X = toSimX(e.clientX), Y = toSimY(e.clientY);
+    const k = 1000 / S * STEP_DT * 0.5;   // px/ms -> sim units/step
+    sim.impulse(X, Y, vxp * k, vyp * k, 1.6);
+  }
+  ptr.x = e.clientX; ptr.y = e.clientY; ptr.t = now;
+});
+const endPtr = e => { if (ptr && e.pointerId === ptr.id) ptr = null; };
+canvas.addEventListener('pointerup', endPtr);
+canvas.addEventListener('pointercancel', endPtr);
+window.addEventListener('keydown', e => {
+  if (mode !== 'pointer') return;
+  if (e.key === 'ArrowLeft') ptrTilt -= 0.12;
+  if (e.key === 'ArrowRight') ptrTilt += 0.12;
+  if (e.key === ' ') ptrShake.x += (Math.random() < .5 ? -1 : 1) * 3;
+});
+
+function updateGravity() {
+  if (mode === 'pointer') {
+    ptrShake.x *= 0.85; ptrShake.y *= 0.85;
+    target = { x: Math.sin(ptrTilt) + ptrShake.x, y: Math.cos(ptrTilt) + ptrShake.y };
+  }
+  // light low-pass to remove sensor noise but keep shakes
+  grav.x += (target.x - grav.x) * 0.55;
+  grav.y += (target.y - grav.y) * 0.55;
+  let m = Math.hypot(grav.x, grav.y);
+  let gx = grav.x, gy = grav.y;
+  if (m > 0.2) lastDir = { x: gx / m, y: gy / m };
+  // phone lying flat: keep a minimum in-plane pull so the water doesn't float
+  if (m < 0.3) { gx = lastDir.x * 0.3; gy = lastDir.y * 0.3; m = 0.3; }
+  if (m > 4) { gx *= 4 / m; gy *= 4 / m; }
+  return { x: gx, y: gy };
+}
+
+// ---------- Pour ----------
+let pouring = false, pourT = 0;
+function pourStep(g) {
+  const m = Math.hypot(g.x, g.y) || 1, ux = g.x / m, uy = g.y / m;
+  // spout sits "above" the cup relative to current gravity
+  const ox = 0 - ux * 5, oy = H / 2 - uy * (H / 2 + 5);
+  pourT++;
+  const off = (pourT % 3 - 1) * 0.16;
+  sim.add(ox - uy * off, oy + ux * off);
+  const i = sim.count - 1;
+  if (i >= 0) { sim.vx[i] = ux * 0.26; sim.vy[i] = uy * 0.26; }
+}
+
+// ---------- Rendering ----------
+let glassBack = null, glassFront = null;
+function wallPath(c) {
+  c.beginPath();
+  c.moveTo(toScreenX(-Wt / 2 - T), toScreenY(0));
+  c.lineTo(toScreenX(-Wb / 2 - T), toScreenY(H + T));
+  c.lineTo(toScreenX(Wb / 2 + T), toScreenY(H + T));
+  c.lineTo(toScreenX(Wt / 2 + T), toScreenY(0));
+}
+function makeLayer() { const cv = document.createElement('canvas'); cv.width = canvas.width; cv.height = canvas.height; const c = cv.getContext('2d'); c.scale(dpr, dpr); return [cv, c]; }
+
+function buildGlassCache() {
+  // background
+  let [bg, b] = makeLayer();
+  const grd = b.createRadialGradient(cx, cy - Hs * 0.1, 10, cx, cy, Math.max(W, Hs) * 0.8);
+  grd.addColorStop(0, '#1a2a48'); grd.addColorStop(1, '#070b16');
+  b.fillStyle = grd; b.fillRect(0, 0, W, Hs);
+  // interior tint
+  b.beginPath();
+  b.moveTo(toScreenX(-Wt / 2), toScreenY(0)); b.lineTo(toScreenX(-Wb / 2), toScreenY(H));
+  b.lineTo(toScreenX(Wb / 2), toScreenY(H)); b.lineTo(toScreenX(Wt / 2), toScreenY(0)); b.closePath();
+  const ig = b.createLinearGradient(toScreenX(-Wt / 2), 0, toScreenX(Wt / 2), 0);
+  ig.addColorStop(0, 'rgba(255,255,255,.06)'); ig.addColorStop(.5, 'rgba(255,255,255,.015)'); ig.addColorStop(1, 'rgba(255,255,255,.05)');
+  b.fillStyle = ig; b.fill();
+  glassBack = bg;
+
+  // front glass
+  let [fg, f] = makeLayer();
+  f.lineJoin = 'round'; f.lineCap = 'round';
+  // base (thick glass bottom)
+  const bx0 = toScreenX(-Wb / 2 - 2 * T), bx1 = toScreenX(Wb / 2 + 2 * T), by0 = toScreenY(H + T), by1 = toScreenY(H + BASE);
+  const bgrad = f.createLinearGradient(0, by0, 0, by1);
+  bgrad.addColorStop(0, 'rgba(190,225,255,.30)'); bgrad.addColorStop(1, 'rgba(190,225,255,.12)');
+  f.fillStyle = bgrad;
+  roundRect(f, bx0, by0 - T * S * 0.2, bx1 - bx0, by1 - by0 + T * S * 0.2, Math.min(10, S * 0.6)); f.fill();
+  f.strokeStyle = 'rgba(255,255,255,.35)'; f.lineWidth = 1; f.stroke();
+  // walls
+  wallPath(f);
+  f.strokeStyle = 'rgba(190,225,255,.20)'; f.lineWidth = 2 * T * S; f.stroke();
+  // inner and outer edges
+  for (const [off, a] of [[-T, .55], [T, .30]]) {
+    f.beginPath();
+    f.moveTo(toScreenX(-Wt / 2 - T - off), toScreenY(0));
+    f.lineTo(toScreenX(-Wb / 2 - T - off), toScreenY(H + T - off * 0));
+    f.moveTo(toScreenX(Wt / 2 + T + off), toScreenY(0));
+    f.lineTo(toScreenX(Wb / 2 + T + off), toScreenY(H + T - off * 0));
+    f.strokeStyle = `rgba(255,255,255,${a})`; f.lineWidth = 1.2; f.stroke();
+  }
+  // rim highlights
+  for (const sgn of [-1, 1]) {
+    f.beginPath(); f.arc(toScreenX(sgn * (Wt / 2 + T)), toScreenY(0), T * S, 0, Math.PI * 2);
+    f.fillStyle = 'rgba(220,240,255,.35)'; f.fill();
+  }
+  // specular streaks
+  const sx = toScreenX(-Wt / 2 + 1.2), sx2 = toScreenX(-Wb / 2 + 1.0);
+  const sg = f.createLinearGradient(0, toScreenY(0), 0, toScreenY(H));
+  sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(.25, 'rgba(255,255,255,.16)');
+  sg.addColorStop(.8, 'rgba(255,255,255,.10)'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+  f.beginPath(); f.moveTo(sx, toScreenY(0.6)); f.lineTo(sx2, toScreenY(H - 0.6));
+  f.strokeStyle = sg; f.lineWidth = S * 0.55; f.stroke();
+  f.beginPath(); f.moveTo(sx + S * 0.9, toScreenY(1.5)); f.lineTo(sx2 + S * 0.8, toScreenY(H * 0.55));
+  f.lineWidth = S * 0.15; f.stroke();
+  const rx = toScreenX(Wt / 2 - 0.9), rx2 = toScreenX(Wb / 2 - 0.8);
+  f.beginPath(); f.moveTo(rx, toScreenY(1)); f.lineTo(rx2, toScreenY(H - 1));
+  f.strokeStyle = 'rgba(255,255,255,.06)'; f.lineWidth = S * 0.35; f.stroke();
+  glassFront = fg;
+}
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+function renderWater() {
+  field.fill(0); foam.fill(0);
+  const n = sim.count, X = sim.x, Y = sim.y, VX = sim.vx, VY = sim.vy;
+  const R = KR * S / CELL, R2 = R * R, invR2 = 1 / R2;
+  const vScale = 1 / (sim.P.maxV * 0.5);
+  for (let i = 0; i < n; i++) {
+    const px = (cx + X[i] * S) / CELL, py = (cy + (Y[i] - H / 2) * S) / CELL;
+    const spd = Math.hypot(VX[i], VY[i]) * vScale;
+    const x0 = Math.max(0, Math.floor(px - R)), x1 = Math.min(fw - 1, Math.ceil(px + R));
+    const y0 = Math.max(0, Math.floor(py - R)), y1 = Math.min(fh - 1, Math.ceil(py + R));
+    for (let yy = y0; yy <= y1; yy++) {
+      const dy = yy + 0.5 - py, dy2 = dy * dy, row = yy * fw;
+      for (let xx = x0; xx <= x1; xx++) {
+        const dx = xx + 0.5 - px, d2 = (dx * dx + dy2) * invR2;
+        if (d2 >= 1) continue;
+        const q = 1 - d2, w = q * q * q;
+        field[row + xx] += w; foam[row + xx] += w * spd;
+      }
+    }
+  }
+  const d = img.data, len = fw * fh;
+  for (let k = 0, p = 0; k < len; k++, p += 4) {
+    const f = field[k];
+    if (f < 0.3) { d[p + 3] = 0; continue; }
+    let a = (f - 0.3) / 0.3; if (a > 1) a = 1; a = a * a * (3 - 2 * a);
+    // near-surface lightening
+    let e = 1 - (f - 0.55) / 1.4; if (e < 0) e = 0; else if (e > 1) e = 1;
+    let fo = (foam[k] / f - 0.55) * 0.8; if (fo < 0) fo = 0; else if (fo > 0.4) fo = 0.4;
+    let r = 18 + 70 * e, g = 92 + 90 * e, b = 205 + 45 * e;
+    r += (240 - r) * fo; g += (248 - g) * fo; b += (255 - b) * fo;
+    d[p] = r; d[p + 1] = g; d[p + 2] = b; d[p + 3] = a * (0.80 + 0.15 * e + 0.05 * fo) * 255;
+  }
+  fctx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(fieldCanvas, 0, 0, fw * CELL, fh * CELL);
+}
+
+// ---------- HUD ----------
+const levelEl = document.getElementById('level'), tiltEl = document.getElementById('tilt');
+function countInside() {
+  let c = 0; const X = sim.x, Y = sim.y;
+  for (let i = 0; i < sim.count; i++) {
+    const y = Y[i]; if (y < 0 || y > H) continue;
+    const half = (Wt + (Wb - Wt) * (y / H)) / 2;
+    if (Math.abs(X[i]) < half) c++;
+  }
+  return c;
+}
+
+// ---------- Main loop ----------
+let last = performance.now(), acc = 0, hudT = 0, running = false;
+function frame(now) {
+  let dt = (now - last) / 1000; last = now;
+  if (dt > 0.05) dt = 0.05;
+  acc += dt;
+  const g = updateGravity();
+  let steps = 0;
+  while (acc >= STEP_DT && steps < 10) {
+    if (pouring) pourStep(g);
+    sim.step(g.x, g.y);
+    acc -= STEP_DT; steps++;
+  }
+  if (steps === 10) acc = 0;
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.drawImage(glassBack, 0, 0, W, Hs);
+  renderWater();
+  ctx.drawImage(glassFront, 0, 0, W, Hs);
+
+  if (now - hudT > 120) {
+    hudT = now;
+    levelEl.textContent = Math.round(countInside() / fullCount * 100) + '%';
+    const ang = Math.atan2(grav.x, grav.y) * 180 / Math.PI;
+    tiltEl.textContent = Math.round(ang) + '°';
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---------- UI ----------
+const toastEl = document.getElementById('toast');
+let toastTimer = 0;
+function toast(msg, ms = 2600) {
+  toastEl.textContent = msg; toastEl.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
+}
+
+const pourBtn = document.getElementById('pour');
+const startPour = e => { e.preventDefault(); pouring = true; pourBtn.classList.add('on'); };
+const stopPour = () => { pouring = false; pourBtn.classList.remove('on'); };
+pourBtn.addEventListener('pointerdown', startPour);
+pourBtn.addEventListener('pointerup', stopPour);
+pourBtn.addEventListener('pointerleave', stopPour);
+pourBtn.addEventListener('pointercancel', stopPour);
+pourBtn.addEventListener('contextmenu', e => e.preventDefault());
+document.getElementById('reset').addEventListener('click', refill);
+document.getElementById('flip').addEventListener('click', () => {
+  if (mode !== 'sensor') { toast('センサー使用時のみ有効です'); return; }
+  manualFlip *= -1; toast(manualFlip < 0 ? 'センサー軸を反転しました' : 'センサー軸を元に戻しました');
+});
+
+function usePointer(msg) {
+  mode = 'pointer';
+  window.removeEventListener('devicemotion', onMotion);
+  if (msg) toast(msg, 4000);
+}
+
+document.getElementById('start').addEventListener('click', async () => {
+  document.getElementById('intro').style.display = 'none';
+  if (!running) { running = true; last = performance.now(); requestAnimationFrame(frame); }
+  const hasMotion = typeof DeviceMotionEvent !== 'undefined';
+  if (!hasMotion) { usePointer('ドラッグで傾け、フリックで揺らせます'); return; }
+  try {
+    const reqs = [];
+    if (typeof DeviceMotionEvent.requestPermission === 'function') reqs.push(DeviceMotionEvent.requestPermission());
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function')
+      reqs.push(DeviceOrientationEvent.requestPermission().catch(() => 'denied'));
+    const res = await Promise.all(reqs);
+    if (res.length && res[0] !== 'granted') { usePointer('センサーが許可されませんでした。ドラッグで操作できます'); return; }
+  } catch (err) {
+    usePointer(location.protocol !== 'https:' ? 'センサーにはHTTPSが必要です。ドラッグで操作できます' : 'センサーを使えません。ドラッグで操作できます');
+    return;
+  }
+  mode = 'sensor';
+  window.addEventListener('devicemotion', onMotion);
+  window.addEventListener('deviceorientation', onOrientation);
+  setTimeout(() => {
+    if (!motionSeen) usePointer('センサーの値が届きません。ドラッグで操作できます');
+    else toast('傾けたり揺らしたりしてみてください');
+  }, 1200);
+});
+
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+resize();
+// draw a still frame behind the intro
+ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+for (let i = 0; i < 300; i++) sim.step(0, 1);
+ctx.drawImage(glassBack, 0, 0, W, Hs); renderWater(); ctx.drawImage(glassFront, 0, 0, W, Hs);
+})();
+</script>
+</body>
+</html>
