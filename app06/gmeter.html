@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0d10">
+<title>Gメーター</title>
+<style>
+  :root {
+    --bg: #0b0d10; --panel: #15191f; --line: #262c35; --text: #e8ecf1; --dim: #8a94a3;
+    --accent: #3ad1a0; --brake: #ff5d5d; --warn: #ffb547; --lat: #5aa9ff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; }
+  body { display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    overscroll-behavior: none; user-select: none; -webkit-user-select: none; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px 4px; }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .02em; }
+  #status { font-size: 12px; color: var(--dim); }
+  #status.ok { color: var(--accent); }
+  #status.warn { color: var(--warn); }
+  main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #stage { flex: 1; min-height: 240px; position: relative; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px 16px; }
+  .cell { background: var(--panel); border-radius: 12px; padding: 8px 10px; }
+  .cell .k { font-size: 11px; color: var(--dim); }
+  .cell .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .cell .v small { font-size: 12px; font-weight: 500; color: var(--dim); margin-left: 2px; }
+  .max { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 0 16px 8px; }
+  .max .cell { padding: 6px 8px; }
+  .max .v { font-size: 17px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 16px 12px; }
+  button { flex: 1 1 30%; min-height: 44px; border: 1px solid var(--line); background: var(--panel);
+    color: var(--text); border-radius: 12px; font-size: 14px; font-weight: 600; }
+  button:active { transform: scale(.98); }
+  button.primary { background: var(--accent); color: #05261b; border-color: transparent; }
+  button.active { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; }
+  #overlay { position: fixed; inset: 0; background: rgba(5,7,9,.92); display: flex; align-items: center;
+    justify-content: center; z-index: 10; padding: 24px; }
+  #overlay.hidden { display: none; }
+  .card { background: var(--panel); border-radius: 18px; padding: 22px; max-width: 420px; width: 100%; }
+  .card h2 { margin: 0 0 10px; font-size: 20px; }
+  .card p, .card li { font-size: 14px; line-height: 1.6; color: #c7ced8; }
+  .card ol { padding-left: 20px; margin: 8px 0 16px; }
+  .card button { width: 100%; margin-top: 8px; }
+  #toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: #222a33; color: var(--text); padding: 10px 16px; border-radius: 999px; font-size: 13px;
+    opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 20; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+  details { padding: 0 16px 14px; color: var(--dim); font-size: 13px; }
+  details summary { cursor: pointer; padding: 6px 0; }
+  .row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+  .row label { flex: 0 0 90px; }
+  .row input[type=range] { flex: 1; }
+  .row .val { width: 42px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+  @media (orientation: landscape) and (max-height: 500px) {
+    main { flex-direction: row; }
+    #stage { flex: 1.2; }
+    .side { flex: 1; overflow-y: auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Gメーター</h1>
+  <span id="status">未開始</span>
+</header>
+
+<main>
+  <div id="stage"><canvas id="gcanvas"></canvas></div>
+  <div class="side">
+    <div class="readout">
+      <div class="cell"><div class="k">前後</div><div class="v" id="vLon">0.00<small>G</small></div></div>
+      <div class="cell"><div class="k">横</div><div class="v" id="vLat">0.00<small>G</small></div></div>
+      <div class="cell"><div class="k" id="kSpeed">合成</div><div class="v" id="vTot">0.00<small>G</small></div></div>
+    </div>
+    <div class="max">
+      <div class="cell"><div class="k">最大 加速</div><div class="v" id="mAcc">0.00</div></div>
+      <div class="cell"><div class="k">最大 減速</div><div class="v" id="mBrk">0.00</div></div>
+      <div class="cell"><div class="k">最大 左</div><div class="v" id="mL">0.00</div></div>
+      <div class="cell"><div class="k">最大 右</div><div class="v" id="mR">0.00</div></div>
+    </div>
+    <div class="controls">
+      <button id="btnCal">① 停車補正</button>
+      <button id="btnLearn">② 前方学習</button>
+      <button id="btnReset">最大値リセット</button>
+      <button id="btnFlipF">前後反転</button>
+      <button id="btnFlipL">左右反転</button>
+      <button id="btnScale">表示 1.0G</button>
+    </div>
+    <details>
+      <summary>設定</summary>
+      <div class="row"><label>平滑化</label><input type="range" id="rSmooth" min="0" max="0.95" step="0.05"><span class="val" id="sSmooth"></span></div>
+      <div class="row"><label>軌跡の長さ</label><input type="range" id="rTrail" min="0" max="10" step="1"><span class="val" id="sTrail"></span></div>
+      <div class="row"><label>速度表示</label><button id="btnGps" style="flex:1">GPSで速度を表示</button></div>
+      <div class="row"><label>デモ</label><button id="btnDemo" style="flex:1">センサーなしで動作確認</button></div>
+    </details>
+  </div>
+</main>
+
+<div id="overlay">
+  <div class="card">
+    <h2>はじめに</h2>
+    <ol>
+      <li>iPhoneをホルダーにしっかり固定します（向きは自由）。</li>
+      <li>「開始」をタップして、モーションセンサーへのアクセスを許可します。</li>
+      <li><b>停車中</b>に「① 停車補正」をタップします（1.5秒、動かさない）。</li>
+      <li>「② 前方学習」をタップしてから、まっすぐ発進します（省略した場合は自動で推定します）。</li>
+    </ol>
+    <p style="font-size:12px;color:var(--dim)">運転中は操作しないでください。操作は停車中に、または同乗者が行ってください。</p>
+    <button class="primary" id="btnStart">開始</button>
+    <button id="btnStartDemo">デモで試す</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+(() => {
+  const G0 = 9.80665;
+  const $ = id => document.getElementById(id);
+
+  // ---------- 設定 ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('gm_' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('gm_' + k, JSON.stringify(v)); } catch {} }
+  };
+  const S = {
+    smooth: store.get('smooth', 0.8),
+    trailSec: store.get('trailSec', 3),
+    scale: store.get('scale', 1.0),
+    flipF: store.get('flipF', false),
+    flipL: store.get('flipL', false),
+    up: store.get('up', null),       // 重力方向（単位ベクトル、端末座標）
+    fwd: store.get('fwd', null),     // 前方向（単位ベクトル、端末座標、水平面上）
+  };
+
+  // ---------- ベクトル ----------
+  const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+  const mul = (a, s) => [a[0]*s, a[1]*s, a[2]*s];
+  const len = a => Math.hypot(a[0], a[1], a[2]);
+  const norm = a => { const l = len(a); return l > 1e-9 ? mul(a, 1/l) : [0,0,0]; };
+  const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+  const horiz = (v, u) => sub(v, mul(u, dot(v, u)));
+
+  // ---------- 状態 ----------
+  let running = false, demo = false, demoT = 0;
+  let lastIncl = [0, 0, -G0], gravityCal = null;
+  let lon = 0, lat = 0;                 // 平滑化後（G）
+  let max = { acc: 0, brk: 0, l: 0, r: 0 };
+  const trail = [];                     // {t, x, y}
+  let calibrating = null, learning = null;
+  let lastEventAt = 0, gotSensor = false;
+  let speedKmh = null, gpsWatch = null;
+  let wakeLock = null;
+
+  // ---------- UI ヘルパー ----------
+  const toastEl = $('toast'); let toastTimer;
+  function toast(msg, ms = 2200) {
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
+  }
+  function setStatus(text, cls = '') { const s = $('status'); s.textContent = text; s.className = cls; }
+  function refreshButtons() {
+    $('btnFlipF').classList.toggle('active', S.flipF);
+    $('btnFlipL').classList.toggle('active', S.flipL);
+    $('btnScale').textContent = `表示 ${S.scale.toFixed(1)}G`;
+    $('rSmooth').value = S.smooth; $('sSmooth').textContent = S.smooth.toFixed(2);
+    $('rTrail').value = S.trailSec; $('sTrail').textContent = S.trailSec + '秒';
+    $('btnCal').classList.toggle('active', !!S.up);
+    $('btnLearn').classList.toggle('active', !!S.fwd);
+  }
+
+  // ---------- 軸の決定 ----------
+  function axes() {
+    const u = S.up || [0, 0, 1];
+    let f = S.fwd;
+    if (!f) {
+      // 自動推定：端末のz軸（画面の法線）が水平に近ければそれを前方向、そうでなければy軸
+      const hz = horiz([0,0,-1], u), hy = horiz([0,1,0], u);
+      f = norm(len(hz) > len(hy) ? hz : hy);
+    }
+    if (S.flipF) f = mul(f, -1);
+    let l = norm(cross(f, u));
+    if (S.flipL) l = mul(l, -1);
+    return { u, f, l };
+  }
+
+  // ---------- センサー処理 ----------
+  function onMotion(e) {
+    const gi = e.accelerationIncludingGravity;
+    if (!gi || gi.x === null) return;
+    gotSensor = true; lastEventAt = performance.now();
+    const incl = [gi.x, gi.y, gi.z];
+    lastIncl = incl;
+    let lin;
+    const a = e.acceleration;
+    if (a && a.x !== null) lin = [a.x, a.y, a.z];
+    else lin = gravityCal ? sub(incl, gravityCal) : [0, 0, 0];
+    processSample(incl, lin);
+  }
+
+  function processSample(incl, lin) {
+    if (calibrating) {
+      calibrating.sum = [calibrating.sum[0]+incl[0], calibrating.sum[1]+incl[1], calibrating.sum[2]+incl[2]];
+      calibrating.sq += len(lin) ** 2;
+      calibrating.n++;
+      return;
+    }
+    const { u, f, l } = axes();
+    const h = horiz(lin, u);
+
+    if (learning) {
+      const mag = len(h) / G0;
+      if (mag > 0.08) {
+        learning.sum = [learning.sum[0]+h[0], learning.sum[1]+h[1], learning.sum[2]+h[2]];
+        learning.n++;
+        if (learning.n >= 45) finishLearn();
+      }
+    }
+
+    const rawLon = dot(h, f) / G0;
+    const rawLat = dot(h, l) / G0;
+    const k = S.smooth;
+    lon = k * lon + (1 - k) * rawLon;
+    lat = k * lat + (1 - k) * rawLat;
+
+    if (lon > max.acc) max.acc = lon;
+    if (-lon > max.brk) max.brk = -lon;
+    if (-lat > max.l) max.l = -lat;
+    if (lat > max.r) max.r = lat;
+
+    const now = performance.now();
+    trail.push({ t: now, x: lat, y: lon });
+    const cutoff = now - S.trailSec * 1000;
+    while (trail.length && trail[0].t < cutoff) trail.shift();
+  }
+
+  // ---------- 補正 ----------
+  function startCalibration() {
+    if (!running) return toast('先に「開始」してください');
+    calibrating = { sum: [0,0,0], sq: 0, n: 0 };
+    setStatus('補正中… 動かさないで', 'warn');
+    $('btnCal').disabled = true;
+    setTimeout(() => {
+      const c = calibrating; calibrating = null; $('btnCal').disabled = false;
+      if (!c || c.n < 10) { setStatus('補正失敗', 'warn'); return toast('センサー値が取れませんでした'); }
+      const g = mul(c.sum, 1 / c.n);
+      const motion = Math.sqrt(c.sq / c.n) / G0;
+      gravityCal = g;
+      S.up = norm(g); store.set('up', S.up);
+      S.fwd = null; store.set('fwd', null);   // 取り付けが変わった可能性があるので前方向もリセット
+      lon = lat = 0; trail.length = 0; resetMax();
+      refreshButtons();
+      setStatus('計測中', 'ok');
+      toast(motion > 0.05 ? '揺れを検出。停車中に再補正を推奨' : '補正しました。次は ② 前方学習');
+    }, 1500);
+  }
+
+  function startLearn() {
+    if (!running) return toast('先に「開始」してください');
+    if (!S.up) return toast('先に ① 補正を行ってください');
+    learning = { sum: [0,0,0], n: 0 };
+    S.fwd = null; S.flipF = false; S.flipL = false;
+    refreshButtons();
+    setStatus('学習中… まっすぐ発進', 'warn');
+    toast('まっすぐ加速してください');
+    learning.timer = setTimeout(() => {
+      if (learning) { learning = null; setStatus('計測中', 'ok'); toast('学習できませんでした（加速が足りません）'); }
+    }, 30000);
+  }
+  function finishLearn() {
+    const f = norm(horiz(learning.sum, S.up || [0,0,1]));
+    clearTimeout(learning.timer); learning = null;
+    S.fwd = f; store.set('fwd', f);
+    store.set('flipF', S.flipF); store.set('flipL', S.flipL);
+    lon = lat = 0; trail.length = 0; resetMax();
+    refreshButtons(); setStatus('計測中', 'ok');
+    toast('前方向を設定しました。左右が逆なら「左右反転」');
+  }
+
+  function resetMax() {
+    max = { acc: 0, brk: 0, l: 0, r: 0 };
+  }
+
+  // ---------- 開始 ----------
+  async function start() {
+    try {
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        const p = await DeviceMotionEvent.requestPermission();
+        if (p !== 'granted') { toast('モーションセンサーが許可されませんでした'); return; }
+      }
+    } catch (err) {
+      toast('許可を求められませんでした。HTTPSで開いているか確認してください', 4000);
+      return;
+    }
+    window.addEventListener('devicemotion', onMotion);
+    running = true;
+    $('overlay').classList.add('hidden');
+    setStatus(S.up ? '計測中' : '補正してください', S.up ? 'ok' : 'warn');
+    requestWakeLock();
+    setTimeout(() => {
+      if (!gotSensor && !demo) {
+        setStatus('センサー値なし', 'warn');
+        toast('センサーの値が届きません。HTTPSのページをiPhoneで開いてください', 4500);
+      }
+    }, 2000);
+  }
+
+  function startDemo() {
+    demo = true; running = true;
+    $('overlay').classList.add('hidden');
+    S.up = [0, 0, 1]; S.fwd = [0, 1, 0];
+    setStatus('デモ', 'warn');
+    refreshButtons();
+    toast('デモモード：架空の走行データを表示中');
+  }
+
+  function demoStep(dt) {
+    demoT += dt;
+    const t = demoT;
+    // 加速→コーナー→ブレーキを繰り返す架空のデータ
+    const phase = t % 12;
+    let ax = 0, ay = 0;
+    if (phase < 3) ay = 0.3 * Math.sin(phase / 3 * Math.PI);
+    else if (phase < 7) { const p = (phase - 3) / 4; ax = 0.55 * Math.sin(p * Math.PI) * (Math.floor(t / 12) % 2 ? -1 : 1); ay = 0.05; }
+    else if (phase < 9.5) ay = -0.6 * Math.sin((phase - 7) / 2.5 * Math.PI);
+    ax += (Math.random() - .5) * 0.06; ay += (Math.random() - .5) * 0.06;
+    // 端末座標：x=右, y=前, z=上 という想定
+    processSample([0, 0, G0], [ax * G0, ay * G0, 0]);
+  }
+
+  // ---------- 画面ON維持 ----------
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    } catch { /* 非対応・拒否時は無視 */ }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && running && !wakeLock) requestWakeLock();
+  });
+
+  // ---------- GPS ----------
+  function toggleGps() {
+    if (gpsWatch !== null) {
+      navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; speedKmh = null;
+      $('btnGps').textContent = 'GPSで速度を表示'; $('kSpeed').textContent = '合成';
+      return;
+    }
+    if (!('geolocation' in navigator)) return toast('位置情報が使えません');
+    gpsWatch = navigator.geolocation.watchPosition(pos => {
+      const s = pos.coords.speed;
+      speedKmh = (s === null || s < 0) ? null : s * 3.6;
+    }, err => { toast('位置情報エラー: ' + err.message); }, { enableHighAccuracy: true, maximumAge: 0 });
+    $('btnGps').textContent = 'GPSをオフ'; $('kSpeed').textContent = '速度';
+  }
+
+  // ---------- 描画 ----------
+  const cv = $('gcanvas'), ctx = cv.getContext('2d');
+  let W = 0, H = 0, dpr = 1;
+  function resize() {
+    const r = $('stage').getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  new ResizeObserver(resize).observe($('stage'));
+
+  function colorFor(g) {
+    if (g < 0.2) return '#3ad1a0';
+    if (g < 0.4) return '#c8e05a';
+    if (g < 0.6) return '#ffb547';
+    return '#ff5d5d';
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const cx = W / 2, cy = H / 2;
+    const R = Math.min(W, H) / 2 - 22;
+    const px = g => g / S.scale * R;
+
+    // グリッド円
+    const rings = S.scale <= 0.5 ? [0.1, 0.2, 0.3, 0.4, 0.5] : [0.25, 0.5, 0.75, 1.0];
+    ctx.lineWidth = 1;
+    rings.forEach((g, i) => {
+      ctx.strokeStyle = i === rings.length - 1 ? '#3a424e' : '#232932';
+      ctx.beginPath(); ctx.arc(cx, cy, px(g), 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#5c6674'; ctx.font = '10px -apple-system, sans-serif';
+      ctx.fillText(g.toFixed(2).replace(/0$/, ''), cx + 4, cy - px(g) + 12);
+    });
+    ctx.strokeStyle = '#232932';
+    ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+
+    // ラベル
+    ctx.font = '600 12px -apple-system, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#3ad1a0'; ctx.fillText('加速', cx, cy - R - 6);
+    ctx.fillStyle = '#ff5d5d'; ctx.fillText('減速', cx, cy + R + 16);
+    ctx.fillStyle = '#5aa9ff'; ctx.textAlign = 'right'; ctx.fillText('左', cx - R - 4, cy + 4);
+    ctx.textAlign = 'left'; ctx.fillText('右', cx + R + 4, cy + 4);
+    ctx.textAlign = 'start';
+
+    // 最大値の外周マーカー
+    ctx.fillStyle = 'rgba(255,255,255,.35)';
+    const mk = (x, y) => { ctx.beginPath(); ctx.arc(cx + x, cy + y, 2.5, 0, Math.PI * 2); ctx.fill(); };
+    mk(0, -px(Math.min(max.acc, S.scale))); mk(0, px(Math.min(max.brk, S.scale)));
+    mk(-px(Math.min(max.l, S.scale)), 0); mk(px(Math.min(max.r, S.scale)), 0);
+
+    // 軌跡
+    const now = performance.now();
+    if (trail.length > 1) {
+      ctx.lineCap = 'round';
+      for (let i = 1; i < trail.length; i++) {
+        const a = trail[i - 1], b = trail[i];
+        const age = (now - b.t) / (S.trailSec * 1000 || 1);
+        ctx.strokeStyle = `rgba(90,169,255,${Math.max(0, 0.7 * (1 - age))})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx + px(a.x), cy - px(a.y));
+        ctx.lineTo(cx + px(b.x), cy - px(b.y));
+        ctx.stroke();
+      }
+    }
+
+    // 現在値
+    const tot = Math.hypot(lon, lat);
+    let x = px(lat), y = -px(lon);
+    const d = Math.hypot(x, y);
+    if (d > R) { x = x / d * R; y = y / d * R; }
+    const col = colorFor(tot);
+    ctx.shadowColor = col; ctx.shadowBlur = 18;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(cx + x, cy + y, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#0b0d10'; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  function fmt(g) { return (g >= 0 ? '+' : '−') + Math.abs(g).toFixed(2); }
+  function updateText() {
+    $('vLon').innerHTML = fmt(lon) + '<small>G</small>';
+    $('vLon').style.color = lon > 0.05 ? 'var(--accent)' : lon < -0.05 ? 'var(--brake)' : '';
+    $('vLat').innerHTML = Math.abs(lat).toFixed(2) + '<small>' + (lat < -0.02 ? 'G 左' : lat > 0.02 ? 'G 右' : 'G') + '</small>';
+    if (gpsWatch !== null) {
+      $('vTot').innerHTML = (speedKmh === null ? '--' : speedKmh.toFixed(0)) + '<small>km/h</small>';
+    } else {
+      $('vTot').innerHTML = Math.hypot(lon, lat).toFixed(2) + '<small>G</small>';
+    }
+    $('mAcc').textContent = max.acc.toFixed(2);
+    $('mBrk').textContent = max.brk.toFixed(2);
+    $('mL').textContent = max.l.toFixed(2);
+    $('mR').textContent = max.r.toFixed(2);
+  }
+
+  let lastFrame = performance.now(), textTick = 0;
+  function loop(t) {
+    const dt = Math.min(0.1, (t - lastFrame) / 1000); lastFrame = t;
+    if (demo) demoStep(dt);
+    if (running && !demo && gotSensor && t - lastEventAt > 1500) setStatus('センサー停止中', 'warn');
+    draw();
+    if ((textTick += dt) > 0.08) { textTick = 0; updateText(); }
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- イベント ----------
+  $('btnStart').addEventListener('click', start);
+  $('btnStartDemo').addEventListener('click', startDemo);
+  $('btnDemo').addEventListener('click', () => { if (!demo) startDemo(); });
+  $('btnCal').addEventListener('click', () => demo ? toast('デモでは補正不要です') : startCalibration());
+  $('btnLearn').addEventListener('click', () => demo ? toast('デモでは学習不要です') : startLearn());
+  $('btnReset').addEventListener('click', () => { resetMax(); toast('最大値をリセットしました'); });
+  $('btnFlipF').addEventListener('click', () => { S.flipF = !S.flipF; store.set('flipF', S.flipF); refreshButtons(); });
+  $('btnFlipL').addEventListener('click', () => { S.flipL = !S.flipL; store.set('flipL', S.flipL); refreshButtons(); });
+  $('btnScale').addEventListener('click', () => {
+    S.scale = S.scale === 1.0 ? 0.5 : S.scale === 0.5 ? 1.5 : 1.0; store.set('scale', S.scale); refreshButtons();
+  });
+  $('rSmooth').addEventListener('input', e => { S.smooth = +e.target.value; store.set('smooth', S.smooth); refreshButtons(); });
+  $('rTrail').addEventListener('input', e => { S.trailSec = +e.target.value; store.set('trailSec', S.trailSec); refreshButtons(); });
+  $('btnGps').addEventListener('click', toggleGps);
+
+  refreshButtons();
+  resize();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
