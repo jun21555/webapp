@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="現在地">
+<meta name="theme-color" content="#000000">
+<title>現在地ダッシュボード</title>
+<style>
+  :root {
+    --bg: #000;
+    --fg: #f2f2f2;
+    --dim: #8a8a8a;
+    --accent: #7cc4ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--fg); }
+  body {
+    font-family: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    -webkit-user-select: none; user-select: none;
+    overflow: hidden;
+  }
+  .wrap {
+    height: 100%;
+    display: flex; flex-direction: column;
+    justify-content: space-evenly; align-items: center;
+    text-align: center; padding: 2vh 4vw;
+  }
+  #date { font-size: clamp(16px, 4.5vmin, 36px); color: var(--dim); letter-spacing: .05em; }
+  #time {
+    font-size: clamp(72px, 29vmin, 280px); font-weight: 600;
+    font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: .02em;
+  }
+  #pref { font-size: clamp(16px, 4.5vmin, 36px); color: var(--dim); }
+  #city {
+    font-size: clamp(36px, 12vmin, 110px); font-weight: 700; line-height: 1.15;
+    color: var(--accent); word-break: keep-all; overflow-wrap: anywhere;
+  }
+  .weather { display: flex; align-items: center; gap: 4vmin; }
+  #wicon { font-size: clamp(40px, 13vmin, 120px); line-height: 1; }
+  #temp { font-size: clamp(40px, 13vmin, 120px); font-weight: 600; font-variant-numeric: tabular-nums; }
+  #wtext { font-size: clamp(16px, 4.5vmin, 36px); color: var(--dim); }
+  #status { font-size: clamp(11px, 2.6vmin, 16px); color: #555; }
+  #status.err { color: #ff7b7b; }
+
+  /* 横向き（車載ホルダー）では2カラム */
+  @media (orientation: landscape) {
+    .wrap { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr auto; gap: 1vh 4vw; }
+    .clock { grid-column: 1 / 3; }
+    #time { font-size: clamp(72px, 36vmin, 320px); }
+    .place, .wx { align-self: center; }
+    #status { grid-column: 1 / 3; }
+  }
+
+  #start {
+    position: fixed; inset: 0; background: rgba(0,0,0,.92);
+    display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px;
+    font-size: 20px; text-align: center; padding: 24px; z-index: 10;
+  }
+  #start button {
+    font-size: 24px; padding: 18px 44px; border-radius: 16px; border: none;
+    background: var(--accent); color: #000; font-weight: 700;
+  }
+  #start p { color: var(--dim); font-size: 15px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="clock">
+    <div id="date">--</div>
+    <div id="time">--:--</div>
+  </div>
+  <div class="place">
+    <div id="pref">&nbsp;</div>
+    <div id="city">位置を取得中…</div>
+  </div>
+  <div class="wx">
+    <div class="weather"><span id="wicon">·</span><span id="temp">--°</span></div>
+    <div id="wtext">&nbsp;</div>
+  </div>
+  <div id="status">&nbsp;</div>
+</div>
+
+<div id="start">
+  <button id="startBtn">開始</button>
+  <p>タップすると位置情報の許可を求めます。<br>画面は自動で消えないようにします。</p>
+</div>
+
+<!-- 国土地理院の市区町村コード→名称の対応表（GSI.MUNI_ARRAY） -->
+<script src="https://maps.gsi.go.jp/js/muni.js"></script>
+<script>
+(() => {
+  const LOCATION_INTERVAL = 60 * 1000;      // 現在地：1分ごと
+  const WEATHER_INTERVAL  = 5 * 60 * 1000;  // 天気：5分ごと
+
+  const $ = id => document.getElementById(id);
+  const WEEK = ['日','月','火','水','木','金','土'];
+  const pad = n => String(n).padStart(2, '0');
+
+  let lastPos = null;
+  let lastWeatherAt = 0;
+  let lastWeatherPos = null;
+  let wakeLock = null;
+
+  // ---- 時計 ----
+  function tick() {
+    const d = new Date();
+    $('date').textContent = `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`;
+    $('time').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // ---- 状態表示 ----
+  function status(msg, isErr = false) {
+    $('status').textContent = msg;
+    $('status').className = isErr ? 'err' : '';
+  }
+
+  // ---- 距離（m）----
+  function distance(a, b) {
+    const R = 6371000, rad = x => x * Math.PI / 180;
+    const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+    const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+
+  // ---- 逆ジオコーディング（国土地理院 → 失敗時 OpenStreetMap）----
+  async function reverseGeocode(lat, lon) {
+    try {
+      const r = await fetch(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat}&lon=${lon}`);
+      const j = await r.json();
+      const code = j && j.results && j.results.muniCd;
+      const table = window.GSI && GSI.MUNI_ARRAY;
+      if (code && table) {
+        const v = table[code] || table[String(parseInt(code, 10))];
+        if (v) {
+          const [, pref, , muni] = v.split(',');
+          return { pref, city: muni.replace(/[\s　]+/g, ' ').trim() };
+        }
+      }
+    } catch (e) { /* フォールバックへ */ }
+
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14&accept-language=ja`);
+    const j = await r.json();
+    const a = j.address || {};
+    const city = [a.city || a.town || a.village || a.county || '', a.city_district || a.suburb || '']
+      .filter(Boolean).join(' ');
+    return { pref: a.province || a.state || '', city: city || j.name || '不明' };
+  }
+
+  // ---- 天気（Open-Meteo、APIキー不要）----
+  const WMO = {
+    0:['☀️','快晴'], 1:['🌤️','晴れ'], 2:['⛅','晴れ時々曇り'], 3:['☁️','曇り'],
+    45:['🌫️','霧'], 48:['🌫️','霧（着氷）'],
+    51:['🌦️','弱い霧雨'], 53:['🌦️','霧雨'], 55:['🌧️','強い霧雨'],
+    56:['🌧️','着氷性の霧雨'], 57:['🌧️','着氷性の霧雨'],
+    61:['🌧️','弱い雨'], 63:['🌧️','雨'], 65:['🌧️','強い雨'],
+    66:['🌧️','着氷性の雨'], 67:['🌧️','着氷性の強い雨'],
+    71:['🌨️','弱い雪'], 73:['🌨️','雪'], 75:['❄️','強い雪'], 77:['🌨️','霧雪'],
+    80:['🌦️','にわか雨'], 81:['🌧️','強いにわか雨'], 82:['⛈️','激しいにわか雨'],
+    85:['🌨️','にわか雪'], 86:['❄️','強いにわか雪'],
+    95:['⛈️','雷雨'], 96:['⛈️','雷雨（ひょう）'], 99:['⛈️','激しい雷雨（ひょう）'],
+  };
+  async function updateWeather(lat, lon) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,weather_code,is_day&timezone=auto`;
+    const j = await (await fetch(url)).json();
+    const c = j.current;
+    let [icon, text] = WMO[c.weather_code] || ['·', '—'];
+    if (!c.is_day && c.weather_code <= 1) icon = '🌙';
+    $('wicon').textContent = icon;
+    $('temp').textContent = `${Math.round(c.temperature_2m)}°`;
+    $('wtext').textContent = text;
+  }
+
+  // ---- 位置の更新 ----
+  function getPosition() {
+    return new Promise((res, rej) =>
+      navigator.geolocation.getCurrentPosition(res, rej,
+        { enableHighAccuracy: false, maximumAge: 30000, timeout: 20000 }));
+  }
+
+  async function update() {
+    let pos;
+    try {
+      const p = await getPosition();
+      pos = { lat: +p.coords.latitude.toFixed(5), lon: +p.coords.longitude.toFixed(5) };
+    } catch (e) {
+      const msg = e.code === 1 ? '位置情報が許可されていません（設定 > プライバシー > 位置情報サービス）'
+                : '位置を取得できませんでした。再試行します…';
+      status(msg, true);
+      return;
+    }
+
+    // 住所：200m 以上動いたときだけ問い合わせ
+    if (!lastPos || distance(lastPos, pos) > 200) {
+      try {
+        const { pref, city } = await reverseGeocode(pos.lat, pos.lon);
+        $('pref').textContent = pref || ' ';
+        $('city').textContent = city;
+        lastPos = pos;
+      } catch (e) {
+        status('住所を取得できませんでした（通信を確認）', true);
+      }
+    }
+
+    // 天気：5分経過 or 5km 以上移動
+    const now = Date.now();
+    if (now - lastWeatherAt >= WEATHER_INTERVAL || !lastWeatherPos || distance(lastWeatherPos, pos) > 5000) {
+      try {
+        await updateWeather(pos.lat, pos.lon);
+        lastWeatherAt = now;
+        lastWeatherPos = pos;
+      } catch (e) {
+        status('天気を取得できませんでした（通信を確認）', true);
+        return;
+      }
+    }
+
+    const d = new Date();
+    status(`更新 ${pad(d.getHours())}:${pad(d.getMinutes())}${wakeLock ? '' : '　※画面の自動ロック防止が無効'}`);
+  }
+
+  // ---- 画面を消さない（Screen Wake Lock）----
+  async function keepAwake() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    } catch (e) { wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      keepAwake();
+      update();   // 復帰したらすぐ更新
+    }
+  });
+
+  // ---- 開始 ----
+  let timer = null;
+  $('startBtn').addEventListener('click', async () => {
+    $('start').style.display = 'none';
+    if (!('geolocation' in navigator)) {
+      status('この端末は位置情報に対応していません', true);
+      return;
+    }
+    await keepAwake();
+    update();
+    clearInterval(timer);
+    timer = setInterval(update, LOCATION_INTERVAL);
+  });
+})();
+</script>
+</body>
+</html>
