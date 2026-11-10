@@ -37,6 +37,19 @@
     color:#d8d2ff;background:#ffffff12;box-shadow:none;border:1.5px solid #ffffff30;border-radius:10px}
   .spd button.on{color:#1a0010;background:linear-gradient(180deg,#7ff6ff,#00b8d9);border-color:#7ff6ff;box-shadow:0 0 10px #00e5ff88}
   .spd button:active{transform:none}
+  #homeBtn{position:fixed;left:8px;top:calc(env(safe-area-inset-top) + 8px);z-index:4;width:34px;height:34px;padding:0;
+    border-radius:50%;background:rgba(20,10,40,.55);border:1px solid rgba(255,255,255,.3);box-shadow:none;
+    display:flex;align-items:center;justify-content:center;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+  #homeBtn:active{transform:scale(.9)}
+  #homeBtn svg{width:18px;height:18px}
+  #confirm{position:fixed;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:rgba(5,2,12,.6)}
+  #confirm.hidden,#homeBtn.hidden{display:none}
+  #confirm .box{width:260px;padding:20px;border-radius:16px;text-align:center;background:#1a0c33;border:2px solid #7ff6ff;box-shadow:0 0 16px #00e5ff66}
+  #confirm p{margin:0 0 16px;font-size:15px;font-weight:700}
+  #confirm .row{display:flex;gap:10px}
+  #confirm .row button{flex:1;padding:11px 0;font-size:15px;letter-spacing:0}
+  #confirm .row .sub{background:#ffffff18;color:#fff;box-shadow:none;border:1px solid #ffffff40}
+  .homeLink{display:inline-block;margin-top:14px;font-size:13px;color:#7ff6ff;text-decoration:none}
   .how{margin:18px 0 0;padding:12px 14px;list-style:none;text-align:left;font-size:12.5px;line-height:1.75;
     color:#d8d2ff;background:#ffffff0d;border-radius:10px}
   .how b{color:#7ff6ff;font-weight:700}
@@ -46,6 +59,9 @@
 <body>
 <canvas id="c"></canvas>
 <div id="safe"></div>
+<button id="homeBtn" class="hidden" aria-label="ホームに戻る"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></button>
+<div id="confirm" class="hidden"><div class="box"><p>ゲームを中断して<br>ホームに戻りますか？</p>
+  <div class="row"><button class="sub" id="cNo">つづける</button><button id="cYes">戻る</button></div></div></div>
 <div id="ui">
   <div class="panel">
     <div class="logo">Last Call</div>
@@ -57,6 +73,7 @@
       <button data-k="1">ふつう</button><button data-k="0.78">ゆっくり</button><button data-k="0.6">とても<br>ゆっくり</button>
     </div>
     <button id="go">START</button>
+    <div><a class="homeLink" href="./index.html">⌂ ホームに戻る</a></div>
     <ul class="how">
       <li><b>左半分</b>をタップ … 左フリッパー</li>
       <li><b>右半分</b>をタップ … 右フリッパー</li>
@@ -230,7 +247,7 @@ function gameOver(){
   if(newHi){ showMsg('NEW HIGH SCORE',fmt(score),2.5,true); sfx.jackpot(); } else sfx.over();
   setTimeout(()=>{ $('uiTitle').textContent=newHi?'NEW HIGH SCORE!':'GAME OVER';
     $('uiHi').innerHTML='SCORE '+fmt(lastScore)+'<br>HIGH SCORE '+fmt(hi);
-    $('go').textContent='PLAY AGAIN'; $('ui').classList.remove('hidden'); },2400);
+    $('go').textContent='PLAY AGAIN'; $('ui').classList.remove('hidden'); $('homeBtn').classList.add('hidden'); },2400);
 }
 
 // ---- switches ----
@@ -331,7 +348,7 @@ function collideBumper(b,m){
     addScore(superT>0?5000:1000); bonus+=100;
   }
 }
-let gateSwing=0;
+let gateSwing=0, paused=false;
 function step(dt){
   flipL.update(dt); flipR.update(dt);
   for(const m of bumpers) if(m.cool>0) m.cool-=dt;
@@ -481,7 +498,7 @@ function dmdContent(){
     return;
   }
   if(state==='play'||state==='bonus'){
-    d.font=sm; d.fillStyle='#8a8a8a'; d.textAlign='left'; d.fillText('BALL '+ballNum+(extraBalls?' +EB':''),2,9);
+    d.font=sm; d.fillStyle='#8a8a8a'; d.textAlign='left'; d.fillText('BALL '+ballNum+(extraBalls?' +EB':''),19,9);
     d.textAlign='right'; d.fillText((multiball?'HAPPY HOUR  ':(superT>0?'SUPER  ':''))+bonusMult+'X',126,9);
     d.textAlign='center'; d.fillStyle='#fff'; d.font=big; d.fillText(fmt(score),64,29,124);
     if(laneBall()&&pull>0){ d.fillStyle='#bbb'; d.fillRect(40,11,48*pull,2); }
@@ -776,9 +793,13 @@ let wakeLock=null;
 $('go').addEventListener('click',()=>{
   initAudio();
   try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').then(l=>wakeLock=l).catch(()=>{}); }catch(e){}
-  $('ui').classList.add('hidden'); touchMap.clear(); refreshInput(); newGame();
+  $('ui').classList.add('hidden'); $('homeBtn').classList.remove('hidden'); touchMap.clear(); refreshInput(); newGame();
 });
 $('uiHi').textContent='HIGH SCORE '+fmt(hi);
+const stopTouch=e=>e.stopPropagation();
+$('homeBtn').addEventListener('click',()=>{ paused=true; touchMap.clear(); keyState.L=keyState.R=keyState.P=false; refreshInput(); pull=0; $('confirm').classList.remove('hidden'); });
+$('cNo').addEventListener('click',()=>{ $('confirm').classList.add('hidden'); paused=false; last=performance.now(); });
+$('cYes').addEventListener('click',()=>{ location.href='./index.html'; });
 function markSpeed(){ document.querySelectorAll('#spd button').forEach(b=>b.classList.toggle('on',parseFloat(b.dataset.k)===speedK)); }
 document.querySelectorAll('#spd button').forEach(b=>b.addEventListener('click',()=>{ speedK=parseFloat(b.dataset.k); markSpeed(); initAudio(); sfx.chime(speedK===1?2:speedK===0.78?1:0);
   try{ localStorage.setItem('lastcall_speed',String(speedK)); }catch(e){} }));
@@ -789,8 +810,9 @@ document.addEventListener('visibilitychange',()=>{ last=performance.now(); touch
 let last=performance.now(), acc=0;
 function frame(now){
   let dt=(now-last)/1000; last=now; if(dt>0.05) dt=0.05; if(dt<0) dt=0;
+  if(paused){ acc=0; dt=0; }
   acc+=dt; let n=0; while(acc>=DT&&n<40){ step(DT); acc-=DT; n++; } if(n>=40) acc=0;
-  update(dt);
+  if(!paused) update(dt);
   dmdTimer+=dt; if(dmdTimer>0.05){ dmdTimer=0; renderDMD(); }
   render();
   requestAnimationFrame(frame);
