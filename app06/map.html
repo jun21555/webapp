@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="現在地マップ">
+<meta name="theme-color" content="#1a73e8">
+<title>現在地マップ</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { margin: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; }
+  #map { position: fixed; inset: 0; }
+
+  /* 上部：カテゴリのオン・オフ */
+  .filters {
+    position: fixed; left: 0; right: 0;
+    top: calc(10px + env(safe-area-inset-top));
+    z-index: 1000; display: flex; gap: 8px; overflow-x: auto;
+    padding: 0 12px; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+    border: 2px solid var(--c); background: var(--c); color: #fff;
+    border-radius: 999px; padding: 7px 12px; font-size: 14px; font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,.18); -webkit-tap-highlight-color: transparent;
+  }
+  .chip.off { background: #fff; color: #555; border-color: #ccc; }
+  .chip .n { font-size: 12px; opacity: .85; font-weight: 500; }
+
+  /* 下部パネル */
+  .panel {
+    position: fixed; left: 12px; right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 1000; background: rgba(255,255,255,.96); border-radius: 16px; padding: 12px 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.18);
+  }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row + .row { margin-top: 10px; }
+  #status { flex: 1; font-size: 13px; line-height: 1.4; color: #333; }
+  #status b { font-size: 14px; }
+  button.btn {
+    border: 0; border-radius: 12px; padding: 10px 14px; font-size: 14px; font-weight: 600;
+    background: #1a73e8; color: #fff; -webkit-tap-highlight-color: transparent; white-space: nowrap;
+  }
+  button.btn.off { background: #e8eaed; color: #333; }
+  button.btn:disabled { opacity: .5; }
+  select {
+    font-size: 14px; padding: 9px 8px; border-radius: 12px; border: 1px solid #ccc; background: #fff; color: #333;
+  }
+  #searchBtn { flex: 1; }
+
+  /* マーカー */
+  .dot {
+    width: 18px; height: 18px; border-radius: 50%; background: #1a73e8;
+    border: 3px solid #fff; box-shadow: 0 0 6px rgba(0,0,0,.4); box-sizing: border-box;
+  }
+  .poi {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--c);
+    border: 2px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,.4); box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1;
+  }
+  .leaflet-popup-content { margin: 12px 14px; font-size: 13px; line-height: 1.5; }
+  .pop-title { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .pop-cat { color: #666; font-size: 12px; }
+  .pop-links { margin-top: 8px; display: flex; gap: 10px; }
+  .pop-links a { color: #1a73e8; font-weight: 600; text-decoration: none; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="filters" id="filters"></div>
+
+<div class="panel">
+  <div class="row">
+    <div id="status">「開始」を押すと現在地を取得します</div>
+    <button class="btn" id="startBtn">開始</button>
+    <button class="btn off" id="followBtn" hidden>追従</button>
+  </div>
+  <div class="row">
+    <select id="radius" aria-label="検索範囲">
+      <option value="500">500m</option>
+      <option value="1000" selected>1km</option>
+      <option value="2000">2km</option>
+      <option value="3000">3km</option>
+    </select>
+    <button class="btn" id="searchBtn">この周辺を検索</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  // ===== カテゴリ定義 =====
+  // q: Overpass の検索条件、match: 取得結果のタグがこのカテゴリかどうか
+  const CATS = [
+    { id: 'conv',    name: 'コンビニ',         emoji: '🏪', color: '#e8710a',
+      q: ['nwr["shop"="convenience"]'],
+      match: t => t.shop === 'convenience' },
+    { id: 'parking', name: 'コインパーキング', emoji: '🅿️', color: '#1e88e5',
+      q: ['nwr["amenity"="parking"]["access"!~"^(private|no|customers)$"]'],
+      match: t => t.amenity === 'parking' },
+    { id: 'fuel',    name: 'ガソリンスタンド', emoji: '⛽', color: '#d93025',
+      q: ['nwr["amenity"="fuel"]'],
+      match: t => t.amenity === 'fuel' },
+    { id: 'carshop', name: 'カー用品店',       emoji: '🔧', color: '#188038',
+      q: ['nwr["shop"~"^(car_parts|tyres)$"]'],
+      match: t => t.shop === 'car_parts' || t.shop === 'tyres' },
+  ];
+
+  // オン・オフ状態を記憶（使えない環境では毎回すべてオン）
+  let enabled = {};
+  try { enabled = JSON.parse(localStorage.getItem('poiEnabled') || '{}'); } catch (e) {}
+  CATS.forEach(c => { if (enabled[c.id] === undefined) enabled[c.id] = true; });
+  function saveEnabled() { try { localStorage.setItem('poiEnabled', JSON.stringify(enabled)); } catch (e) {} }
+
+  // ===== 地図 =====
+  const map = L.map('map', { zoomControl: false }).setView([35.681, 139.767], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  const layers = {};
+  CATS.forEach(c => {
+    layers[c.id] = L.layerGroup();
+    if (enabled[c.id]) layers[c.id].addTo(map);
+  });
+
+  // ===== フィルターチップ =====
+  const filtersEl = document.getElementById('filters');
+  const chips = {};
+  CATS.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (enabled[c.id] ? '' : ' off');
+    b.style.setProperty('--c', c.color);
+    b.innerHTML = `<span>${c.emoji}</span><span>${c.name}</span><span class="n"></span>`;
+    b.addEventListener('click', () => {
+      enabled[c.id] = !enabled[c.id];
+      b.classList.toggle('off', !enabled[c.id]);
+      if (enabled[c.id]) layers[c.id].addTo(map); else map.removeLayer(layers[c.id]);
+      saveEnabled();
+    });
+    filtersEl.appendChild(b);
+    chips[c.id] = b;
+  });
+  function setCount(id, n) { chips[id].querySelector('.n').textContent = n == null ? '' : n; }
+
+  // ===== 現在地 =====
+  const statusEl = document.getElementById('status');
+  const startBtn = document.getElementById('startBtn');
+  const followBtn = document.getElementById('followBtn');
+  const searchBtn = document.getElementById('searchBtn');
+  const radiusSel = document.getElementById('radius');
+
+  let me = null, meCircle = null, watchId = null, follow = true, first = true, searchCircle = null;
+  const meIcon = L.divIcon({ className: '', html: '<div class="dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
+
+  function setFollow(on) { follow = on; followBtn.classList.toggle('off', !on); }
+  map.on('dragstart', () => setFollow(false));
+  followBtn.addEventListener('click', () => {
+    setFollow(!follow);
+    if (follow && me) map.setView(me.getLatLng(), Math.max(map.getZoom(), 16));
+  });
+
+  startBtn.addEventListener('click', () => {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      startBtn.textContent = '開始'; startBtn.classList.remove('off');
+      statusEl.textContent = '位置の更新を停止しました';
+      return;
+    }
+    if (!('geolocation' in navigator)) { statusEl.textContent = 'このブラウザは位置情報に対応していません'; return; }
+    if (!window.isSecureContext) { statusEl.textContent = '位置情報は HTTPS で開いたページでのみ使えます'; return; }
+    statusEl.textContent = '位置情報を取得中…';
+    watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    startBtn.textContent = '停止'; startBtn.classList.add('off');
+    followBtn.hidden = false; setFollow(true);
+  });
+
+  function onPos(pos) {
+    const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+    const ll = [lat, lng];
+    if (!me) {
+      me = L.marker(ll, { icon: meIcon, zIndexOffset: 1000 }).addTo(map);
+      meCircle = L.circle(ll, { radius: accuracy, color: '#1a73e8', weight: 1, fillOpacity: .12, interactive: false }).addTo(map);
+    } else {
+      me.setLatLng(ll); meCircle.setLatLng(ll).setRadius(accuracy);
+    }
+    if (first) {
+      map.setView(ll, 16); first = false;
+      search(lat, lng);                     // 初回は自動で周辺検索
+    } else if (follow) {
+      map.panTo(ll);
+    }
+    const t = new Date(pos.timestamp).toLocaleTimeString('ja-JP');
+    if (!searching) statusEl.innerHTML = `<b>${lat.toFixed(5)}, ${lng.toFixed(5)}</b><br>精度 約${Math.round(accuracy)}m ・ ${t}`;
+  }
+
+  function onErr(err) {
+    const msg = {
+      1: '位置情報が許可されていません。設定 › プライバシーとセキュリティ › 位置情報サービス › Safari Webサイト を「使用中のみ」にしてください',
+      2: '位置を特定できませんでした（電波状況を確認してください）',
+      3: '位置情報の取得がタイムアウトしました'
+    }[err.code] || err.message;
+    statusEl.textContent = msg;
+    if (err.code === 1) {
+      navigator.geolocation.clearWatch(watchId); watchId = null;
+      startBtn.textContent = '開始'; startBtn.classList.remove('off');
+    }
+  }
+
+  // ===== 周辺検索（OpenStreetMap / Overpass API）=====
+  const ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  ];
+  let searching = false;
+
+  // 「この周辺を検索」：地図の中心を検索（現在地から離れた場所も調べられる）
+  searchBtn.addEventListener('click', () => {
+    const c = map.getCenter();
+    search(c.lat, c.lng);
+  });
+  radiusSel.addEventListener('change', () => {
+    const c = searchCircle ? searchCircle.getLatLng() : map.getCenter();
+    search(c.lat, c.lng);
+  });
+
+  async function search(lat, lng) {
+    if (searching) return;
+    searching = true;
+    searchBtn.disabled = true; searchBtn.textContent = '検索中…';
+    const r = +radiusSel.value;
+
+    if (searchCircle) map.removeLayer(searchCircle);
+    searchCircle = L.circle([lat, lng], { radius: r, color: '#555', weight: 1, dashArray: '5 6', fill: false, interactive: false }).addTo(map);
+
+    const parts = CATS.flatMap(c => c.q.map(q => `${q}(around:${r},${lat},${lng});`)).join('\n');
+    const query = `[out:json][timeout:25];(\n${parts}\n);out center tags;`;
+
+    let data = null, lastErr = null;
+    for (const url of ENDPOINTS) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 30000);
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'data=' + encodeURIComponent(query),
+          signal: ctrl.signal,
+        });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        data = await res.json();
+        break;
+      } catch (e) { lastErr = e; }
+    }
+
+    searching = false;
+    searchBtn.disabled = false; searchBtn.textContent = 'この周辺を検索';
+
+    if (!data) {
+      statusEl.textContent = '周辺情報を取得できませんでした。少し待ってから再度お試しください';
+      console.warn(lastErr);
+      return;
+    }
+    render(data.elements || [], lat, lng);
+  }
+
+  function render(elements, cLat, cLng) {
+    CATS.forEach(c => layers[c.id].clearLayers());
+    const counts = Object.fromEntries(CATS.map(c => [c.id, 0]));
+
+    for (const el of elements) {
+      const t = el.tags || {};
+      const lat = el.lat ?? el.center?.lat, lng = el.lon ?? el.center?.lon;
+      if (lat == null) continue;
+      const cat = CATS.find(c => c.match(t));
+      if (!cat) continue;
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div class="poi" style="--c:${cat.color}">${cat.emoji}</div>`,
+        iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -14],
+      });
+      L.marker([lat, lng], { icon }).bindPopup(() => popupHtml(cat, t, lat, lng)).addTo(layers[cat.id]);
+      counts[cat.id]++;
+    }
+
+    CATS.forEach(c => setCount(c.id, counts[c.id]));
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    statusEl.innerHTML = `<b>${total}件</b> 見つかりました（半径${radiusSel.selectedOptions[0].text}）<br>上のボタンで種類ごとに表示を切り替えられます`;
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+
+  function distanceText(lat, lng) {
+    if (!me) return '';
+    const d = me.getLatLng().distanceTo([lat, lng]);
+    return d < 1000 ? `現在地から約${Math.round(d)}m` : `現在地から約${(d / 1000).toFixed(1)}km`;
+  }
+
+  function popupHtml(cat, t, lat, lng) {
+    const name = t['name:ja'] || t.name || t.brand || t.operator || cat.name;
+    const lines = [];
+    if (t.brand && t.brand !== name) lines.push(esc(t.brand));
+    if (t.opening_hours) lines.push('営業時間: ' + esc(t.opening_hours === '24/7' ? '24時間' : t.opening_hours));
+    if (cat.id === 'parking') {
+      if (t.fee === 'yes') lines.push('有料');
+      else if (t.fee === 'no') lines.push('無料');
+      if (t.capacity) lines.push('収容台数: ' + esc(t.capacity) + '台');
+    }
+    if (cat.id === 'fuel') {
+      const fuels = [];
+      if (t['fuel:octane_91'] === 'yes') fuels.push('レギュラー');
+      if (t['fuel:octane_100'] === 'yes' || t['fuel:octane_98'] === 'yes') fuels.push('ハイオク');
+      if (t['fuel:diesel'] === 'yes') fuels.push('軽油');
+      if (fuels.length) lines.push(fuels.join('・'));
+      if (t.self_service === 'yes') lines.push('セルフ');
+    }
+    const dist = distanceText(lat, lng);
+    if (dist) lines.push(dist);
+
+    const q = encodeURIComponent(name);
+    const apple = `https://maps.apple.com/?daddr=${lat},${lng}&q=${q}`;
+    const google = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+
+    return `<div class="pop-title">${esc(name)}</div>
+      <div class="pop-cat">${cat.emoji} ${cat.name}</div>
+      ${lines.map(l => `<div>${l}</div>`).join('')}
+      <div class="pop-links"><a href="${apple}" target="_blank" rel="noopener">Appleマップで経路</a><a href="${google}" target="_blank" rel="noopener">Googleマップ</a></div>`;
+  }
+</script>
+</body>
+</html>
