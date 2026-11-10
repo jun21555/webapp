@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="そら模様">
+<meta name="theme-color" content="#0f2a5c">
+<title>そら模様 – 現在地の天気と空気</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --card: rgba(255,255,255,.13);
+    --line: rgba(255,255,255,.16);
+    --dim: rgba(255,255,255,.68);
+    --good:#4be08a; --ok:#9fd8ff; --warn:#ffd23f; --bad:#ff9a3c; --worst:#ff5a6a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+  html{background:#0f2a5c}
+  body{
+    min-height:100dvh;color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+    background:linear-gradient(180deg,#2a7bdc 0%,#1a4fa8 45%,#0f2a5c 100%);
+    padding:calc(env(safe-area-inset-top) + 10px) calc(env(safe-area-inset-right) + 16px)
+            calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 16px);
+  }
+  body.night{background:linear-gradient(180deg,#14204a 0%,#0c1533 55%,#060a1c 100%)}
+  html:has(body.night){background:#060a1c}
+  body.rain{background:linear-gradient(180deg,#5c6f87 0%,#3b4c63 50%,#1e2838 100%)}
+  html:has(body.rain){background:#1e2838}
+  main{max-width:480px;margin:0 auto}
+
+  /* ヘッダー */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px}
+  .btn{min-width:44px;height:44px;border:0;border-radius:22px;background:var(--card);color:#fff;
+    font-size:20px;display:grid;place-items:center;cursor:pointer;transition:transform .12s,background .12s}
+  .btn:active{transform:scale(.9);background:rgba(255,255,255,.25)}
+  .btn.spin span{display:inline-block;animation:spin .9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .place{flex:1;text-align:center;min-width:0}
+  #pref{font-size:13px;color:var(--dim)}
+  #city{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* 現在の天気 */
+  .hero{text-align:center;padding:14px 0 8px}
+  #wicon{font-size:64px;line-height:1.1}
+  #temp{font-size:88px;font-weight:200;line-height:1;letter-spacing:-2px;font-variant-numeric:tabular-nums;margin-left:18px}
+  #wtext{font-size:18px;font-weight:600;margin-top:4px}
+  #sub{font-size:14px;color:var(--dim);margin-top:4px;font-variant-numeric:tabular-nums}
+
+  /* 時間ごと */
+  .card{background:var(--card);border:.5px solid var(--line);border-radius:18px;
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .hourly{margin-top:14px;padding:12px 4px 10px}
+  .hourly h2,.sec{font-size:12px;font-weight:600;color:var(--dim);letter-spacing:.04em;padding:0 12px 8px}
+  .hours{display:flex;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .hours::-webkit-scrollbar{display:none}
+  .h{flex:0 0 56px;text-align:center;font-variant-numeric:tabular-nums}
+  .h .t{font-size:12px;color:var(--dim)}
+  .h .i{font-size:22px;margin:4px 0 2px}
+  .h .v{font-size:16px;font-weight:600}
+  .h .p{font-size:11px;color:#8fd3ff;height:14px}
+
+  /* タイル */
+  .sec{padding:18px 4px 8px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tile{padding:12px 14px 13px;min-height:118px;display:flex;flex-direction:column;position:relative}
+  .tile .lab{font-size:12px;color:var(--dim);font-weight:600;display:flex;align-items:center;gap:5px}
+  .tile .val{font-size:30px;font-weight:600;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.1}
+  .tile .val small{font-size:14px;font-weight:500;margin-left:3px;color:var(--dim)}
+  .tile .note{font-size:12px;color:var(--dim);margin-top:auto;padding-top:6px;line-height:1.35}
+  .lv{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:10px;margin-top:6px;
+    color:#0b1530;align-self:flex-start}
+  .bar{height:5px;border-radius:3px;background:rgba(255,255,255,.18);margin-top:8px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:3px;background:#8fd3ff;width:0;transition:width .6s}
+  .wide{grid-column:1/3}
+
+  #pollenTile{cursor:pointer}
+  #pollenTile:active{transform:scale(.98)}
+
+  #status{margin-top:16px;text-align:center;font-size:12px;color:var(--dim);line-height:1.5}
+  #status.err{color:#ffb4b4}
+  .credit{margin-top:6px;text-align:center;font-size:10.5px;color:rgba(255,255,255,.45);line-height:1.5}
+  .credit a{color:inherit}
+
+  .skel{color:transparent!important;background:rgba(255,255,255,.12);border-radius:8px;animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.5}}
+
+  /* 設定シート */
+  dialog{margin:auto auto 0;width:100%;max-width:480px;border:0;border-radius:20px 20px 0 0;
+    background:#14254d;color:#fff;padding:20px 18px calc(env(safe-area-inset-bottom) + 20px)}
+  dialog::backdrop{background:rgba(0,0,0,.5)}
+  dialog h3{font-size:17px;margin-bottom:8px}
+  dialog p{font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:12px}
+  dialog a{color:#8fd3ff}
+  dialog input{width:100%;font-size:16px;padding:12px;border-radius:12px;border:1px solid var(--line);
+    background:rgba(255,255,255,.08);color:#fff}
+  .row{display:flex;gap:10px;margin-top:14px}
+  .row button{flex:1;height:46px;border:0;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer}
+  .row .pri{background:#3a8dff;color:#fff}
+  .row .sec2{background:rgba(255,255,255,.12);color:#fff}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <button class="btn" id="setBtn" aria-label="設定"><span>⚙︎</span></button>
+    <div class="place">
+      <div id="pref">&nbsp;</div>
+      <div id="city">現在地を取得中…</div>
+    </div>
+    <button class="btn" id="reload" aria-label="更新"><span>↻</span></button>
+  </div>
+
+  <section class="hero">
+    <div><span id="wicon">⏳</span><span id="temp">--°</span></div>
+    <div id="wtext">&nbsp;</div>
+    <div id="sub">&nbsp;</div>
+  </section>
+
+  <section class="card hourly">
+    <h2>12時間の予報</h2>
+    <div class="hours" id="hours"></div>
+  </section>
+
+  <div class="sec">気象</div>
+  <div class="grid">
+    <div class="card tile">
+      <div class="lab">💧 湿度</div>
+      <div class="val" id="hum">--<small>%</small></div>
+      <div class="bar"><i id="humBar"></i></div>
+      <div class="note" id="humNote">&nbsp;</div>
+    </div>
+    <div class="card tile">
+      <div class="lab">☂️ 降水確率</div>
+      <div class="val" id="pop">--<small>%</small></div>
+      <div class="bar"><i id="popBar"></i></div>
+      <div class="note" id="popNote">&nbsp;</div>
+    </div>
+    <div class="card tile wide">
+      <div class="lab">🧭 気圧</div>
+      <div class="val" id="pres">----<small>hPa</small></div>
+      <div class="note" id="presNote">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="sec">空気</div>
+  <div class="grid">
+    <div class="card tile wide" id="pollenTile">
+      <div class="lab">🌲 花粉</div>
+      <div class="val" id="pollen" style="font-size:24px">--</div>
+      <span class="lv" id="pollenLv" hidden></span>
+      <div class="note" id="pollenNote">&nbsp;</div>
+    </div>
+    <div class="card tile">
+      <div class="lab">🌫️ 黄砂</div>
+      <div class="val" id="dust">--<small>µg/m³</small></div>
+      <span class="lv" id="dustLv" hidden></span>
+      <div class="note" id="dustNote">&nbsp;</div>
+    </div>
+    <div class="card tile">
+      <div class="lab">😷 PM2.5</div>
+      <div class="val" id="pm">--<small>µg/m³</small></div>
+      <span class="lv" id="pmLv" hidden></span>
+      <div class="note" id="pmNote">&nbsp;</div>
+    </div>
+  </div>
+
+  <div id="status">位置情報の利用を許可してください</div>
+  <div class="credit">
+    天気・PM2.5・黄砂（ダスト）: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>（CAMS 予測モデル）／
+    地名: 国土地理院<br>黄砂は大気中ダスト濃度のモデル値で、気象庁の黄砂情報とは異なります。
+  </div>
+</main>
+
+<dialog id="dlg">
+  <h3>花粉データの設定</h3>
+  <p>
+    日本の花粉（スギ・ヒノキ・イネ科など）は、無料・キー不要で取れるデータがありません。
+    <a href="https://developers.google.com/maps/documentation/pollen/overview?hl=ja" target="_blank" rel="noopener">Google Pollen API</a>
+    の API キーを入れると、現在地の花粉レベルを表示します。キーはこの端末の中だけに保存されます。<br>
+    キーが無いときは、ヨーロッパなど対応地域ではモデル値を、それ以外では季節の目安を表示します。
+  </p>
+  <input id="keyIn" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Google Pollen API キー（任意）">
+  <div class="row">
+    <button class="sec2" id="dlgCancel">閉じる</button>
+    <button class="pri" id="dlgSave">保存して更新</button>
+  </div>
+</dialog>
+
+<!-- 国土地理院の市区町村コード→名称の対応表（GSI.MUNI_ARRAY） -->
+<script src="https://maps.gsi.go.jp/js/muni.js" async></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2, '0');
+  const KEY_STORE = 'sora.googlePollenKey';
+  const getKey = () => { try { return localStorage.getItem(KEY_STORE) || ''; } catch { return ''; } };
+  const setKey = v => { try { v ? localStorage.setItem(KEY_STORE, v) : localStorage.removeItem(KEY_STORE); } catch {} };
+
+  const COLORS = { good:'var(--good)', ok:'var(--ok)', warn:'var(--warn)', bad:'var(--bad)', worst:'var(--worst)' };
+  function level(el, text, c) {
+    const e = $(el); e.hidden = false; e.textContent = text; e.style.background = COLORS[c];
+  }
+
+  // ---- 天気コード（WMO）----
+  const WMO = {
+    0:['☀️','快晴'], 1:['🌤️','晴れ'], 2:['⛅','晴れ時々曇り'], 3:['☁️','曇り'],
+    45:['🌫️','霧'], 48:['🌫️','霧（着氷）'],
+    51:['🌦️','弱い霧雨'], 53:['🌦️','霧雨'], 55:['🌧️','強い霧雨'],
+    56:['🌧️','着氷性の霧雨'], 57:['🌧️','着氷性の霧雨'],
+    61:['🌧️','弱い雨'], 63:['🌧️','雨'], 65:['🌧️','強い雨'],
+    66:['🌧️','着氷性の雨'], 67:['🌧️','着氷性の強い雨'],
+    71:['🌨️','弱い雪'], 73:['🌨️','雪'], 75:['❄️','強い雪'], 77:['🌨️','霧雪'],
+    80:['🌦️','にわか雨'], 81:['🌧️','強いにわか雨'], 82:['⛈️','激しいにわか雨'],
+    85:['🌨️','にわか雪'], 86:['❄️','強いにわか雪'],
+    95:['⛈️','雷雨'], 96:['⛈️','雷雨（ひょう）'], 99:['⛈️','激しい雷雨（ひょう）'],
+  };
+  const wmo = (code, isDay) => {
+    let [icon, text] = WMO[code] || ['·', '—'];
+    if (!isDay && code <= 2) icon = code === 2 ? '☁️' : '🌙';
+    return [icon, text];
+  };
+
+  // ---- 位置 ----
+  function getPosition() {
+    return new Promise((ok, ng) => {
+      if (!navigator.geolocation) return ng(new Error('この端末は位置情報に対応していません'));
+      navigator.geolocation.getCurrentPosition(
+        p => ok({ lat: +p.coords.latitude.toFixed(4), lon: +p.coords.longitude.toFixed(4) }),
+        e => ng(new Error(e.code === 1
+          ? '位置情報が許可されていません。設定 › プライバシー › 位置情報サービス で Safari を許可してください'
+          : '位置情報を取得できませんでした')),
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 5 * 60 * 1000 });
+    });
+  }
+
+  // ---- 逆ジオコーディング（国土地理院 → 失敗時 OpenStreetMap）----
+  async function reverseGeocode(lat, lon) {
+    try {
+      const j = await (await fetch(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat}&lon=${lon}`)).json();
+      const r = j && j.results;
+      const table = window.GSI && GSI.MUNI_ARRAY;
+      if (r && r.muniCd && table) {
+        const v = table[r.muniCd] || table[String(parseInt(r.muniCd, 10))];
+        if (v) {
+          const [, pref, , muni] = v.split(',');
+          return { pref, city: (muni.replace(/[\s　]+/g, ' ').trim() + ' ' + (r.lv01Nm && r.lv01Nm !== '－' ? r.lv01Nm : '')).trim() };
+        }
+      }
+    } catch { /* フォールバックへ */ }
+    try {
+      const j = await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14&accept-language=ja`)).json();
+      const a = j.address || {};
+      const city = [a.city || a.town || a.village || a.county || '', a.suburb || a.quarter || ''].filter(Boolean).join(' ');
+      return { pref: a.province || a.state || a.country || '', city: city || j.name || '現在地' };
+    } catch {
+      return { pref: '', city: `${lat.toFixed(2)}, ${lon.toFixed(2)}` };
+    }
+  }
+
+  // ---- 天気（Open-Meteo）----
+  async function fetchWeather(lat, lon) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,is_day,pressure_msl,surface_pressure,precipitation` +
+      `&hourly=temperature_2m,precipitation_probability,weather_code,is_day,pressure_msl` +
+      `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
+      `&past_hours=3&forecast_hours=25&forecast_days=1&timezone=auto`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('天気データの取得に失敗しました');
+    return r.json();
+  }
+
+  // ---- 大気（Open-Meteo Air Quality）----
+  const EU_POLLEN = {
+    alder_pollen:'ハンノキ', birch_pollen:'シラカバ', grass_pollen:'イネ科',
+    mugwort_pollen:'ヨモギ', olive_pollen:'オリーブ', ragweed_pollen:'ブタクサ'
+  };
+  async function fetchAir(lat, lon) {
+    const vars = ['pm2_5', 'dust', ...Object.keys(EU_POLLEN)].join(',');
+    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
+      `&current=${vars}&hourly=pm2_5,dust&forecast_hours=24&timezone=auto`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('大気データの取得に失敗しました');
+    return r.json();
+  }
+
+  // ---- 花粉（Google Pollen API・任意）----
+  async function fetchGooglePollen(lat, lon, key) {
+    const url = `https://pollen.googleapis.com/v1/forecast:lookup?key=${encodeURIComponent(key)}` +
+      `&location.latitude=${lat}&location.longitude=${lon}&days=1&languageCode=ja&plantsDescription=false`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`Google Pollen API エラー (${r.status})`);
+    return r.json();
+  }
+
+  // ================= 描画 =================
+  function renderWeather(w) {
+    const c = w.current;
+    const [icon, text] = wmo(c.weather_code, c.is_day);
+    $('wicon').textContent = icon;
+    $('temp').textContent = `${Math.round(c.temperature_2m)}°`;
+    $('wtext').textContent = text;
+    const d = w.daily;
+    $('sub').textContent = `最高 ${Math.round(d.temperature_2m_max[0])}°  最低 ${Math.round(d.temperature_2m_min[0])}°  体感 ${Math.round(c.apparent_temperature)}°`;
+    document.body.classList.toggle('night', !c.is_day);
+    document.body.classList.toggle('rain', c.is_day && c.weather_code >= 51);
+
+    // 今の時刻に当たる hourly の位置
+    const h = w.hourly;
+    const nowKey = c.time.slice(0, 13);
+    let i0 = h.time.findIndex(t => t.slice(0, 13) === nowKey);
+    if (i0 < 0) i0 = 0;
+
+    // 12時間の予報
+    let html = '';
+    for (let i = i0; i < Math.min(i0 + 13, h.time.length); i++) {
+      const hr = +h.time[i].slice(11, 13);
+      const [ic] = wmo(h.weather_code[i], h.is_day[i]);
+      const p = h.precipitation_probability[i];
+      html += `<div class="h"><div class="t">${i === i0 ? '今' : hr + '時'}</div><div class="i">${ic}</div>` +
+              `<div class="v">${Math.round(h.temperature_2m[i])}°</div><div class="p">${p != null && p >= 10 ? p + '%' : ''}</div></div>`;
+    }
+    $('hours').innerHTML = html;
+
+    // 湿度
+    const hum = c.relative_humidity_2m;
+    $('hum').innerHTML = `${hum}<small>%</small>`;
+    $('humBar').style.width = hum + '%';
+    $('humNote').textContent = hum < 30 ? '乾燥しています。保湿・のどのケアを' :
+                               hum < 40 ? 'やや乾燥' : hum <= 60 ? '快適な湿度です' :
+                               hum <= 75 ? 'やや蒸し暑い・ジメジメ' : '湿度が高め。カビ・結露に注意';
+
+    // 降水確率（今の1時間 + 今日の最大）
+    const popNow = h.precipitation_probability[i0];
+    const next6 = h.precipitation_probability.slice(i0, i0 + 6).filter(v => v != null);
+    const max6 = next6.length ? Math.max(...next6) : null;
+    $('pop').innerHTML = `${popNow ?? '--'}<small>%</small>`;
+    $('popBar').style.width = (popNow || 0) + '%';
+    $('popNote').textContent = `6時間以内の最大 ${max6 ?? '--'}%・今日の最大 ${d.precipitation_probability_max[0] ?? '--'}%`;
+
+    // 気圧（海面気圧）と3時間の変化
+    const pNow = c.pressure_msl;
+    const pPast = h.pressure_msl[Math.max(0, i0 - 3)];
+    const pNext = h.pressure_msl[Math.min(h.time.length - 1, i0 + 3)];
+    const fmt = v => (v > 0 ? '+' : '') + v.toFixed(1);
+    const dPast = pNow - pPast, dNext = pNext - pNow;
+    const arrow = dNext <= -1 ? '↘︎' : dNext >= 1 ? '↗︎' : '→';
+    $('pres').innerHTML = `${Math.round(pNow)}<small>hPa ${arrow}</small>`;
+    let msg = `過去3時間 ${fmt(dPast)} hPa ／ この先3時間 ${fmt(dNext)} hPa`;
+    if (dNext <= -2 || dPast <= -2) msg += '\n気圧が下がっています。頭痛・だるさに注意';
+    else if (pNow < 1000) msg += '\n低気圧の影響を受けています';
+    else if (pNow >= 1020) msg += '\n高気圧に覆われ、安定しています';
+    $('presNote').innerText = msg + `\n地上気圧 ${Math.round(c.surface_pressure)} hPa`;
+  }
+
+  function renderAir(a) {
+    const c = a.current;
+    // PM2.5（環境省の目安：日平均 35 が環境基準、70 超で注意喚起）
+    const pm = c.pm2_5;
+    if (pm != null) {
+      $('pm').innerHTML = `${Math.round(pm)}<small>µg/m³</small>`;
+      if (pm <= 15) level('pmLv', '良い', 'good');
+      else if (pm <= 35) level('pmLv', '普通', 'ok');
+      else if (pm <= 70) level('pmLv', 'やや多い', 'warn');
+      else level('pmLv', '多い・注意', 'worst');
+      const max = Math.max(...a.hourly.pm2_5.filter(v => v != null));
+      $('pmNote').textContent = `24時間の最大 ${Math.round(max)}`;
+    } else $('pmNote').textContent = 'データなし';
+
+    // 黄砂（大気中ダスト濃度。目安の区分）
+    const dust = c.dust;
+    if (dust != null) {
+      $('dust').innerHTML = `${Math.round(dust)}<small>µg/m³</small>`;
+      if (dust < 10) level('dustLv', 'ほぼなし', 'good');
+      else if (dust < 30) level('dustLv', '少ない', 'ok');
+      else if (dust < 70) level('dustLv', 'やや多い', 'warn');
+      else if (dust < 150) level('dustLv', '多い', 'bad');
+      else level('dustLv', '非常に多い', 'worst');
+      const max = Math.max(...a.hourly.dust.filter(v => v != null));
+      $('dustNote').textContent = `24時間の最大 ${Math.round(max)}`;
+    } else $('dustNote').textContent = 'データなし';
+  }
+
+  // 花粉：Google（キーあり）→ Open-Meteo（欧州など）→ 季節の目安
+  const SEASON_JP = [
+    '', // 0
+    'スギ花粉が飛び始める地域も（九州・関東など）',
+    'スギ花粉のシーズン',
+    'スギ花粉のピーク',
+    'ヒノキ花粉のピーク・スギは終盤',
+    'ヒノキ終盤・イネ科が増える時期',
+    'イネ科（カモガヤなど）の時期',
+    'イネ科の時期',
+    'ブタクサ・ヨモギが出始める時期',
+    'ブタクサ・ヨモギ（キク科）の時期',
+    'ブタクサ・ヨモギの終盤',
+    '飛散は少ない時期',
+    '飛散は少ない時期',
+  ];
+  async function renderPollen(lat, lon, air) {
+    const key = getKey();
+    if (key) {
+      try {
+        const g = await fetchGooglePollen(lat, lon, key);
+        const day = g.dailyInfo && g.dailyInfo[0];
+        const items = [...(day?.plantInfo || []), ...(day?.pollenTypeInfo || [])]
+          .filter(p => p.indexInfo).sort((x, y) => y.indexInfo.value - x.indexInfo.value);
+        if (items.length) {
+          const top = items[0];
+          const v = top.indexInfo.value;
+          $('pollen').textContent = `${top.displayName}`;
+          level('pollenLv', top.indexInfo.category, v <= 1 ? 'good' : v === 2 ? 'ok' : v === 3 ? 'warn' : v === 4 ? 'bad' : 'worst');
+          $('pollenNote').textContent = items.slice(1, 4).map(p => `${p.displayName} ${p.indexInfo.category}`).join('・') || 'Google Pollen API';
+          return;
+        }
+      } catch (e) {
+        $('pollenNote').textContent = e.message;
+      }
+    }
+    // Open-Meteo（ヨーロッパのみ値がある）
+    const c = air && air.current;
+    const vals = c ? Object.keys(EU_POLLEN).filter(k => c[k] != null).map(k => [EU_POLLEN[k], c[k]]) : [];
+    if (vals.length) {
+      vals.sort((x, y) => y[1] - x[1]);
+      const [name, v] = vals[0];
+      $('pollen').innerHTML = `${Math.round(v)}<small>粒/m³ ${name}</small>`;
+      if (v < 10) level('pollenLv', '少ない', 'good');
+      else if (v < 50) level('pollenLv', 'やや多い', 'warn');
+      else if (v < 150) level('pollenLv', '多い', 'bad');
+      else level('pollenLv', '非常に多い', 'worst');
+      $('pollenNote').textContent = vals.slice(1, 4).map(([n, x]) => `${n} ${Math.round(x)}`).join('・');
+      return;
+    }
+    // 季節の目安
+    const m = new Date().getMonth() + 1;
+    $('pollen').textContent = SEASON_JP[m];
+    $('pollenLv').hidden = true;
+    $('pollenNote').textContent = (key ? '' : '季節の目安です。') + 'タップして Google Pollen API キーを設定すると実測レベルを表示します';
+  }
+
+  // ================= 更新 =================
+  let busy = false;
+  async function refresh() {
+    if (busy) return;
+    busy = true;
+    $('reload').classList.add('spin');
+    $('status').className = '';
+    $('status').textContent = '現在地を取得中…';
+    try {
+      const { lat, lon } = await getPosition();
+      $('status').textContent = 'データを取得中…';
+      const [place, w, air] = await Promise.all([
+        reverseGeocode(lat, lon),
+        fetchWeather(lat, lon),
+        fetchAir(lat, lon).catch(e => { console.warn(e); return null; }),
+      ]);
+      $('pref').textContent = place.pref || ' ';
+      $('city').textContent = place.city;
+      renderWeather(w);
+      if (air) renderAir(air);
+      await renderPollen(lat, lon, air);
+      const d = new Date();
+      $('status').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())} 更新` + (air ? '' : '（大気データは取得できませんでした）');
+    } catch (e) {
+      $('status').textContent = e.message;
+      $('status').className = 'err';
+      if ($('city').textContent.endsWith('…')) $('city').textContent = '現在地';
+    } finally {
+      busy = false;
+      $('reload').classList.remove('spin');
+    }
+  }
+
+  $('reload').addEventListener('click', refresh);
+
+  // 設定
+  const dlg = $('dlg');
+  const openSettings = () => { $('keyIn').value = getKey(); dlg.showModal(); };
+  $('setBtn').addEventListener('click', openSettings);
+  $('pollenTile').addEventListener('click', openSettings);
+  $('dlgCancel').addEventListener('click', () => dlg.close());
+  $('dlgSave').addEventListener('click', () => { setKey($('keyIn').value.trim()); dlg.close(); refresh(); });
+  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+
+  // アプリに戻ってきたとき、10分以上たっていれば自動更新
+  let lastShown = Date.now();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && Date.now() - lastShown > 10 * 60 * 1000) refresh();
+    if (document.visibilityState === 'hidden') lastShown = Date.now();
+  });
+  setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 15 * 60 * 1000);
+
+  refresh();
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
