@@ -434,7 +434,7 @@ function update(dt){
 // ===================== audio =====================
 let AC=null, master=null, noiseBuf=null, lastWall=0, lastClick=0;
 function initAudio(){
-  try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
+  try{ if(navigator.audioSession) navigator.audioSession.type='ambient'; }catch(e){}
   try{
     if(!AC){ const A=window.AudioContext||window.webkitAudioContext; if(!A) return; AC=new A();
       master=AC.createGain(); master.gain.value=0.6;
