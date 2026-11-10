@@ -40,13 +40,13 @@
   .icon{width:64px;height:64px;border-radius:15px;overflow:hidden;
     box-shadow:0 6px 16px rgba(0,0,0,.28),inset 0 0 0 .5px rgba(255,255,255,.18);
     transition:transform .15s ease,filter .15s ease;animation:pop .45s cubic-bezier(.2,1.4,.4,1) both}
-  .icon svg{display:block;width:100%;height:100%}
+  .icon svg,.icon img{display:block;width:100%;height:100%}
   .app:active .icon{transform:scale(.88);filter:brightness(.8)}
   .name{margin-top:7px;font-size:11.5px;font-weight:500;max-width:76px;white-space:nowrap;overflow:hidden;
     text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.45)}
   .app:nth-child(2) .icon{animation-delay:.04s}.app:nth-child(3) .icon{animation-delay:.08s}
   .app:nth-child(4) .icon{animation-delay:.12s}.app:nth-child(5) .icon{animation-delay:.16s}
-  .app:nth-child(6) .icon{animation-delay:.2s}
+  .app:nth-child(6) .icon{animation-delay:.2s}.app:nth-child(7) .icon{animation-delay:.24s}
   @keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
   .dots{display:flex;justify-content:center;gap:7px;margin:40px 0 0}
   .dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4)}
@@ -185,6 +185,11 @@
       <path d="M6 56 Q14 52 20 56 T34 56 T48 56 T60 56" stroke="#00e5ff" stroke-width="1.5" fill="none" opacity=".7"/>
     </svg></div>
     <span class="name">サウンド</span>
+  </a>
+  <!-- そら模様（天気・花粉・黄砂・PM2.5） -->
+  <a class="app" href="weather/weather.html">
+    <div class="icon"><img src="weather/apple-touch-icon.png" alt=""></div>
+    <span class="name">そら模様</span>
   </a>
 </nav>
 
