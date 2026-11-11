@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="EVOLVE">
+<meta name="theme-color" content="#000000">
+<title>EVOLVE – 進化するシューティング</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#000;overflow:hidden;overscroll-behavior:none;
+    -webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+  body{height:100dvh;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif}
+  canvas{position:fixed;inset:0;width:100vw;height:100dvh;display:block;touch-action:none}
+  #probe{position:fixed;visibility:hidden;pointer-events:none;
+    padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+  .btn{position:fixed;z-index:2;width:44px;height:44px;border-radius:22px;border:1px solid rgba(255,255,255,.22);
+    background:rgba(255,255,255,.07);color:#fff;display:grid;place-items:center;text-decoration:none;
+    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:transform .12s,background .12s;
+    font:600 15px/1 -apple-system,sans-serif;cursor:pointer;touch-action:manipulation}
+  .btn:active{transform:scale(.88);background:rgba(255,255,255,.18)}
+  .btn svg{width:22px;height:22px}
+  #home{top:calc(env(safe-area-inset-top) + 8px);left:calc(env(safe-area-inset-left) + 10px)}
+  #snd{top:calc(env(safe-area-inset-top) + 8px);right:calc(env(safe-area-inset-right) + 10px)}
+  #wpn{width:68px;height:68px;border-radius:34px;right:calc(env(safe-area-inset-right) + 14px);
+    bottom:calc(env(safe-area-inset-bottom) + 16px);display:flex;flex-direction:column;gap:3px;
+    border-color:var(--c,#6ff);box-shadow:0 0 14px var(--c,#6ff) inset,0 0 10px rgba(0,0,0,.6)}
+  #wpn small{font:600 9px/1 Menlo,monospace;opacity:.7;letter-spacing:.08em}
+  #wpn b{font:800 11px/1 Menlo,monospace;letter-spacing:.04em;color:var(--c,#6ff)}
+  #wpn[hidden]{display:none}
+</style>
+</head>
+<body>
+<div id="probe"></div>
+<canvas id="c"></canvas>
+<a id="home" class="btn" href="../index.html" aria-label="ホームへ戻る">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></svg>
+</a>
+<button id="snd" class="btn" aria-label="サウンド切替">♪</button>
+<button id="wpn" class="btn" hidden aria-label="武器切替"><small>WEAPON</small><b>NORMAL</b></button>
+<script>
+'use strict';
+/* =========================================================
+   EVOLVE — 遊ぶほど「ゲームそのもの」が進化するシューティング
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const cv = $('#c'), ctx = cv.getContext('2d');
+const TAU = Math.PI * 2;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[Math.random() * a.length | 0];
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const MONO = '"SF Mono",Menlo,Consolas,monospace';
+const JP = '-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif';
+
+let VW = 390, W = 390, H = 844, OX = 0, DPR = 1, SAT = 0, SAB = 0;
+let G = null, mode = 'title', modeT = 0, paused = false, gdt = 0;
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('evolve.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('evolve.' + k, JSON.stringify(v)); } catch (e) {} }
+};
+let HI = store.get('hi', 0), BEST_EVO = store.get('bestEvo', 0), newRecord = false;
+
+/* ---------- 画面サイズ ---------- */
+let STARS = [];
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  VW = window.innerWidth; H = window.innerHeight;
+  W = Math.min(VW, 520); OX = (VW - W) / 2;
+  cv.width = Math.round(VW * DPR); cv.height = Math.round(H * DPR);
+  const cs = getComputedStyle($('#probe'));
+  SAT = parseFloat(cs.paddingTop) || 0; SAB = parseFloat(cs.paddingBottom) || 0;
+  STARS = Array.from({ length: 90 }, () => ({ x: Math.random() * W, y: Math.random() * H, z: rnd(.2, 1) }));
+  if (G) { G.p.x = clamp(G.p.x, 16, W - 16); G.p.y = clamp(G.p.y, SAT + 90, baseY()); }
+}
+window.addEventListener('resize', resize);
+const baseY = () => H - SAB - 104;
+
+/* ---------- 進化テーブル ---------- */
+const EVOS = [
+  { g: 0,   name: 'GENESIS',   desc: 'はじまりの形。横にしか動けない' },
+  { g: 12,  name: 'RAPID',     desc: '連射できるようになった' },
+  { g: 30,  name: 'FREE MOVE', desc: '上下にも自由に動ける機体へ' },
+  { g: 55,  name: 'SWARM',     desc: '敵が編隊を崩して襲いかかる' },
+  { g: 85,  name: 'CHROMA',    desc: '世界に色とビートが宿った（1UP）' },
+  { g: 120, name: 'SPREAD',    desc: '3WAYショット解禁。右下で武器切替' },
+  { g: 160, name: 'LOCK-ON',   desc: '押して敵を捕捉、離してレーザー発射' },
+  { g: 205, name: 'TITAN',     desc: '巨大な敵が現れるようになった' },
+  { g: 260, name: 'PULSE',     desc: '火力倍増。世界が脈動する（1UP）' },
+  { g: 330, name: 'INFINITY',  desc: 'ロック数増加。ここから先は無限' },
+];
+function evoInfo(n) {
+  if (n < EVOS.length) return EVOS[n];
+  const k = n - EVOS.length + 1;
+  return { g: EVOS[EVOS.length - 1].g + k * 90, name: 'INFINITY +' + k, desc: 'さらに進化。敵が激しさを増す' };
+}
+const WEAPONS = [
+  { id: 'normal', name: 'NORMAL', evo: 0, c: '#7ff' },
+  { id: 'spread', name: 'SPREAD', evo: 5, c: '#ffd04a' },
+  { id: 'lock',   name: 'LOCK',   evo: 6, c: '#ff4fd8' },
+];
+const avail = () => WEAPONS.filter(w => G && G.evo >= w.evo);
+const curW = () => WEAPONS.find(w => w.id === G.weapon) || WEAPONS[0];
+
+/* ---------- 手続き生成のドット敵 ---------- */
+function genSprite() {
+  for (;;) {
+    const half = [];
+    for (let i = 0; i < 20; i++) half.push(Math.random() < ((i % 4) === 3 ? .6 : .45));
+    half[5] = true; half[6] = false; half[7] = true;          // 目
+    half[9] = half[10] = half[11] = true;                     // 胴
+    const make = h => { const a = []; for (let y = 0; y < 5; y++) for (let x = 0; x < 7; x++) a.push(h[y * 4 + (x < 4 ? x : 6 - x)] ? 1 : 0); return a; };
+    const h2 = half.slice(); for (let x = 0; x < 4; x++) h2[16 + x] = Math.random() < .5; h2[12] = !h2[12];
+    const f0 = make(half), f1 = make(h2);
+    const n = f0.reduce((s, v) => s + v, 0);
+    if (n >= 15 && n <= 28) return [f0, f1];
+  }
+}
+let TITLE_SPR = Array.from({ length: 5 }, genSprite), titleMutT = 0;
+
+/* =========================================================
+   サウンド（Web Audio で全部合成）
+   ========================================================= */
+const AU = { c: null, m: null, nb: null, on: store.get('sound', true), next: 0, step: 0 };
+function audioInit() {
+  try {
+    if (!AU.c) {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      AU.c = new AC();
+      const comp = AU.c.createDynamicsCompressor();
+      AU.m = AU.c.createGain(); AU.m.gain.value = AU.on ? .5 : 0;
+      AU.m.connect(comp); comp.connect(AU.c.destination);
+      const len = AU.c.sampleRate; const b = AU.c.createBuffer(1, len, AU.c.sampleRate);
+      const d = b.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1; AU.nb = b;
+      const s = AU.c.createBufferSource(); s.buffer = AU.c.createBuffer(1, 1, 22050); s.connect(AU.m); s.start(0);
+    }
+    if (AU.c.state !== 'running') AU.c.resume();
+  } catch (e) {}
+}
+const aok = () => AU.c && AU.on && AU.c.state === 'running';
+const mtof = n => 440 * Math.pow(2, (n - 69) / 12);
+function env(g, t, a, d, v) { g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(v, t + a); g.gain.exponentialRampToValueAtTime(.0001, t + a + d); }
+function osc(type, f0, f1, t, dur, vol) {
+  const o = AU.c.createOscillator(), g = AU.c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t);
+  if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  env(g, t, .004, dur, vol); o.connect(g); g.connect(AU.m); o.start(t); o.stop(t + dur + .05);
+}
+function nz(t, dur, vol, ft, fq, q) {
+  const s = AU.c.createBufferSource(), f = AU.c.createBiquadFilter(), g = AU.c.createGain();
+  s.buffer = AU.nb; f.type = ft; f.frequency.value = fq; if (q) f.Q.value = q;
+  env(g, t, .002, dur, vol); s.connect(f); f.connect(g); g.connect(AU.m);
+  s.start(t, Math.random() * .5); s.stop(t + dur + .05);
+}
+const SFX = {
+  shot() { if (!aok()) return; const t = AU.c.currentTime; G.evo < 4 ? osc('square', 1300, 350, t, .06, .035) : osc('triangle', 2000, 700, t, .05, .05); },
+  hit() { if (!aok()) return; osc('square', 220, 160, AU.c.currentTime, .04, .04); },
+  boom(big) { if (!aok()) return; const t = AU.c.currentTime; nz(t, big ? .9 : .28, big ? .7 : .35, 'lowpass', big ? 900 : 1600); osc('sine', big ? 160 : 220, 35, t, big ? .7 : .2, big ? .6 : .3); },
+  march(i) { if (!aok()) return; osc('square', [104, 93, 83, 78][i % 4], 0, AU.c.currentTime, .09, .12); },
+  lock(n) { if (!aok()) return; osc('sine', 700 + n * 110, 0, AU.c.currentTime, .06, .09); },
+  laser(n) { if (!aok()) return; const t = AU.c.currentTime; osc('sawtooth', 220, 1800, t, .3, .06 + n * .006); nz(t, .25, .15, 'highpass', 3000); },
+  die() { if (!aok()) return; const t = AU.c.currentTime; nz(t, 1.1, .8, 'lowpass', 700); osc('sawtooth', 500, 30, t, 1, .2); },
+  evolve() { if (!aok()) return; const t = AU.c.currentTime; [0, 4, 7, 12, 16, 19, 24].forEach((n, i) => osc(i % 2 ? 'square' : 'triangle', mtof(64 + n), 0, t + i * .06, .25, .09)); nz(t, .8, .2, 'bandpass', 2500, .6); },
+  warn() { if (!aok()) return; const t = AU.c.currentTime; for (let i = 0; i < 3; i++) { osc('square', 440, 0, t + i * .5, .2, .1); osc('square', 330, 0, t + i * .5 + .22, .2, .1); } },
+  bonus() { if (!aok()) return; const t = AU.c.currentTime; [0, 5, 9, 12].forEach((n, i) => osc('square', mtof(76 + n), 0, t + i * .05, .1, .06)); },
+};
+/* --- 進化に合わせて層が増えるBGM --- */
+const BASS = [45, 41, 48, 43];
+const CHORD = [[57, 60, 64], [53, 57, 60], [55, 60, 64], [55, 59, 62]];
+const bpm = () => Math.min(152, 108 + G.evo * 4);
+function playStep(s, t) {
+  const e = G.evo, i = s % 16, bar = (s >> 4) % 4, spb = 60 / bpm() / 4;
+  if (e >= 1 && i % 4 === 0) osc('sine', 150, 40, t, .2, .55);
+  if (e >= 4 && (i === 4 || i === 12)) nz(t, .13, .3, 'bandpass', 1900, .7);
+  if (e >= 2 && (e >= 8 ? i % 2 === 1 : i % 4 === 2)) nz(t, .035, .09, 'highpass', 8000);
+  if (e >= 3 && i % 2 === 0) osc('triangle', mtof(BASS[bar] + (i % 4 === 2 ? 12 : 0)), 0, t, spb * 1.7, .26);
+  if (e >= 5) osc('square', mtof(CHORD[bar][i % 3] + 12 + (i >= 8 && e >= 7 ? 12 : 0)), 0, t, spb * .7, .025);
+  if (e >= 8 && [0, 3, 6, 10, 12].includes(i)) osc('triangle', mtof(CHORD[bar][(i >> 2) % 3] + 24), 0, t, spb * 2.2, .05);
+}
+setInterval(() => {
+  if (!AU.c || AU.c.state !== 'running' || mode !== 'play' || paused || !G) return;
+  const spb = 60 / bpm() / 4;
+  if (AU.next < AU.c.currentTime - .05) AU.next = AU.c.currentTime + .03;
+  while (AU.next < AU.c.currentTime + .12) { if (AU.on) playStep(AU.step, AU.next); AU.next += spb; AU.step = (AU.step + 1) % 64; }
+}, 25);
+
+/* =========================================================
+   ゲーム状態
+   ========================================================= */
+function startGame() {
+  G = {
+    score: 0, genes: 0, evo: 0, lives: 3, wave: 0, diff: 1, t: 0, hue: 190,
+    p: { x: W / 2, y: baseY(), inv: 2, cool: 0, alive: true, respawn: 0 },
+    pb: [], eb: [], en: [], parts: [], rings: [], lasers: [], locks: [], dots: [], pops: [], queue: [],
+    lockT: 0, clearT: 0, form: null, frame: 0, banner: null, flash: 0, shake: 0,
+    weapon: 'normal', nextBoss: 1e9, diveT: 3, bonusT: rnd(8, 14),
+  };
+  mode = 'play'; modeT = 0; paused = false; newRecord = false;
+  AU.step = 0; if (AU.c) AU.next = AU.c.currentTime + .05;
+  banner('EVOLUTION 00', 'GENESIS', EVOS[0].desc);
+  nextWave(); updWpnBtn();
+}
+function banner(top, name, desc) { G.banner = { top, name, desc, t: 0 }; }
+function gameOver() {
+  mode = 'over'; modeT = 0;
+  if (G.score > HI) { HI = G.score; newRecord = true; store.set('hi', HI); }
+  if (G.evo > BEST_EVO) { BEST_EVO = G.evo; store.set('bestEvo', BEST_EVO); }
+  updWpnBtn();
+}
+
+function checkEvo() {
+  while (G.genes >= evoInfo(G.evo + 1).g) {
+    G.evo++;
+    const info = evoInfo(G.evo);
+    banner('EVOLUTION ' + String(G.evo).padStart(2, '0'), info.name, info.desc);
+    G.flash = 1; G.shake = Math.max(G.shake, .3); SFX.evolve();
+    for (const b of G.eb) spark(b.x, b.y, col(40), 3, 60);
+    G.eb = [];
+    if (G.evo === 4 || G.evo === 8) G.lives = Math.min(G.lives + 1, 6);
+    if (G.evo === 5) G.weapon = 'spread';
+    if (G.evo === 6) G.weapon = 'lock';
+    if (G.evo === 7) G.nextBoss = G.wave + 1;
+    G.p.inv = Math.max(G.p.inv, 1);
+    updWpnBtn();
+  }
+}
+
+/* ---------- ウェーブ ---------- */
+function nextWave() {
+  G.wave++;
+  G.diff = 1 + G.wave * .035 + Math.max(0, G.evo - 9) * .12;
+  if (G.evo >= 7 && G.wave >= G.nextBoss) { spawnBoss(); G.nextBoss = G.wave + 6; return; }
+  if (G.evo < 3) { spawnFormation(); return; }
+  const opts = ['formation', 'formation', 'snake', 'swoop'];
+  if (G.evo >= 5) opts.push('turret', 'snake', 'swoop');
+  if (G.evo >= 8) opts.push('mix', 'mix');
+  const k = pick(opts);
+  if (k === 'formation') spawnFormation();
+  else if (k === 'snake') { spawnSnake(0); if (G.diff > 1.4) spawnSnake(1.6); }
+  else if (k === 'swoop') { spawnSwoop(0); spawnSwoop(1.8); }
+  else if (k === 'turret') { spawnTurret(0); spawnSnake(1); if (G.diff > 1.5) spawnTurret(2.5); }
+  else { spawnSnake(0); spawnSwoop(1.5); spawnTurret(3); spawnSwoop(4.5); }
+}
+const later = (t, fn) => G.queue.push({ t, fn });
+
+function spawnFormation() {
+  const cols = Math.min(6 + (G.wave > 10 ? 1 : 0), Math.floor((W - 60) / 42) + 1);
+  const rows = Math.min(3 + Math.floor(G.wave / 3), 5);
+  const sp = [genSprite(), genSprite(), genSprite()];
+  const fw = (cols - 1) * 42;
+  G.form = { x: (W - fw) / 2, y: SAT + 118, dir: 1, stepT: 0, total: rows * cols, enter: 1, fireT: 1.6, note: 0 };
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    G.en.push({ type: 'grid', state: 'form', r, c, ox: c * 42, oy: r * 34, x: -99, y: -99, hp: (G.evo >= 6 && r === 0) ? 2 : 1,
+      rad: 13, spr: sp[Math.min(2, Math.floor(r * 3 / rows))], score: (rows - r) * 10 + 10, t: 0, hitT: 0 });
+  }
+}
+function spawnSnake(delay) {
+  const n = 7 + Math.min(6, G.wave >> 2), x0 = rnd(80, W - 80), amp = rnd(50, Math.min(120, x0 - 20, W - x0 - 20)), w = rnd(1.6, 2.6), v = rnd(110, 150) * Math.sqrt(G.diff);
+  for (let i = 0; i < n; i++) later(delay + i * .2, () => G.en.push({ type: 'snake', x0, amp, w, v, t: 0, x: x0, y: -20, hp: 1, rad: 11, score: 20, fireT: rnd(.8, 3), hitT: 0 }));
+}
+function spawnSwoop(delay) {
+  const left = Math.random() < .5, y0 = SAT + rnd(90, 220), n = 6 + Math.min(4, G.wave >> 3);
+  for (let i = 0; i < n; i++) later(delay + i * .18, () => G.en.push({ type: 'swoop', x: left ? -20 : W + 20, y: y0, a: left ? 0 : Math.PI, om: left ? 1.25 : -1.25,
+    s: 230 * Math.sqrt(G.diff), t: 0, hp: 1, rad: 11, score: 25, shot: false, hitT: 0 }));
+}
+function spawnTurret(delay) {
+  later(delay, () => { const hp = Math.round(7 * Math.sqrt(G.diff)); G.en.push({ type: 'turret', x: rnd(70, W - 70), y: -30, ty: SAT + rnd(150, 300), state: 'in', t: 0, ang: 0, fireT: 1, hp, maxhp: hp, rad: 19, score: 120, genes: 3, hitT: 0 }); });
+}
+function spawnBoss() {
+  const hp = Math.round(70 * G.diff + G.evo * 6);
+  G.en.push({ type: 'boss', x: W / 2, y: -90, ty: SAT + 175, hp, maxhp: hp, rad: 46, t: 0, pat: 0, patT: 0, fireT: 1.5, ang: 0, score: 3000, genes: 20, hitT: 0 });
+  banner('WARNING', 'TITAN APPROACHING', '巨大な敵が接近中'); SFX.warn();
+}
+
+/* ---------- 弾 ---------- */
+const bs = () => 1 + (G.diff - 1) * .5;
+function eshoot(x, y, vx, vy) { if (G.eb.length < 420) G.eb.push({ x, y, vx, vy, r: G.evo < 4 ? 3 : 4 }); }
+function aimed(e, sp, n = 1, spr = .22) {
+  const tx = G.p.alive ? G.p.x : W / 2, ty = G.p.alive ? G.p.y : baseY();
+  const a = Math.atan2(ty - e.y, tx - e.x);
+  for (let k = 0; k < n; k++) { const b = a + (k - (n - 1) / 2) * spr; eshoot(e.x, e.y, Math.cos(b) * sp, Math.sin(b) * sp); }
+}
+function ring(e, n, sp, off = 0) { for (let k = 0; k < n; k++) { const a = off + k * TAU / n; eshoot(e.x, e.y, Math.cos(a) * sp, Math.sin(a) * sp); } }
+
+/* ---------- エフェクト ---------- */
+function col(off = 0, l = 62) { return G && G.evo >= 4 ? `hsl(${(G.hue + off) % 360},100%,${l}%)` : '#eef4ff'; }
+function spark(x, y, c, n, sp) {
+  for (let i = 0; i < n; i++) { const a = Math.random() * TAU, s = sp * rnd(.3, 1.2), l = rnd(.3, .7); G.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: l, max: l, c }); }
+}
+function boom(x, y, c, big) {
+  spark(x, y, c, big ? 46 : 14, big ? 320 : 170);
+  G.rings.push({ x, y, r: 4, vr: big ? 460 : 230, life: big ? .6 : .32, max: big ? .6 : .32, c });
+  if (big) spark(x, y, '#fff', 20, 200);
+}
+
+/* ---------- ダメージ ---------- */
+function damage(e, d, mult = 1) {
+  if (e.dead) return;
+  e.hp -= d; e.hitT = .07;
+  if (e.hp <= 0) kill(e, mult); else SFX.hit();
+}
+function kill(e, mult = 1) {
+  e.dead = true;
+  const pts = (e.score || 10) * (1 + (G.evo >> 1)) * mult;
+  G.score += pts;
+  const gn = e.genes || 1; G.genes += gn;
+  for (let i = 0; i < Math.min(gn, 6); i++) G.dots.push({ x: e.x, y: e.y, t: -i * .05, d: rnd(.5, .8), ox: rnd(-40, 40) });
+  const c = e.type === 'grid' ? rowCol(e) : col(e.type === 'boss' ? 0 : 60);
+  boom(e.x, e.y, c, e.type === 'boss' || e.type === 'turret');
+  SFX.boom(e.type === 'boss');
+  if (mult > 1) G.pops.push({ x: e.x, y: e.y - 12, txt: pts + ' ×' + mult, life: .9 });
+  if (e.type === 'bonus') { G.pops.push({ x: e.x, y: e.y - 12, txt: '+' + pts, life: 1.2 }); SFX.bonus(); }
+  if (e.type === 'boss') {
+    G.shake = 1.2; G.flash = .7;
+    for (const b of G.eb) spark(b.x, b.y, col(40), 2, 50); G.eb = [];
+    for (let i = 0; i < 8; i++) later(i * .12, () => { boom(e.x + rnd(-50, 50), e.y + rnd(-40, 40), col(i * 30), true); SFX.boom(false); });
+    G.pops.push({ x: e.x, y: e.y, txt: 'TITAN DOWN +' + pts, life: 2 });
+  }
+  checkEvo();
+}
+function playerHit(force) {
+  const p = G.p;
+  if (!p.alive || (p.inv > 0 && !force)) return;
+  p.alive = false; G.lives--; p.respawn = G.lives <= 0 ? 2.4 : 1.8;
+  boom(p.x, p.y, '#fff', true); spark(p.x, p.y, col(180), 30, 260);
+  G.shake = .8; G.flash = .35; SFX.die();
+  for (const b of G.eb) spark(b.x, b.y, '#f66', 2, 40);
+  G.eb = []; G.locks = [];
+}
+
+/* =========================================================
+   入力
+   ========================================================= */
+const input = { id: null, held: false, lx: 0, ly: 0, dx: 0, dy: 0 };
+const keys = {};
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault(); audioInit();
+  if (mode === 'title') { if (modeT > .3) startGame(); else return; }
+  else if (mode === 'over') { if (modeT > 1.3) startGame(); return; }
+  else if (paused) { paused = false; return; }
+  if (input.id === null) {
+    input.id = e.pointerId; input.held = true; input.lx = e.clientX; input.ly = e.clientY;
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+});
+cv.addEventListener('pointermove', e => {
+  if (e.pointerId !== input.id) return;
+  input.dx += e.clientX - input.lx; input.dy += e.clientY - input.ly;
+  input.lx = e.clientX; input.ly = e.clientY;
+});
+const release = e => { if (e.pointerId === input.id) { input.id = null; input.held = false; } };
+cv.addEventListener('pointerup', release);
+cv.addEventListener('pointercancel', release);
+document.addEventListener('gesturestart', e => e.preventDefault());
+
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  audioInit();
+  if ((e.code === 'Space' || e.code === 'Enter') && (mode === 'title' || (mode === 'over' && modeT > 1.3))) startGame();
+  if (mode === 'play' && (e.code === 'KeyX' || e.code === 'ShiftLeft' || e.code === 'ShiftRight')) cycleWeapon();
+  if (mode === 'play' && (e.code === 'KeyP' || e.code === 'Escape')) paused = !paused;
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+const wpnBtn = $('#wpn');
+function updWpnBtn() {
+  const av = G ? avail() : [];
+  if (mode !== 'play' || av.length < 2) { wpnBtn.hidden = true; return; }
+  wpnBtn.hidden = false;
+  const w = curW(); wpnBtn.querySelector('b').textContent = w.name; wpnBtn.style.setProperty('--c', w.c);
+}
+function cycleWeapon() {
+  const av = avail(); if (av.length < 2) return;
+  const i = av.findIndex(w => w.id === G.weapon);
+  G.weapon = av[(i + 1) % av.length].id; G.locks = [];
+  if (aok()) osc('square', 880, 1320, AU.c.currentTime, .06, .05);
+  updWpnBtn();
+}
+wpnBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); audioInit(); cycleWeapon(); });
+
+const sndBtn = $('#snd');
+function updSnd() { sndBtn.textContent = AU.on ? '♪' : '×'; sndBtn.style.opacity = AU.on ? 1 : .55; }
+sndBtn.addEventListener('click', () => {
+  AU.on = !AU.on; store.set('sound', AU.on); audioInit();
+  if (AU.m) AU.m.gain.value = AU.on ? .5 : 0; updSnd();
+});
+updSnd();
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (mode === 'play') paused = true; input.id = null; input.held = false; }
+  else audioInit();
+});
+
+/* =========================================================
+   更新
+   ========================================================= */
+function update(dt) {
+  G.t += dt;
+  if (G.evo >= 8) G.hue = (G.hue + dt * 14) % 360;
+  updPlayer(dt);
+  updForm(dt);
+  updEnemies(dt);
+  updShots(dt);
+  updLasers(dt);
+
+  for (const q of G.queue) { q.t -= dt; if (q.t <= 0) q.fn(); }
+  G.queue = G.queue.filter(q => q.t > 0);
+  G.en = G.en.filter(e => !e.dead && !e.gone);
+  G.locks = G.locks.filter(e => !e.dead && !e.gone);
+
+  if (!G.en.length && !G.queue.length) { G.clearT += dt; if (G.clearT > 1) { G.clearT = 0; nextWave(); } }
+  else G.clearT = 0;
+
+  if (G.banner) { G.banner.t += dt; if (G.banner.t > 3) G.banner = null; }
+  G.flash = Math.max(0, G.flash - dt * 2.2);
+  G.shake = Math.max(0, G.shake - dt * 2);
+}
+
+function updPlayer(dt) {
+  const p = G.p;
+  p.inv = Math.max(0, p.inv - dt); p.cool -= dt;
+  if (!p.alive) {
+    input.dx = input.dy = 0;
+    p.respawn -= dt;
+    if (p.respawn <= 0) {
+      if (G.lives <= 0) { gameOver(); return; }
+      p.alive = true; p.inv = 2.5; p.x = W / 2; p.y = baseY();
+    }
+    return;
+  }
+  const free = G.evo >= 2;
+  const kx = (keys.ArrowRight || keys.KeyD ? 1 : 0) - (keys.ArrowLeft || keys.KeyA ? 1 : 0);
+  const ky = (keys.ArrowDown || keys.KeyS ? 1 : 0) - (keys.ArrowUp || keys.KeyW ? 1 : 0);
+  const spd = free ? 300 : 240;
+  p.x += kx * spd * dt + input.dx * 1.3;
+  if (free) p.y += ky * spd * dt + input.dy * 1.3;
+  else p.y += (baseY() - p.y) * Math.min(1, dt * 8);
+  input.dx = input.dy = 0;
+  p.x = clamp(p.x, 16, W - 16);
+  p.y = clamp(p.y, SAT + 90, H - SAB - 46);
+
+  const firing = input.held || keys.Space;
+  const w = curW().id;
+  if (w === 'lock') {
+    if (firing) {
+      G.lockT -= dt;
+      const max = G.evo >= 9 ? 12 : 8;
+      if (G.lockT <= 0 && G.locks.length < max) {
+        G.lockT = .075;
+        let best = null, bd = 380 * 380;
+        for (const e of G.en) {
+          if (e.dead || e.y > p.y - 8 || e.y < SAT + 30 || e.x < 0 || e.x > W) continue;
+          const have = G.locks.filter(l => l === e).length;
+          if (have >= Math.max(1, Math.ceil(e.hp / 2))) continue;
+          const d = (e.x - p.x) ** 2 + (e.y - p.y) ** 2 + have * 4e4;
+          if (d < bd) { bd = d; best = e; }
+        }
+        if (best) { G.locks.push(best); SFX.lock(G.locks.length); }
+      }
+    } else if (G.locks.length) {
+      const n = G.locks.length;
+      G.locks.forEach((e, i) => {
+        const a = -Math.PI / 2 + (i - (n - 1) / 2) * .32 + rnd(-.1, .1);
+        G.lasers.push({ x: p.x, y: p.y - 10, vx: Math.cos(a) * 280, vy: Math.sin(a) * 280, sp: 280, tg: e, mult: n, trail: [], t: 0, done: false });
+      });
+      SFX.laser(n); G.locks = [];
+    } else G.lockT = 0;
+    return;
+  }
+  if (!firing || p.cool > 0) return;
+  const c = col(0, 70);
+  if (w === 'spread') {
+    p.cool = .15;
+    const angs = G.evo >= 8 ? [-.36, -.18, 0, .18, .36] : [-.2, 0, .2];
+    for (const a of angs) G.pb.push({ x: p.x, y: p.y - 12, vx: Math.sin(a) * 720, vy: -Math.cos(a) * 720, c: '#ffd04a' });
+  } else if (G.evo === 0) {
+    if (G.pb.length) return;
+    p.cool = .05; G.pb.push({ x: p.x, y: p.y - 12, vx: 0, vy: -640, c });
+  } else if (G.evo >= 8) {
+    p.cool = .085; G.pb.push({ x: p.x - 6, y: p.y - 10, vx: 0, vy: -820, c }, { x: p.x + 6, y: p.y - 10, vx: 0, vy: -820, c });
+  } else {
+    p.cool = G.evo >= 4 ? .1 : .12; G.pb.push({ x: p.x, y: p.y - 12, vx: 0, vy: -760, c });
+  }
+  SFX.shot();
+}
+
+function updForm(dt) {
+  const f = G.form; if (!f) return;
+  const mem = G.en.filter(e => e.type === 'grid' && e.state === 'form' && !e.dead);
+  if (!mem.length) { G.form = null; return; }
+  if (f.enter > 0) f.enter = Math.max(0, f.enter - dt * 1.3);
+  const alive = G.en.filter(e => e.type === 'grid' && !e.dead).length;
+  const interval = (.055 + .5 * alive / f.total) / Math.sqrt(G.diff) * (G.evo >= 3 ? .8 : 1);
+  f.stepT -= dt;
+  if (f.stepT <= 0 && f.enter === 0) {
+    f.stepT += interval; G.frame ^= 1;
+    let mn = 1e9, mx = -1e9; for (const m of mem) { mn = Math.min(mn, f.x + m.ox); mx = Math.max(mx, f.x + m.ox); }
+    const st = G.evo >= 2 ? 8 : 6;
+    if ((f.dir > 0 && mx + st > W - 18) || (f.dir < 0 && mn - st < 18)) { f.y += 14; f.dir *= -1; }
+    else f.x += f.dir * st;
+    if (G.evo < 3) SFX.march(f.note++);
+  }
+  let maxY = 0;
+  for (const m of mem) { m.x = f.x + m.ox; m.y = f.y + m.oy - 300 * f.enter * f.enter; maxY = Math.max(maxY, m.y); }
+  if (maxY > baseY() - 28) {           // 侵略された
+    for (const m of mem) { m.dead = true; boom(m.x, m.y, rowCol(m), false); }
+    G.form = null; playerHit(true); return;
+  }
+  if (f.enter > 0) return;
+  f.fireT -= dt;
+  if (f.fireT <= 0) {
+    f.fireT = rnd(.6, 1.4) / G.diff * (G.evo < 1 ? 1.5 : 1);
+    const bottoms = {}; for (const m of mem) if (!bottoms[m.c] || bottoms[m.c].r < m.r) bottoms[m.c] = m;
+    const m = pick(Object.values(bottoms));
+    if (G.evo >= 4 && Math.random() < .35) aimed(m, 190 * bs()); else eshoot(m.x, m.y + 10, 0, 210 * bs());
+  }
+  if (G.evo >= 1) {
+    G.bonusT -= dt;
+    if (G.bonusT <= 0) { G.bonusT = rnd(12, 20); const l = Math.random() < .5; G.en.push({ type: 'bonus', x: l ? -30 : W + 30, y: SAT + 100, vx: l ? 95 : -95, hp: 1, rad: 14, score: 300, genes: 5, hitT: 0 }); }
+  }
+  if (G.evo >= 3) {
+    G.diveT -= dt;
+    if (G.diveT <= 0) { G.diveT = rnd(1.4, 2.8) / G.diff; const m = pick(mem); m.state = 'dive'; m.vx = 0; m.vy = -70; m.t = 0; }
+  }
+}
+
+function updEnemies(dt) {
+  const p = G.p;
+  for (const e of G.en) {
+    if (e.dead) continue;
+    e.hitT = Math.max(0, (e.hitT || 0) - dt);
+    e.t = (e.t || 0) + dt;
+    switch (e.type) {
+      case 'grid':
+        if (e.state === 'dive') {
+          e.vy = Math.min(e.vy + 420 * dt, 270 * Math.sqrt(G.diff));
+          e.vx = clamp(e.vx + Math.sign(p.x - e.x) * 320 * dt, -160, 160);
+          e.x += e.vx * dt; e.y += e.vy * dt;
+          if (!e.shot && e.t > .6) { e.shot = true; aimed(e, 200 * bs(), G.evo >= 6 ? 3 : 1); }
+          if (e.y > H + 30) e.gone = true;
+        }
+        break;
+      case 'snake':
+        e.y = -20 + e.v * e.t; e.x = e.x0 + e.amp * Math.sin(e.t * e.w);
+        e.fireT -= dt;
+        if (e.fireT <= 0) { e.fireT = rnd(2, 4) / G.diff; if (e.y > SAT + 60 && e.y < p.y - 140) aimed(e, 180 * bs()); }
+        if (e.y > H + 30) e.gone = true;
+        break;
+      case 'swoop':
+        if (e.t < 2.1) e.a += e.om * dt;
+        e.x += Math.cos(e.a) * e.s * dt; e.y += Math.sin(e.a) * e.s * dt;
+        if (!e.shot && e.t > .9) { e.shot = true; aimed(e, 190 * bs(), G.evo >= 7 ? 2 : 1, .3); }
+        if (e.t > 1 && (e.x < -40 || e.x > W + 40 || e.y > H + 40 || e.y < -40)) e.gone = true;
+        break;
+      case 'turret':
+        if (e.state === 'in') { e.y += (e.ty - e.y) * Math.min(1, dt * 2.5); if (Math.abs(e.y - e.ty) < 2 || e.t > 2) { e.state = 'hold'; e.t = 0; } }
+        else if (e.state === 'hold') {
+          e.ang += dt * 1.1; e.fireT -= dt;
+          if (e.fireT <= 0) { e.fireT = 1.3 / Math.sqrt(G.diff); ring(e, 8 + Math.min(8, Math.floor(G.diff * 2)), 125 * bs(), e.ang); }
+          if (e.t > 7) e.state = 'out';
+        } else { e.y += 140 * dt; if (e.y > H + 40) e.gone = true; }
+        break;
+      case 'bonus':
+        e.x += e.vx * dt; if (e.x < -50 || e.x > W + 50) e.gone = true;
+        break;
+      case 'boss': {
+        e.y += (e.ty - e.y) * Math.min(1, dt * 1.2);
+        e.x = W / 2 + Math.sin(e.t * .55) * (W / 2 - 70);
+        e.ang += dt; e.patT += dt;
+        if (e.patT > 4.2) { e.patT = 0; e.pat = (e.pat + 1) % 3; }
+        if (e.t < 2) break;
+        e.fireT -= dt;
+        if (e.fireT <= 0) {
+          if (e.pat === 0) { e.fireT = .95 / Math.sqrt(G.diff); ring(e, 14 + (G.evo >> 1), 140 * bs(), e.ang); }
+          else if (e.pat === 1) { e.fireT = .55 / Math.sqrt(G.diff); aimed(e, 200 * bs(), 5, .2); }
+          else { e.fireT = .085; for (const o of [0, Math.PI]) { const a = e.ang * 2.6 + o; eshoot(e.x, e.y, Math.cos(a) * 150 * bs(), Math.sin(a) * 150 * bs()); } }
+        }
+        break;
+      }
+    }
+    // 体当たり
+    if (p.alive && p.inv <= 0 && e.y > 0) {
+      const hr = G.evo >= 2 ? 5 : 10;
+      if ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 < (e.rad * .75 + hr) ** 2) { playerHit(); if (e.type !== 'boss') damage(e, 99); }
+    }
+  }
+}
+
+function updShots(dt) {
+  const p = G.p;
+  for (const b of G.pb) {
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.y < -20 || b.x < -20 || b.x > W + 20) { b.dead = true; continue; }
+    for (const e of G.en) {
+      if (e.dead || e.y < -10) continue;
+      if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 < (e.rad + 3) ** 2) { damage(e, 1); b.dead = true; spark(b.x, b.y, b.c, 3, 90); break; }
+    }
+  }
+  G.pb = G.pb.filter(b => !b.dead);
+  const hr = G.evo >= 2 ? 3.5 : 8;
+  for (const b of G.eb) {
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.y < -20 || b.y > H + 20 || b.x < -20 || b.x > W + 20) { b.dead = true; continue; }
+    if (p.alive && p.inv <= 0 && (b.x - p.x) ** 2 + (b.y - p.y) ** 2 < (b.r + hr) ** 2) { b.dead = true; playerHit(); break; }
+  }
+  G.eb = G.eb.filter(b => !b.dead);
+  for (const q of G.parts) { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 1 - 2.6 * dt; q.vy *= 1 - 2.6 * dt; q.life -= dt; }
+  G.parts = G.parts.filter(q => q.life > 0);
+  if (G.parts.length > 700) G.parts.splice(0, G.parts.length - 700);
+  for (const r of G.rings) { r.r += r.vr * dt; r.life -= dt; }
+  G.rings = G.rings.filter(r => r.life > 0);
+  for (const d of G.dots) d.t += dt;
+  G.dots = G.dots.filter(d => d.t < d.d);
+  for (const q of G.pops) { q.life -= dt; q.y -= 30 * dt; }
+  G.pops = G.pops.filter(q => q.life > 0);
+}
+
+function updLasers(dt) {
+  for (const l of G.lasers) {
+    l.t += dt;
+    if (!l.done) {
+      const tg = l.tg;
+      if (tg && !tg.dead && !tg.gone) {
+        const dx = tg.x - l.x, dy = tg.y - l.y, d = Math.hypot(dx, dy) || 1;
+        l.sp = Math.min(l.sp + 1700 * dt, 1150);
+        const k = Math.min(1, dt * (3 + l.t * 14));
+        l.vx += (dx / d * l.sp - l.vx) * k; l.vy += (dy / d * l.sp - l.vy) * k;
+        if (d < 16) { damage(tg, 2, l.mult); spark(l.x, l.y, '#ff8ff0', 6, 140); l.done = true; }
+      }
+      l.x += l.vx * dt; l.y += l.vy * dt;
+      l.trail.push({ x: l.x, y: l.y });
+      if (l.trail.length > 16) l.trail.shift();
+      if (l.t > 2.5 || l.y < -60 || l.y > H + 60 || l.x < -60 || l.x > W + 60) l.done = true;
+    } else l.trail.shift();
+  }
+  G.lasers = G.lasers.filter(l => !l.done || l.trail.length);
+}
+
+/* =========================================================
+   描画
+   ========================================================= */
+function strokeGlow(c, w) {
+  ctx.strokeStyle = c;
+  if (G && G.evo >= 4) { ctx.globalAlpha = .28; ctx.lineWidth = w * 3.4; ctx.stroke(); ctx.globalAlpha = 1; }
+  ctx.lineWidth = w; ctx.stroke();
+}
+function poly(x, y, r, n, a) { ctx.beginPath(); for (let i = 0; i <= n; i++) { const t = a + i * TAU / n; i ? ctx.lineTo(x + Math.cos(t) * r, y + Math.sin(t) * r) : ctx.moveTo(x + Math.cos(t) * r, y + Math.sin(t) * r); } }
+const rowCol = e => G.evo >= 4 ? `hsl(${(G.hue + e.r * 38) % 360},100%,64%)` : '#eef4ff';
+
+function drawSprite(spr, x, y, px, c) {
+  ctx.fillStyle = c;
+  for (let i = 0; i < 35; i++) if (spr[i]) ctx.fillRect(x + ((i % 7) - 3.5) * px, y + ((i / 7 | 0) - 2.5) * px, px - .5, px - .5);
+}
+
+function drawBG(dt) {
+  const evo = G ? G.evo : 0, playing = mode === 'play' && !paused;
+  const sp = mode === 'title' ? 30 : evo < 2 ? 6 : evo < 8 ? 50 : 130;
+  for (const s of STARS) {
+    if (playing || mode === 'title') { s.y += s.z * sp * dt; if (s.y > H) { s.y = 0; s.x = Math.random() * W; } }
+    ctx.globalAlpha = s.z * .8; ctx.fillStyle = evo >= 4 ? col(s.z * 120, 80) : '#fff';
+    const len = evo >= 8 ? s.z * 6 : 1.5;
+    ctx.fillRect(s.x, s.y, 1.5, len);
+  }
+  ctx.globalAlpha = 1;
+  if (!G || evo < 4 || mode === 'title') return;
+  // 遠近グリッド
+  const hy = H * .46, cx = W / 2, sc = (G.t * (evo >= 8 ? 1.2 : .6)) % 1;
+  ctx.lineWidth = 1; ctx.strokeStyle = col(0, 55);
+  ctx.globalAlpha = .13; ctx.beginPath();
+  for (let i = -9; i <= 9; i++) { ctx.moveTo(cx + i * 6, hy); ctx.lineTo(cx + i * W * .2, H); }
+  ctx.stroke();
+  for (let k = 0; k < 12; k++) {
+    const z = (k + sc) / 12, y = hy + (H - hy) * z * z;
+    ctx.globalAlpha = .2 * z; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  if (evo >= 8) {          // 天井も
+    ctx.strokeStyle = col(180, 55); const ty = SAT + 70, top = H * .3;
+    for (let k = 0; k < 8; k++) { const z = (k + sc) / 8, y = top - (top - ty) * z * z; ctx.globalAlpha = .12 * z; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawEnemy(e) {
+  const hit = e.hitT > 0;
+  switch (e.type) {
+    case 'grid': {
+      const fr = e.state === 'dive' ? ((e.t * 6) | 0) & 1 : G.frame;
+      const c = hit ? '#fff' : rowCol(e);
+      if (G.evo >= 4) { ctx.globalAlpha = .22; drawSprite(e.spr[fr], e.x, e.y, 4.4, c); ctx.globalAlpha = 1; }
+      drawSprite(e.spr[fr], e.x, e.y, 3.4, c);
+      break;
+    }
+    case 'snake': {
+      poly(e.x, e.y, e.rad, 4, e.t * 3); strokeGlow(hit ? '#fff' : col(120), 1.8);
+      ctx.fillStyle = col(120, 80); ctx.fillRect(e.x - 2, e.y - 2, 4, 4);
+      break;
+    }
+    case 'swoop': {
+      const a = e.a; ctx.beginPath();
+      ctx.moveTo(e.x + Math.cos(a) * 13, e.y + Math.sin(a) * 13);
+      ctx.lineTo(e.x + Math.cos(a + 2.5) * 11, e.y + Math.sin(a + 2.5) * 11);
+      ctx.lineTo(e.x + Math.cos(a + Math.PI) * 4, e.y + Math.sin(a + Math.PI) * 4);
+      ctx.lineTo(e.x + Math.cos(a - 2.5) * 11, e.y + Math.sin(a - 2.5) * 11); ctx.closePath();
+      strokeGlow(hit ? '#fff' : col(220), 1.8);
+      break;
+    }
+    case 'turret': {
+      poly(e.x, e.y, e.rad, 6, e.ang); strokeGlow(hit ? '#fff' : col(300), 2);
+      poly(e.x, e.y, 9, 3, -e.ang * 2); strokeGlow(col(330, 75), 1.5);
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.rad + 5, -Math.PI / 2, -Math.PI / 2 + TAU * e.hp / e.maxhp);
+      ctx.strokeStyle = col(300, 75); ctx.globalAlpha = .5; ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 1;
+      break;
+    }
+    case 'bonus': {
+      ctx.beginPath(); ctx.ellipse(e.x, e.y, 18, 6, 0, 0, TAU); strokeGlow(hit ? '#fff' : '#ff5d6c', 1.8);
+      ctx.beginPath(); ctx.arc(e.x, e.y - 3, 7, Math.PI, 0); strokeGlow('#ff9aa3', 1.5);
+      ctx.fillStyle = '#ffd0d4'; for (let i = -1; i <= 1; i++) if (((G.t * 8) | 0) % 3 === i + 1) ctx.fillRect(e.x + i * 9 - 1.5, e.y - 1.5, 3, 3);
+      break;
+    }
+    case 'boss': {
+      const c = hit ? '#fff' : col(0);
+      poly(e.x, e.y, 52, 8, e.ang * .5); strokeGlow(c, 2.2);
+      poly(e.x, e.y, 36, 4, -e.ang); strokeGlow(col(60), 1.8);
+      poly(e.x, e.y, 62 + Math.sin(G.t * 4) * 3, 3, e.ang * .3 + Math.PI / 2); strokeGlow(col(300, 55), 1);
+      for (let k = 0; k < 4; k++) { const a = e.ang * .5 + k * TAU / 4; ctx.beginPath(); ctx.moveTo(e.x + Math.cos(a) * 52, e.y + Math.sin(a) * 52); ctx.lineTo(e.x + Math.cos(a) * 74, e.y + Math.sin(a) * 74); strokeGlow(c, 1.6); }
+      const pr = 10 + Math.sin(G.t * 8) * 2.5;
+      ctx.beginPath(); ctx.arc(e.x, e.y, pr, 0, TAU); ctx.fillStyle = hit ? '#fff' : col(30, 70); ctx.fill();
+      // HPバー
+      const bw = W - 60, bx = 30, by = SAT + 88;
+      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(bx, by, bw, 4);
+      ctx.fillStyle = col(0, 60); ctx.fillRect(bx, by, bw * Math.max(0, e.hp / e.maxhp), 4);
+      ctx.font = `700 9px ${MONO}`; ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.fillText('TITAN', bx, by - 3);
+      break;
+    }
+  }
+}
+
+function drawPlayer() {
+  const p = G.p;
+  if (!p.alive) return;
+  if (p.inv > 0 && ((p.inv * 12) | 0) % 2) return;
+  if (G.evo < 2) {               // 初期形態: ドットの砲台
+    const c = '#9fffb0'; ctx.fillStyle = c;
+    ctx.fillRect(p.x - 13, p.y + 2, 26, 8); ctx.fillRect(p.x - 10, p.y - 1, 20, 4);
+    ctx.fillRect(p.x - 3, p.y - 6, 6, 6); ctx.fillRect(p.x - 1, p.y - 10, 2, 4);
+    return;
+  }
+  const c = G.evo >= 4 ? col(180, 70) : '#eef4ff';
+  ctx.beginPath(); ctx.moveTo(p.x, p.y - 17); ctx.lineTo(p.x + 11, p.y + 10); ctx.lineTo(p.x, p.y + 4); ctx.lineTo(p.x - 11, p.y + 10); ctx.closePath();
+  strokeGlow(c, 1.8);
+  ctx.beginPath(); ctx.moveTo(p.x, p.y - 8); ctx.lineTo(p.x, p.y + 2); strokeGlow(c, 1);
+  const fl = 6 + Math.random() * 7;
+  ctx.beginPath(); ctx.moveTo(p.x - 3, p.y + 7); ctx.lineTo(p.x, p.y + 7 + fl); ctx.lineTo(p.x + 3, p.y + 7);
+  ctx.strokeStyle = G.evo >= 4 ? col(30, 65) : '#aaa'; ctx.lineWidth = 1.4; ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, TAU); ctx.fill();
+  if (curW().id === 'lock' && (input.held || keys.Space)) {
+    ctx.beginPath(); ctx.arc(p.x, p.y, 380, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.strokeStyle = '#ff4fd8'; ctx.globalAlpha = .18; ctx.lineWidth = 1; ctx.stroke(); ctx.globalAlpha = 1;
+  }
+}
+
+function drawShots() {
+  // 自弾
+  ctx.lineCap = 'round';
+  for (const b of G.pb) {
+    if (G.evo < 4) { ctx.fillStyle = b.c; ctx.fillRect(b.x - 1, b.y - 6, 2, 12); continue; }
+    const k = .022; ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * k, b.y - b.vy * k); strokeGlow(b.c, 2);
+  }
+  // ロックオンレーザー
+  ctx.globalCompositeOperation = 'lighter';
+  for (const l of G.lasers) {
+    if (l.trail.length < 2) continue;
+    ctx.beginPath(); l.trail.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y));
+    ctx.strokeStyle = '#ff4fd8'; ctx.globalAlpha = .35; ctx.lineWidth = 7; ctx.stroke();
+    ctx.strokeStyle = '#ffe6fb'; ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  // 敵弾
+  for (const b of G.eb) {
+    if (G.evo < 4) {
+      ctx.fillStyle = '#fff'; const z = ((G.t * 14) | 0) % 2 ? 1 : -1;
+      ctx.fillRect(b.x - 1 + z, b.y - 5, 2, 3); ctx.fillRect(b.x - 1 - z, b.y - 2, 2, 3); ctx.fillRect(b.x - 1 + z, b.y + 1, 2, 3);
+      continue;
+    }
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 2.2, 0, TAU); ctx.fillStyle = 'rgba(255,60,110,.55)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 1, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+  }
+  // ロック表示
+  const seen = new Map(); for (const e of G.locks) seen.set(e, (seen.get(e) || 0) + 1);
+  ctx.font = `700 9px ${MONO}`; ctx.textAlign = 'left';
+  for (const [e, n] of seen) {
+    const r = e.rad + 7, a = G.t * 4;
+    ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(a); ctx.strokeStyle = '#ff4fd8'; ctx.lineWidth = 1.6;
+    ctx.strokeRect(-r, -r, r * 2, r * 2); ctx.restore();
+    if (n > 1) { ctx.fillStyle = '#ff4fd8'; ctx.fillText('×' + n, e.x + r + 2, e.y - r); }
+  }
+}
+
+function drawFX() {
+  ctx.globalCompositeOperation = 'lighter';
+  for (const q of G.parts) {
+    ctx.globalAlpha = Math.min(1, q.life / q.max * 1.4);
+    if (G.evo < 4) { ctx.fillStyle = q.c; ctx.fillRect(q.x - 1.5, q.y - 1.5, 3, 3); continue; }
+    ctx.strokeStyle = q.c; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx * .035, q.y - q.vy * .035); ctx.stroke();
+  }
+  for (const r of G.rings) {
+    ctx.globalAlpha = r.life / r.max; ctx.strokeStyle = r.c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, TAU); ctx.stroke();
+  }
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+}
+
+function geneBarX() {
+  const a = evoInfo(G.evo).g, b = evoInfo(G.evo + 1).g;
+  return 16 + (W - 32) * clamp((G.genes - a) / (b - a), 0, 1);
+}
+
+function drawHUD() {
+  const y0 = SAT + 8;
+  ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+  ctx.font = `700 19px ${MONO}`; ctx.fillText(String(G.score).padStart(8, '0'), W / 2, y0 + 21);
+  ctx.font = `600 9px ${MONO}`; ctx.globalAlpha = .55; ctx.fillText('HI ' + String(Math.max(HI, G.score)).padStart(8, '0'), W / 2, y0 + 35); ctx.globalAlpha = 1;
+  // 遺伝子バー
+  const by = SAT + 68, info = evoInfo(G.evo);
+  ctx.textAlign = 'left'; ctx.font = `700 10px ${MONO}`; ctx.fillStyle = col(0, 72);
+  ctx.fillText('EVO ' + String(G.evo).padStart(2, '0') + ' ' + info.name, 16, by - 5);
+  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.6)';
+  ctx.fillText('GENE ' + G.genes + ' / ' + evoInfo(G.evo + 1).g, W - 16, by - 5);
+  ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(16, by, W - 32, 3);
+  ctx.fillStyle = col(0, 62); ctx.fillRect(16, by, geneBarX() - 16, 3);
+  // 飛んでいく遺伝子
+  for (const d of G.dots) {
+    if (d.t < 0) continue;
+    const k = d.t / d.d, e = k * k, tx = geneBarX(), ty = by + 1;
+    const x = d.x + (tx - d.x) * e + d.ox * Math.sin(k * Math.PI), y = d.y + (ty - d.y) * e;
+    ctx.fillStyle = col(0, 75); ctx.globalAlpha = .9; ctx.fillRect(x - 2, y - 2, 4, 4);
+  }
+  ctx.globalAlpha = 1;
+  // 残機
+  const ly = H - SAB - 20;
+  for (let i = 0; i < G.lives; i++) {
+    const x = 22 + i * 20;
+    ctx.beginPath(); ctx.moveTo(x, ly - 8); ctx.lineTo(x + 6, ly + 5); ctx.lineTo(x, ly + 2); ctx.lineTo(x - 6, ly + 5); ctx.closePath();
+    ctx.strokeStyle = G.evo >= 4 ? col(180, 70) : '#9fffb0'; ctx.lineWidth = 1.4; ctx.stroke();
+  }
+  ctx.textAlign = 'left'; ctx.font = `600 9px ${MONO}`; ctx.fillStyle = 'rgba(255,255,255,.45)';
+  ctx.fillText('WAVE ' + G.wave, 16, ly - 16);
+  if (curW().id === 'lock' && G.locks.length) {
+    ctx.textAlign = 'center'; ctx.font = `800 12px ${MONO}`; ctx.fillStyle = '#ff4fd8';
+    ctx.fillText('LOCK ' + G.locks.length + '/' + (G.evo >= 9 ? 12 : 8), G.p.x, G.p.y + 34);
+  }
+  // ポップアップ
+  ctx.textAlign = 'center'; ctx.font = `800 12px ${MONO}`;
+  for (const q of G.pops) { ctx.globalAlpha = Math.min(1, q.life * 2); ctx.fillStyle = '#fff'; ctx.fillText(q.txt, q.x, q.y); }
+  ctx.globalAlpha = 1;
+}
+
+function glitchText(txt, x, y, size, t, c) {
+  ctx.font = `800 ${size}px ${MONO}`; ctx.textAlign = 'center';
+  const g = t < .5 ? (1 - t / .5) : (Math.random() < .03 ? .6 : 0);
+  if (g > 0) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(255,0,90,.8)'; ctx.fillText(txt, x - 6 * g + rnd(-3, 3) * g, y, W - 24);
+    ctx.fillStyle = 'rgba(0,220,255,.8)'; ctx.fillText(txt, x + 6 * g + rnd(-3, 3) * g, y, W - 24);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.fillStyle = c; ctx.fillText(txt, x, y, W - 24);
+}
+
+function drawBanner() {
+  const b = G.banner; if (!b) return;
+  const a = b.t < .2 ? b.t / .2 : b.t > 2.4 ? Math.max(0, (3 - b.t) / .6) : 1;
+  const y = H * .4;
+  ctx.globalAlpha = a;
+  const w = Math.min(W, 420) * Math.min(1, b.t * 4);
+  ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(W / 2 - w / 2, y - 48, w, 92);
+  ctx.fillStyle = col(0, 62); ctx.fillRect(W / 2 - w / 2, y - 48, w, 1); ctx.fillRect(W / 2 - w / 2, y + 43, w, 1);
+  ctx.textAlign = 'center'; ctx.font = `700 11px ${MONO}`; ctx.fillStyle = b.top === 'WARNING' ? '#ff4d6d' : col(0, 72);
+  ctx.fillText(b.top, W / 2, y - 26);
+  glitchText(b.name, W / 2, y + 8, b.name.length > 12 ? 24 : 32, b.t, '#fff');
+  ctx.font = `600 12px ${JP}`; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.textAlign = 'center';
+  ctx.fillText(b.desc, W / 2, y + 31, W - 30);
+  ctx.globalAlpha = 1;
+}
+
+function drawTitle(dt) {
+  titleMutT += dt;
+  if (titleMutT > 1.6) { titleMutT = 0; TITLE_SPR[(Math.random() * 5) | 0] = genSprite(); }
+  const cy = H * .3;
+  // 回転ワイヤーフレーム
+  const t = performance.now() / 1000;
+  for (let k = 0; k < 3; k++) {
+    poly(W / 2, cy, 90 + k * 26, 6 - k, t * (k % 2 ? -.3 : .4));
+    ctx.strokeStyle = `hsla(${(t * 30 + k * 90) % 360},100%,60%,.35)`; ctx.lineWidth = 1; ctx.stroke();
+  }
+  glitchText('EVOLVE', W / 2, cy + 14, Math.min(58, W / 6.5), (t % 4) / 2, '#fff');
+  ctx.font = `600 11px ${MONO}`; ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.textAlign = 'center';
+  ctx.fillText('THE INFINITE GENE SHOOTER', W / 2, cy + 40);
+  // 変異し続けるドット敵
+  const fr = ((t * 2) | 0) & 1;
+  TITLE_SPR.forEach((s, i) => drawSprite(s[fr], W / 2 + (i - 2) * 48, cy + 132, 3.6, `hsl(${(i * 60 + t * 40) % 360},100%,68%)`));
+  ctx.font = `600 10px ${MONO}`; ctx.fillStyle = 'rgba(255,255,255,.4)';
+  ctx.fillText('— MUTATING —', W / 2, cy + 166);
+  // 説明
+  ctx.font = `500 13px ${JP}`; ctx.fillStyle = 'rgba(255,255,255,.85)';
+  const ly = H * .62;
+  ['画面のどこでもドラッグ ： 自機を移動', '押している間 ： オートショット', '敵を倒して GENE を集めると', 'ゲームそのものが進化していく']
+    .forEach((s, i) => ctx.fillText(s, W / 2, ly + i * 22));
+  ctx.font = `500 10px ${JP}`; ctx.fillStyle = 'rgba(255,255,255,.4)';
+  ctx.fillText('PC：矢印キー移動 / Space ショット / X 武器切替 / P ポーズ', W / 2, ly + 98, W - 20);
+  if (((t * 2) | 0) % 2) { ctx.font = `800 17px ${MONO}`; ctx.fillStyle = '#7ff'; ctx.fillText('TAP TO START', W / 2, H - SAB - 92); }
+  ctx.font = `600 11px ${MONO}`; ctx.fillStyle = 'rgba(255,255,255,.6)';
+  ctx.fillText('HI ' + String(HI).padStart(8, '0') + '   BEST EVO ' + String(BEST_EVO).padStart(2, '0'), W / 2, H - SAB - 56);
+}
+
+function drawOver() {
+  ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(0, 0, W, H);
+  const cy = H * .38;
+  glitchText('GAME OVER', W / 2, cy, 34, modeT, '#fff');
+  ctx.textAlign = 'center';
+  ctx.font = `700 24px ${MONO}`; ctx.fillStyle = '#fff'; ctx.fillText(String(G.score).padStart(8, '0'), W / 2, cy + 50);
+  if (newRecord && ((modeT * 3) | 0) % 2) { ctx.font = `800 13px ${MONO}`; ctx.fillStyle = '#ffd04a'; ctx.fillText('NEW RECORD!', W / 2, cy + 74); }
+  ctx.font = `600 12px ${MONO}`; ctx.fillStyle = col(0, 70);
+  ctx.fillText('REACHED  EVO ' + String(G.evo).padStart(2, '0') + '  ' + evoInfo(G.evo).name, W / 2, cy + 104, W - 20);
+  ctx.font = `500 12px ${JP}`; ctx.fillStyle = 'rgba(255,255,255,.6)';
+  ctx.fillText('WAVE ' + G.wave + ' ・ GENE ' + G.genes, W / 2, cy + 126);
+  if (modeT > 1.3 && ((modeT * 2) | 0) % 2) { ctx.font = `800 16px ${MONO}`; ctx.fillStyle = '#7ff'; ctx.fillText('TAP TO RETRY', W / 2, H - SAB - 92); }
+}
+
+function draw(dt) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, H);
+  ctx.translate(OX, 0);
+  if (OX > 0) { ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(-1, 0, 1, H); ctx.fillRect(W, 0, 1, H); }
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  if (G && G.shake > 0 && mode === 'play') ctx.translate(rnd(-1, 1) * G.shake * 7, rnd(-1, 1) * G.shake * 7);
+  drawBG(dt);
+  if (mode === 'title') { drawTitle(dt); ctx.restore(); return; }
+  for (const e of G.en) if (!e.dead) drawEnemy(e);
+  drawShots();
+  drawPlayer();
+  drawFX();
+  ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+  drawHUD();
+  drawBanner();
+  if (G.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${G.flash * .45})`; ctx.fillRect(0, 0, W, H); }
+  if (mode === 'over') drawOver();
+  if (paused && mode === 'play') {
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center'; ctx.font = `800 26px ${MONO}`; ctx.fillStyle = '#fff'; ctx.fillText('PAUSED', W / 2, H * .45);
+    ctx.font = `600 12px ${MONO}`; ctx.fillStyle = '#7ff'; ctx.fillText('TAP TO RESUME', W / 2, H * .45 + 30);
+  }
+  ctx.restore();
+}
+
+/* ---------- メインループ ---------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.033, (now - last) / 1000); last = now;
+  modeT += dt;
+  if (mode === 'play' && !paused) update(dt);
+  else if (mode === 'over' && G) { updShots(dt); G.flash = Math.max(0, G.flash - dt * 2); }
+  draw(dt);
+  requestAnimationFrame(frame);
+}
+resize();
+requestAnimationFrame(frame);
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
