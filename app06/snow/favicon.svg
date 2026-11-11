@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f8cff"/>
+      <stop offset="1" stop-color="#0c2f7a"/>
+    </linearGradient>
+    <linearGradient id="mt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cfe3ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <!-- 背景の山 -->
+  <path d="M-10 400 L150 250 L240 330 L340 220 L522 380 V522 H-10Z" fill="#5a8fe0" opacity=".55"/>
+  <!-- 手前の雪山 -->
+  <path d="M-10 440 L200 230 L300 330 L360 280 L522 430 V522 H-10Z" fill="url(#mt)"/>
+  <path d="M200 230 L250 280 L225 275 L205 300 L185 270 L160 285Z" fill="#a9c8f5" opacity=".7"/>
+  <!-- 積雪ゲージ -->
+  <rect x="372" y="300" width="34" height="150" rx="17" fill="#0c2f7a" opacity=".85"/>
+  <rect x="380" y="360" width="18" height="82" rx="9" fill="#5fd3ff"/>
+  <g stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".9">
+    <path d="M412 330h14M412 365h14M412 400h14"/>
+  </g>
+  <!-- 雪の結晶 -->
+  <g transform="translate(150 140)" stroke="#fff" stroke-width="14" stroke-linecap="round" fill="none">
+    <path d="M0 -70 V70 M-60.6 -35 L60.6 35 M-60.6 35 L60.6 -35"/>
+    <path d="M-18 -52 L0 -34 L18 -52 M-18 52 L0 34 L18 52"/>
+    <path d="M-54 -10 L-30 -17 L-36 -42 M54 10 L30 17 L36 42"/>
+    <path d="M-54 10 L-30 17 L-36 42 M54 -10 L30 -17 L36 -42"/>
+  </g>
+</svg>

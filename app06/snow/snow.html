@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ゲレンデ積雪">
+<meta name="theme-color" content="#0c2f7a">
+<title>ゲレンデ積雪 – スキー場の雪情報</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --card: rgba(255,255,255,.12);
+    --card2: rgba(255,255,255,.2);
+    --line: rgba(255,255,255,.16);
+    --dim: rgba(255,255,255,.66);
+    --snow:#7fe0ff; --star:#ffd23f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+  html{background:#071a45}
+  body{
+    min-height:100dvh;color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+    background:linear-gradient(180deg,#2f7fe6 0%,#164aa6 38%,#0c2f7a 70%,#071a45 100%);
+    background-attachment:fixed;
+    padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 16px)
+            calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 16px);
+  }
+  main{max-width:480px;margin:0 auto}
+  button{font:inherit;color:inherit}
+
+  /* ヘッダー */
+  .top{display:flex;align-items:center;gap:8px;min-height:44px}
+  .btn{min-width:44px;height:44px;border:0;border-radius:22px;background:var(--card);color:#fff;
+    display:grid;place-items:center;cursor:pointer;text-decoration:none;transition:transform .12s,background .12s}
+  .btn:active{transform:scale(.9);background:var(--card2)}
+  .btn svg{width:22px;height:22px}
+  .btn.spin svg{animation:spin .9s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .title{flex:1;text-align:center;min-width:0}
+  .title h1{font-size:19px;font-weight:700;letter-spacing:.02em}
+  .title p{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+
+  h2{font-size:13px;font-weight:700;color:var(--dim);letter-spacing:.05em;margin:20px 4px 8px;display:flex;justify-content:space-between}
+  h2 small{font-weight:600;font-size:12px}
+
+  /* お気に入り */
+  .favs{display:grid;gap:10px}
+  .fav{position:relative;background:var(--card);border:.5px solid var(--line);border-radius:18px;padding:14px 14px 12px;
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);cursor:pointer;transition:transform .12s}
+  .fav:active{transform:scale(.98)}
+  .fav .head{display:flex;align-items:baseline;gap:8px;padding-right:40px}
+  .fav .nm{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fav .pf{font-size:12px;color:var(--dim);white-space:nowrap}
+  .fav .row{display:flex;align-items:flex-end;gap:14px;margin-top:6px}
+  .big{font-size:46px;font-weight:250;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+  .big small{font-size:16px;font-weight:500;margin-left:2px;letter-spacing:0}
+  .stats{display:grid;grid-template-columns:repeat(3,auto);gap:2px 14px;font-size:12px;color:var(--dim);flex:1;justify-content:end;text-align:right}
+  .stats b{display:block;font-size:16px;color:#fff;font-weight:600;font-variant-numeric:tabular-nums}
+  .amd{margin-top:8px;font-size:12px;color:var(--dim);border-top:.5px solid var(--line);padding-top:7px}
+  .amd b{color:#fff;font-weight:600}
+  .starbtn{position:absolute;top:4px;right:4px;width:44px;height:44px;border:0;background:none;font-size:22px;cursor:pointer;color:var(--star)}
+  .empty{border:1.5px dashed rgba(255,255,255,.3);border-radius:18px;padding:16px;text-align:center;font-size:13px;color:var(--dim);line-height:1.6}
+
+  /* 地域チップ */
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;height:40px;padding:0 16px;border-radius:20px;border:.5px solid var(--line);background:var(--card);
+    font-size:14px;font-weight:600;cursor:pointer;transition:transform .12s}
+  .chip:active{transform:scale(.94)}
+  .chip.on{background:#fff;color:#0c2f7a;border-color:#fff}
+
+  /* スキー場リスト */
+  .list{background:var(--card);border:.5px solid var(--line);border-radius:18px;overflow:hidden;margin-top:6px;
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .item{display:flex;align-items:center;min-height:60px;border-bottom:.5px solid var(--line)}
+  .item:last-child{border-bottom:0}
+  .item .main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:9px 0 9px 14px;cursor:pointer;background:none;border:0;text-align:left}
+  .item .main:active{background:rgba(255,255,255,.08)}
+  .item .info{flex:1;min-width:0}
+  .item .nm{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .pf{font-size:11.5px;color:var(--dim)}
+  .item .val{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .item .val b{font-size:20px;font-weight:600}
+  .item .val small{font-size:11px;color:var(--dim)}
+  .item .val .nw{display:block;font-size:11.5px;color:var(--snow)}
+  .item .star{width:52px;height:60px;border:0;background:none;font-size:22px;cursor:pointer;color:rgba(255,255,255,.4)}
+  .item .star.on{color:var(--star)}
+  .item .star:active{transform:scale(.85)}
+  .skel{display:inline-block;width:44px;height:16px;border-radius:6px;background:rgba(255,255,255,.15);animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.4}}
+
+  .note{font-size:11.5px;color:var(--dim);line-height:1.7;margin:20px 4px 0}
+  .note a{color:#bfe4ff}
+  .err{background:rgba(255,90,106,.2);border:.5px solid rgba(255,90,106,.5);border-radius:12px;padding:10px 12px;font-size:13px;margin-top:10px;display:none}
+
+  /* 詳細シート */
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:10}
+  .backdrop.open{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:11;max-height:88dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    background:#102c66;border-radius:22px 22px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.4);
+    padding:8px calc(env(safe-area-inset-right) + 18px) calc(env(safe-area-inset-bottom) + 22px) calc(env(safe-area-inset-left) + 18px);
+    transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.9,.3,1)}
+  .sheet.open{transform:none}
+  .sheet .inner{max-width:480px;margin:0 auto}
+  .grab{width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.3);margin:0 auto 6px}
+  .shead{display:flex;align-items:center;gap:6px}
+  .shead .t{flex:1;min-width:0}
+  .shead h3{font-size:21px;font-weight:700}
+  .shead p{font-size:12.5px;color:var(--dim)}
+  .favbtn{height:44px;padding:0 14px;border-radius:22px;border:0;background:var(--card);font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .favbtn.on{background:var(--star);color:#3a2a00}
+  .favbtn:active{transform:scale(.94)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+  .box{background:var(--card);border:.5px solid var(--line);border-radius:16px;padding:12px}
+  .box .lb{font-size:12px;color:var(--dim)}
+  .box .big{font-size:38px;margin-top:4px}
+  .box .sub{font-size:12px;color:var(--dim);margin-top:6px;line-height:1.6;font-variant-numeric:tabular-nums}
+  .box .sub b{color:#fff;font-weight:600}
+  .sec{font-size:12px;font-weight:700;color:var(--dim);letter-spacing:.05em;margin:16px 2px 8px}
+  .chart{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;background:var(--card);border:.5px solid var(--line);border-radius:16px;padding:12px 8px 10px}
+  .day{display:flex;flex-direction:column;align-items:center;font-variant-numeric:tabular-nums}
+  .day .v{font-size:12px;font-weight:700;color:var(--snow);height:16px}
+  .day .barwrap{height:90px;width:100%;display:flex;align-items:flex-end;justify-content:center}
+  .day .bar{width:60%;max-width:22px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#bff0ff,#4cb8ff);min-height:2px}
+  .day .wx{font-size:18px;margin-top:6px}
+  .day .d{font-size:11.5px;font-weight:600;margin-top:2px}
+  .day .tp{font-size:10.5px;color:var(--dim);margin-top:2px;white-space:nowrap}
+  .day .tp .hi{color:#ffb4a0}.day .tp .lo{color:#a8d4ff}
+  .closebtn{display:block;width:100%;height:48px;margin-top:16px;border:0;border-radius:14px;background:var(--card);font-size:15px;font-weight:600;cursor:pointer}
+  .closebtn:active{background:var(--card2)}
+
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 24px);transform:translate(-50%,20px);opacity:0;
+    background:rgba(20,20,30,.92);color:#fff;padding:12px 18px;border-radius:14px;font-size:14px;z-index:20;
+    transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="btn" href="../index.html" aria-label="ホームへ戻る">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></svg>
+    </a>
+    <div class="title">
+      <h1>ゲレンデ積雪</h1>
+      <p id="updated">読み込み中…</p>
+    </div>
+    <button class="btn" id="reload" aria-label="更新">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+    </button>
+  </div>
+
+  <div class="err" id="err"></div>
+
+  <h2>お気に入り <small id="favCount">0 / 3</small></h2>
+  <div class="favs" id="favs"></div>
+
+  <h2>地域から選ぶ</h2>
+  <div class="chips" id="chips"></div>
+  <div class="list" id="list"></div>
+
+  <p class="note">
+    積雪・新雪・予報は気象モデルによる<b>推定値</b>です（スキー場の公式発表とは異なることがあります）。
+    「アメダス」は近くの気象庁観測所（麓の町など）の<b>実測値</b>です。座標・標高は概略です。<br>
+    データ: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>（気象モデル）／
+    出典: <a href="https://www.jma.go.jp/bosai/amedas/" target="_blank" rel="noopener">気象庁ホームページ</a>（アメダス）
+  </p>
+</main>
+
+<div class="backdrop" id="backdrop"></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sName">
+  <div class="inner">
+    <div class="grab"></div>
+    <div class="shead">
+      <div class="t"><h3 id="sName"></h3><p id="sPref"></p></div>
+      <button class="favbtn" id="sFav"></button>
+    </div>
+    <div class="two">
+      <div class="box"><div class="lb" id="sTopLb">山頂付近</div><div class="big" id="sTopDepth">--</div><div class="sub" id="sTopSub"></div></div>
+      <div class="box"><div class="lb" id="sBaseLb">山麓</div><div class="big" id="sBaseDepth">--</div><div class="sub" id="sBaseSub"></div></div>
+    </div>
+    <div class="sec">7日間の降雪予報（山頂付近）</div>
+    <div class="chart" id="sChart"></div>
+    <div class="sec">近くのアメダス（実測）</div>
+    <div class="box"><div class="sub" id="sAmd" style="margin-top:0">読み込み中…</div></div>
+    <button class="closebtn" id="sClose">閉じる</button>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== スキー場データ（座標・標高[m]は概略） ===== */
+const REGIONS = ['北海道','東北','関東','長野・山梨','新潟','北陸・東海','西日本'];
+const RESORTS = [
+  // 北海道
+  {id:'hirafu',   n:'ニセコグラン・ヒラフ', p:'北海道 倶知安町', r:'北海道', lat:42.862, lon:140.698, top:1200, base:260},
+  {id:'annupuri', n:'ニセコアンヌプリ',     p:'北海道 ニセコ町', r:'北海道', lat:42.849, lon:140.654, top:1160, base:390},
+  {id:'rusutsu',  n:'ルスツリゾート',       p:'北海道 留寿都村', r:'北海道', lat:42.752, lon:140.898, top:994,  base:400},
+  {id:'kiroro',   n:'キロロリゾート',       p:'北海道 赤井川村', r:'北海道', lat:43.078, lon:140.988, top:1180, base:570},
+  {id:'teine',    n:'サッポロテイネ',       p:'北海道 札幌市',   r:'北海道', lat:43.090, lon:141.205, top:1023, base:330},
+  {id:'kokusai',  n:'札幌国際スキー場',     p:'北海道 札幌市',   r:'北海道', lat:43.076, lon:141.100, top:1100, base:630},
+  {id:'furano',   n:'富良野スキー場',       p:'北海道 富良野市', r:'北海道', lat:43.328, lon:142.350, top:1074, base:235},
+  {id:'tomamu',   n:'星野リゾート トマム',  p:'北海道 占冠村',   r:'北海道', lat:43.062, lon:142.620, top:1239, base:540},
+  {id:'asahidake',n:'旭岳ロープウェイ',     p:'北海道 東川町',   r:'北海道', lat:43.656, lon:142.800, top:1600, base:1100},
+  // 東北
+  {id:'appi',     n:'安比高原',             p:'岩手県 八幡平市', r:'東北', lat:40.004, lon:140.978, top:1305, base:510},
+  {id:'shizukuishi',n:'雫石スキー場',       p:'岩手県 雫石町',   r:'東北', lat:39.700, lon:140.930, top:1250, base:400},
+  {id:'getou',    n:'夏油高原',             p:'岩手県 北上市',   r:'東北', lat:39.240, lon:140.920, top:1066, base:580},
+  {id:'hakkoda',  n:'八甲田スキー場',       p:'青森県 青森市',   r:'東北', lat:40.670, lon:140.860, top:1324, base:660},
+  {id:'tazawako', n:'たざわ湖スキー場',     p:'秋田県 仙北市',   r:'東北', lat:39.740, lon:140.790, top:1180, base:320},
+  {id:'zao',      n:'蔵王温泉スキー場',     p:'山形県 山形市',   r:'東北', lat:38.168, lon:140.400, top:1661, base:780},
+  {id:'tengendai',n:'天元台高原',           p:'山形県 米沢市',   r:'東北', lat:37.800, lon:140.170, top:1820, base:1350},
+  {id:'grandeco', n:'グランデコ',           p:'福島県 北塩原村', r:'東北', lat:37.680, lon:140.100, top:1590, base:1010},
+  {id:'alts',     n:'アルツ磐梯',           p:'福島県 磐梯町',   r:'東北', lat:37.630, lon:140.040, top:1200, base:550},
+  {id:'inawashiro',n:'猪苗代スキー場',      p:'福島県 猪苗代町', r:'東北', lat:37.600, lon:140.070, top:1350, base:600},
+  // 関東
+  {id:'marunuma', n:'丸沼高原',             p:'群馬県 片品村',   r:'関東', lat:36.820, lon:139.330, top:2000, base:1400},
+  {id:'iwakura',  n:'尾瀬岩鞍',             p:'群馬県 片品村',   r:'関東', lat:36.830, lon:139.210, top:1700, base:850},
+  {id:'kawaba',   n:'川場スキー場',         p:'群馬県 川場村',   r:'関東', lat:36.770, lon:139.180, top:1870, base:1250},
+  {id:'tambara',  n:'たんばらスキーパーク', p:'群馬県 沼田市',   r:'関東', lat:36.750, lon:139.250, top:1550, base:1200},
+  {id:'hodaigi',  n:'宝台樹スキー場',       p:'群馬県 みなかみ町', r:'関東', lat:36.860, lon:139.070, top:1350, base:950},
+  {id:'kusatsu',  n:'草津温泉スキー場',     p:'群馬県 草津町',   r:'関東', lat:36.620, lon:138.570, top:1960, base:1200},
+  {id:'hunter',   n:'ハンターマウンテン塩原', p:'栃木県 那須塩原市', r:'関東', lat:36.920, lon:139.780, top:1640, base:1050},
+  // 長野・山梨
+  {id:'happo',    n:'白馬八方尾根',         p:'長野県 白馬村',   r:'長野・山梨', lat:36.700, lon:137.830, top:1831, base:760},
+  {id:'goryu',    n:'白馬五竜',             p:'長野県 白馬村',   r:'長野・山梨', lat:36.670, lon:137.830, top:1676, base:750},
+  {id:'iwatake',  n:'白馬岩岳',             p:'長野県 白馬村',   r:'長野・山梨', lat:36.710, lon:137.860, top:1289, base:750},
+  {id:'tsugaike', n:'栂池高原',             p:'長野県 小谷村',   r:'長野・山梨', lat:36.770, lon:137.830, top:1704, base:800},
+  {id:'cortina',  n:'白馬コルチナ',         p:'長野県 小谷村',   r:'長野・山梨', lat:36.800, lon:137.870, top:1400, base:880},
+  {id:'nozawa',   n:'野沢温泉',             p:'長野県 野沢温泉村', r:'長野・山梨', lat:36.920, lon:138.450, top:1650, base:565},
+  {id:'shiga',    n:'志賀高原',             p:'長野県 山ノ内町', r:'長野・山梨', lat:36.730, lon:138.510, top:2307, base:1340},
+  {id:'ryuoo',    n:'竜王スキーパーク',     p:'長野県 山ノ内町', r:'長野・山梨', lat:36.810, lon:138.450, top:1930, base:620},
+  {id:'madarao',  n:'斑尾高原',             p:'長野県 飯山市',   r:'長野・山梨', lat:36.840, lon:138.300, top:1382, base:890},
+  {id:'togakushi',n:'戸隠スキー場',         p:'長野県 長野市',   r:'長野・山梨', lat:36.770, lon:138.070, top:1750, base:1070},
+  {id:'sugadaira',n:'菅平高原',             p:'長野県 上田市',   r:'長野・山梨', lat:36.520, lon:138.330, top:1650, base:1250},
+  {id:'karuizawa',n:'軽井沢プリンス',       p:'長野県 軽井沢町', r:'長野・山梨', lat:36.330, lon:138.635, top:1200, base:970},
+  {id:'kurumayama',n:'車山高原',            p:'長野県 茅野市',   r:'長野・山梨', lat:36.100, lon:138.190, top:1925, base:1500},
+  {id:'fujimi',   n:'富士見パノラマ',       p:'長野県 富士見町', r:'長野・山梨', lat:35.890, lon:138.210, top:1780, base:1050},
+  // 新潟
+  {id:'naeba',    n:'苗場スキー場',         p:'新潟県 湯沢町',   r:'新潟', lat:36.790, lon:138.780, top:1789, base:900},
+  {id:'kagura',   n:'かぐらスキー場',       p:'新潟県 湯沢町',   r:'新潟', lat:36.840, lon:138.760, top:1845, base:620},
+  {id:'gala',     n:'GALA湯沢',             p:'新潟県 湯沢町',   r:'新潟', lat:36.950, lon:138.800, top:1181, base:358},
+  {id:'iwappara', n:'岩原スキー場',         p:'新潟県 湯沢町',   r:'新潟', lat:36.920, lon:138.800, top:800,  base:300},
+  {id:'ishiuchi', n:'石打丸山',             p:'新潟県 南魚沼市', r:'新潟', lat:36.980, lon:138.800, top:920,  base:250},
+  {id:'maiko',    n:'舞子スノーリゾート',   p:'新潟県 南魚沼市', r:'新潟', lat:36.990, lon:138.840, top:937,  base:250},
+  {id:'suginohara',n:'妙高杉ノ原',          p:'新潟県 妙高市',   r:'新潟', lat:36.880, lon:138.170, top:1855, base:731},
+  {id:'akakura',  n:'赤倉温泉スキー場',     p:'新潟県 妙高市',   r:'新潟', lat:36.890, lon:138.180, top:1350, base:750},
+  {id:'arai',     n:'ロッテアライリゾート', p:'新潟県 妙高市',   r:'新潟', lat:37.010, lon:138.180, top:1280, base:330},
+  // 北陸・東海
+  {id:'tateyama', n:'立山山麓スキー場',     p:'富山県 富山市',   r:'北陸・東海', lat:36.550, lon:137.400, top:1200, base:500},
+  {id:'jam',      n:'スキージャム勝山',     p:'福井県 勝山市',   r:'北陸・東海', lat:36.060, lon:136.570, top:1320, base:500},
+  {id:'dynaland', n:'ダイナランド',         p:'岐阜県 郡上市',   r:'北陸・東海', lat:35.970, lon:136.900, top:1420, base:1000},
+  {id:'takasu',   n:'高鷲スノーパーク',     p:'岐阜県 郡上市',   r:'北陸・東海', lat:35.970, lon:136.920, top:1550, base:1060},
+  {id:'washigatake',n:'鷲ヶ岳スキー場',     p:'岐阜県 郡上市',   r:'北陸・東海', lat:36.000, lon:136.920, top:1640, base:900},
+  {id:'honoki',   n:'ほおのき平',           p:'岐阜県 高山市',   r:'北陸・東海', lat:36.180, lon:137.360, top:1500, base:1100},
+  // 西日本
+  {id:'okuibuki', n:'奥伊吹スキー場',       p:'滋賀県 米原市',   r:'西日本', lat:35.480, lon:136.390, top:1150, base:650},
+  {id:'hakodateyama',n:'箱館山スキー場',    p:'滋賀県 高島市',   r:'西日本', lat:35.400, lon:136.030, top:680,  base:280},
+  {id:'hachikita',n:'ハチ北高原',           p:'兵庫県 香美町',   r:'西日本', lat:35.400, lon:134.570, top:1200, base:600},
+  {id:'daisen',   n:'大山スキー場',         p:'鳥取県 大山町',   r:'西日本', lat:35.370, lon:133.550, top:1100, base:750},
+  {id:'osorakan', n:'恐羅漢スノーパーク',   p:'広島県 安芸太田町', r:'西日本', lat:34.590, lon:132.110, top:1250, base:850},
+  {id:'gokase',   n:'五ヶ瀬ハイランド',     p:'宮崎県 五ヶ瀬町', r:'西日本', lat:32.600, lon:131.170, top:1600, base:1400},
+];
+const BY_ID = Object.fromEntries(RESORTS.map(r => [r.id, r]));
+const MAX_FAV = 3;
+
+/* ===== 保存 ===== */
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+let favs = store.get('snow.favs', []).filter(id => BY_ID[id]).slice(0, MAX_FAV);
+let region = store.get('snow.region', '長野・山梨');
+if (!REGIONS.includes(region)) region = REGIONS[0];
+
+/* ===== ユーティリティ ===== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = (v, d = 0) => v == null || isNaN(v) ? '--' : (Math.round(v * 10 ** d) / 10 ** d).toFixed(d);
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2000);
+}
+function wxIcon(code){
+  if (code == null) return '';
+  if (code === 0) return '☀️';
+  if (code <= 2) return '🌤️';
+  if (code === 3) return '☁️';
+  if (code <= 48) return '🌫️';
+  if (code <= 57) return '🌦️';
+  if (code <= 67) return '🌧️';
+  if (code <= 77) return '❄️';
+  if (code <= 82) return '🌧️';
+  if (code <= 86) return '🌨️';
+  return '⛈️';
+}
+function jstHourKey(d = new Date()){
+  const j = new Date(d.getTime() + 9 * 3600e3);
+  return j.toISOString().slice(0, 13) + ':00'; // "YYYY-MM-DDTHH:00"
+}
+function distKm(a1, o1, a2, o2){
+  const R = 6371, r = Math.PI / 180;
+  const dA = (a2 - a1) * r, dO = (o2 - o1) * r;
+  const x = Math.sin(dA/2) ** 2 + Math.cos(a1*r) * Math.cos(a2*r) * Math.sin(dO/2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+
+/* ===== Open-Meteo（気象モデル推定） ===== */
+const OM = 'https://api.open-meteo.com/v1/forecast';
+const TTL = 20 * 60e3;
+const cache = new Map(); // key -> {t, data}
+
+async function omFetch(points, extra = ''){
+  const q = new URLSearchParams({
+    latitude: points.map(p => p.lat).join(','),
+    longitude: points.map(p => p.lon).join(','),
+    elevation: points.map(p => p.elev).join(','),
+    hourly: 'snow_depth,snowfall,temperature_2m',
+    daily: 'snowfall_sum,temperature_2m_max,temperature_2m_min,weather_code',
+    timezone: 'Asia/Tokyo', past_days: '1', forecast_days: '7'
+  });
+  const res = await fetch(OM + '?' + q + extra);
+  if (!res.ok) throw new Error('Open-Meteo ' + res.status);
+  const j = await res.json();
+  return Array.isArray(j) ? j : [j];
+}
+async function omSnowDepthFallback(points){
+  const q = new URLSearchParams({
+    latitude: points.map(p => p.lat).join(','),
+    longitude: points.map(p => p.lon).join(','),
+    hourly: 'snow_depth', models: 'gfs_seamless',
+    timezone: 'Asia/Tokyo', past_days: '1', forecast_days: '1'
+  });
+  const res = await fetch(OM + '?' + q);
+  if (!res.ok) return null;
+  const j = await res.json();
+  return Array.isArray(j) ? j : [j];
+}
+
+function summarize(j, depthAlt){
+  const h = j.hourly, key = jstHourKey();
+  let i = h.time.indexOf(key);
+  if (i < 0) i = h.time.findIndex(t => t > key) - 1;
+  if (i < 0) i = 24;
+  const sum = (a, from, to) => { let s = 0; for (let k = Math.max(0, from); k <= Math.min(a.length - 1, to); k++) s += a[k] || 0; return s; };
+  const pickDepth = arr => { if (!arr) return null; for (let k = i; k >= Math.max(0, i - 6); k--) if (arr[k] != null) return arr[k] * 100; return null; };
+  let depth = pickDepth(h.snow_depth);
+  if (depth == null && depthAlt) {
+    const ah = depthAlt.hourly, ai = ah.time.indexOf(key);
+    if (ai >= 0) for (let k = ai; k >= Math.max(0, ai - 6); k--) if (ah.snow_depth[k] != null) { depth = ah.snow_depth[k] * 100; break; }
+  }
+  const d = j.daily;
+  return {
+    depth,                                   // cm
+    new24: sum(h.snowfall, i - 23, i),       // 過去24h 降雪 cm
+    next24: sum(h.snowfall, i + 1, i + 24),  // 今後24h 予報 cm
+    temp: h.temperature_2m[i],
+    days: d.time.slice(1).map((t, k) => ({
+      date: t, snow: d.snowfall_sum[k + 1], hi: d.temperature_2m_max[k + 1], lo: d.temperature_2m_min[k + 1], code: d.weather_code[k + 1]
+    }))
+  };
+}
+
+// 中腹の標高で一括取得（リスト・お気に入り用）
+async function loadMid(ids, force = false){
+  const need = ids.filter(id => force || !cache.has('mid:' + id) || Date.now() - cache.get('mid:' + id).t > TTL);
+  if (!need.length) return;
+  const pts = need.map(id => { const r = BY_ID[id]; return { lat: r.lat, lon: r.lon, elev: Math.round((r.top + r.base) / 2) }; });
+  const res = await omFetch(pts);
+  let alt = null;
+  if (res.some(j => !j.hourly.snow_depth || j.hourly.snow_depth.every(v => v == null))) {
+    try { alt = await omSnowDepthFallback(pts); } catch {}
+  }
+  need.forEach((id, k) => cache.set('mid:' + id, { t: Date.now(), data: summarize(res[k], alt && alt[k]) }));
+}
+const mid = id => cache.get('mid:' + id)?.data;
+
+/* ===== 気象庁アメダス（実測） ===== */
+const AMD = 'https://www.jma.go.jp/bosai/amedas/';
+let amdTable = null, amdMap = null, amdTime = null, amdT = 0, amdFailed = false;
+async function loadAmedas(force = false){
+  if (amdFailed && !force) return false;
+  if (!force && amdMap && Date.now() - amdT < 10 * 60e3) return true;
+  try {
+    if (!amdTable) amdTable = await (await fetch(AMD + 'const/amedastable.json')).json();
+    const lt = (await (await fetch(AMD + 'data/latest_time.txt', { cache: 'no-store' })).text()).trim();
+    const ts = lt.slice(0,4) + lt.slice(5,7) + lt.slice(8,10) + lt.slice(11,13) + lt.slice(14,16) + '00';
+    amdMap = await (await fetch(AMD + 'data/map/' + ts + '.json')).json();
+    amdTime = lt.slice(11, 16); amdT = Date.now(); amdFailed = false;
+    return true;
+  } catch (e) {
+    amdFailed = true; return false;
+  }
+}
+function nearestAmedas(r){
+  if (!amdTable || !amdMap) return null;
+  let best = null;
+  for (const [code, s] of Object.entries(amdTable)) {
+    const ob = amdMap[code];
+    if (!ob || !ob.snow || ob.snow[0] == null) continue;
+    const lat = s.lat[0] + s.lat[1] / 60, lon = s.lon[0] + s.lon[1] / 60;
+    const d = distKm(r.lat, r.lon, lat, lon);
+    if (d <= 40 && (!best || d < best.d)) best = { d, name: s.kjName, alt: s.alt, snow: ob.snow[0], s24: ob.snow24h ? ob.snow24h[0] : null };
+  }
+  return best;
+}
+function amedasText(r, long = false){
+  if (amdFailed) return long ? 'アメダスのデータを取得できませんでした。' : '';
+  if (!amdMap) return long ? '読み込み中…' : '';
+  const a = nearestAmedas(r);
+  if (!a) return long ? '40km以内に積雪を観測しているアメダスがありません（積雪観測は冬季・一部地点のみ）。' : '';
+  const s24 = a.s24 != null && a.s24 > 0 ? `（24h +${a.s24}cm）` : '';
+  return long
+    ? `<b>${esc(a.name)}</b>（標高${a.alt}m・約${Math.round(a.d)}km）<br>積雪 <b>${a.snow}cm</b>${s24}　${esc(amdTime)} 観測`
+    : `アメダス ${esc(a.name)}（${a.alt}m）: <b>${a.snow}cm</b>${s24}`;
+}
+
+/* ===== 描画 ===== */
+function renderFavs(){
+  $('favCount').textContent = `${favs.length} / ${MAX_FAV}`;
+  const box = $('favs');
+  if (!favs.length) {
+    box.innerHTML = `<div class="empty">下のリストの <span style="color:var(--star)">☆</span> をタップすると<br>お気に入りに登録できます（3つまで）</div>`;
+    return;
+  }
+  box.innerHTML = favs.map(id => {
+    const r = BY_ID[id], m = mid(id);
+    const am = amedasText(r);
+    return `<div class="fav" data-id="${id}">
+      <div class="head"><span class="nm">${esc(r.n)}</span><span class="pf">${esc(r.p)}</span></div>
+      <div class="row">
+        <div><div style="font-size:11px;color:var(--dim)">推定積雪</div><div class="big">${m ? fmt(m.depth) : '--'}<small>cm</small></div></div>
+        <div class="stats">
+          <div>24h新雪<b>${m ? fmt(m.new24) : '--'}<small style="font-size:11px">cm</small></b></div>
+          <div>24h予報<b>${m ? fmt(m.next24) : '--'}<small style="font-size:11px">cm</small></b></div>
+          <div>気温<b>${m ? fmt(m.temp) : '--'}°</b></div>
+        </div>
+      </div>
+      ${am ? `<div class="amd">${am}</div>` : ''}
+      <button class="starbtn" data-star="${id}" aria-label="お気に入り解除">★</button>
+    </div>`;
+  }).join('') + (favs.length < MAX_FAV ? `<div class="empty">あと ${MAX_FAV - favs.length} つ登録できます</div>` : '');
+}
+
+function renderChips(){
+  $('chips').innerHTML = REGIONS.map(g => `<button class="chip${g === region ? ' on' : ''}" data-region="${g}">${g}</button>`).join('');
+  const on = $('chips').querySelector('.on');
+  if (on) on.scrollIntoView({ inline: 'center', block: 'nearest' });
+}
+
+function renderList(){
+  const items = RESORTS.filter(r => r.r === region);
+  $('list').innerHTML = items.map(r => {
+    const m = mid(r.id), on = favs.includes(r.id);
+    const val = m
+      ? `<b>${fmt(m.depth)}</b><small>cm</small><span class="nw">${m.new24 >= 0.5 ? '新雪 +' + fmt(m.new24) + 'cm' : (m.next24 >= 0.5 ? '予報 +' + fmt(m.next24) + 'cm' : '新雪なし')}</span>`
+      : `<span class="skel"></span>`;
+    return `<div class="item">
+      <button class="main" data-id="${r.id}">
+        <div class="info"><div class="nm">${esc(r.n)}</div><div class="pf">${esc(r.p)}・${r.base}–${r.top}m</div></div>
+        <div class="val">${val}</div>
+      </button>
+      <button class="star${on ? ' on' : ''}" data-star="${r.id}" aria-label="${on ? 'お気に入り解除' : 'お気に入りに追加'}">${on ? '★' : '☆'}</button>
+    </div>`;
+  }).join('');
+}
+
+function toggleFav(id){
+  if (favs.includes(id)) {
+    favs = favs.filter(x => x !== id);
+    toast('お気に入りから外しました');
+  } else {
+    if (favs.length >= MAX_FAV) { toast('お気に入りは3つまでです'); return; }
+    favs.push(id);
+    toast('お気に入りに追加しました');
+  }
+  store.set('snow.favs', favs);
+  renderFavs(); renderList();
+  if (openId === id) renderSheetFav();
+  loadMid(favs).then(renderFavs).catch(() => {});
+  loadAmedas().then(renderFavs);
+}
+
+/* ===== 詳細シート ===== */
+let openId = null;
+function renderSheetFav(){
+  const on = favs.includes(openId);
+  $('sFav').className = 'favbtn' + (on ? ' on' : '');
+  $('sFav').textContent = on ? '★ 登録済み' : '☆ お気に入り';
+}
+function boxSub(s){
+  return `24h新雪 <b>${fmt(s.new24)}cm</b>・24h予報 <b>${fmt(s.next24)}cm</b><br>気温 <b>${fmt(s.temp, 1)}°C</b>`;
+}
+async function openSheet(id){
+  const r = BY_ID[id]; openId = id;
+  $('sName').textContent = r.n;
+  $('sPref').textContent = `${r.p}・標高 ${r.base}–${r.top}m`;
+  $('sTopLb').textContent = `山頂付近（${r.top}m）`;
+  $('sBaseLb').textContent = `山麓（${r.base}m）`;
+  ['sTopDepth','sBaseDepth'].forEach(k => $(k).innerHTML = '--');
+  ['sTopSub','sBaseSub'].forEach(k => $(k).textContent = '読み込み中…');
+  $('sChart').innerHTML = '';
+  $('sAmd').innerHTML = amedasText(r, true);
+  renderSheetFav();
+  $('backdrop').classList.add('open'); $('sheet').classList.add('open');
+  $('sheet').scrollTop = 0;
+
+  try {
+    let tb = cache.get('tb:' + id);
+    if (!tb || Date.now() - tb.t > TTL) {
+      const pts = [{ lat: r.lat, lon: r.lon, elev: r.top }, { lat: r.lat, lon: r.lon, elev: r.base }];
+      const res = await omFetch(pts);
+      let alt = null;
+      if (!res[0].hourly.snow_depth || res[0].hourly.snow_depth.every(v => v == null)) { try { alt = await omSnowDepthFallback(pts); } catch {} }
+      tb = { t: Date.now(), data: [summarize(res[0], alt && alt[0]), summarize(res[1], alt && alt[1])] };
+      cache.set('tb:' + id, tb);
+    }
+    if (openId !== id) return;
+    const [top, base] = tb.data;
+    $('sTopDepth').innerHTML = `${fmt(top.depth)}<small>cm</small>`;
+    $('sBaseDepth').innerHTML = `${fmt(base.depth)}<small>cm</small>`;
+    $('sTopSub').innerHTML = boxSub(top);
+    $('sBaseSub').innerHTML = boxSub(base);
+    renderChart(top.days);
+  } catch (e) {
+    if (openId !== id) return;
+    ['sTopSub','sBaseSub'].forEach(k => $(k).textContent = '取得できませんでした');
+  }
+  if (await loadAmedas() && openId === id) $('sAmd').innerHTML = amedasText(r, true);
+  else if (openId === id) $('sAmd').innerHTML = amedasText(r, true);
+}
+function renderChart(days){
+  const max = Math.max(5, ...days.map(d => d.snow || 0));
+  const wd = ['日','月','火','水','木','金','土'];
+  $('sChart').innerHTML = days.map((d, k) => {
+    const dt = new Date(d.date + 'T00:00:00+09:00');
+    const label = k === 0 ? '今日' : k === 1 ? '明日' : wd[dt.getDay()];
+    const v = d.snow || 0;
+    return `<div class="day">
+      <div class="v">${v >= 0.5 ? fmt(v) : ''}</div>
+      <div class="barwrap"><div class="bar" style="height:${Math.round(v / max * 100)}%"></div></div>
+      <div class="wx">${wxIcon(d.code)}</div>
+      <div class="d">${label}</div>
+      <div class="tp"><span class="hi">${fmt(d.hi)}</span>/<span class="lo">${fmt(d.lo)}</span></div>
+    </div>`;
+  }).join('');
+}
+function closeSheet(){
+  openId = null;
+  $('backdrop').classList.remove('open'); $('sheet').classList.remove('open');
+}
+
+/* ===== 読み込み ===== */
+async function refresh(force = false){
+  const btn = $('reload'); btn.classList.add('spin'); $('err').style.display = 'none';
+  const ids = [...new Set([...favs, ...RESORTS.filter(r => r.r === region).map(r => r.id)])];
+  try {
+    await loadMid(ids, force);
+    const d = new Date();
+    $('updated').textContent = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')} 更新`;
+  } catch (e) {
+    $('err').textContent = 'データを取得できませんでした。通信状況を確認して、右上の更新ボタンを押してください。';
+    $('err').style.display = 'block';
+    $('updated').textContent = '取得エラー';
+  }
+  renderFavs(); renderList();
+  btn.classList.remove('spin');
+  if (favs.length) loadAmedas(force).then(renderFavs);
+}
+
+/* ===== イベント ===== */
+document.addEventListener('click', e => {
+  const star = e.target.closest('[data-star]');
+  if (star) { e.stopPropagation(); toggleFav(star.dataset.star); return; }
+  const chip = e.target.closest('[data-region]');
+  if (chip) {
+    region = chip.dataset.region; store.set('snow.region', region);
+    renderChips(); renderList(); refresh();
+    return;
+  }
+  const item = e.target.closest('[data-id]');
+  if (item) openSheet(item.dataset.id);
+});
+$('reload').addEventListener('click', () => { cache.clear(); refresh(true); });
+$('backdrop').addEventListener('click', closeSheet);
+$('sClose').addEventListener('click', closeSheet);
+$('sFav').addEventListener('click', () => openId && toggleFav(openId));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+
+renderChips(); renderFavs(); renderList(); refresh();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
