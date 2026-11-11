@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" shape-rendering="crispEdges">
+  <defs>
+    <radialGradient id="bg" cx=".5" cy=".35" r=".8"><stop offset="0" stop-color="#3b2a8a"/><stop offset=".6" stop-color="#140c3a"/><stop offset="1" stop-color="#06040f"/></radialGradient>
+    <linearGradient id="bl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#9fc4ff"/></linearGradient>
+    <linearGradient id="sh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f63d6"/><stop offset="1" stop-color="#1a347a"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="#fff">
+    <rect x="70" y="80" width="8" height="8"/><rect x="420" y="66" width="8" height="8"/><rect x="452" y="180" width="6" height="6"/>
+    <rect x="52" y="230" width="6" height="6"/><rect x="380" y="430" width="8" height="8"/><rect x="96" y="420" width="6" height="6"/>
+  </g>
+  <!-- 盾 -->
+  <g transform="translate(60 210) scale(.95)">
+    <path d="M0 0 H176 V96 Q176 180 88 218 Q0 180 0 96 Z" fill="#ffd34d"/>
+    <path d="M14 14 H162 V96 Q162 168 88 202 Q14 168 14 96 Z" fill="url(#sh)"/>
+    <path d="M88 44 L104 92 L152 92 L113 120 L128 168 L88 138 L48 168 L63 120 L24 92 L72 92 Z" fill="#ffd34d"/>
+  </g>
+  <!-- 剣（ドット） -->
+  <g transform="translate(40 -10) rotate(40 256 256)">
+    <rect x="240" y="40" width="32" height="270" fill="url(#bl)"/>
+    <rect x="248" y="24" width="16" height="16" fill="#fff"/>
+    <rect x="256" y="40" width="16" height="270" fill="#7fa6e8" opacity=".55"/>
+    <rect x="176" y="306" width="160" height="28" fill="#ffd34d"/>
+    <rect x="176" y="324" width="160" height="10" fill="#c48a12"/>
+    <rect x="240" y="334" width="32" height="90" fill="#7a3f12"/>
+    <rect x="240" y="344" width="32" height="10" fill="#4a2408"/><rect x="240" y="368" width="32" height="10" fill="#4a2408"/><rect x="240" y="392" width="32" height="10" fill="#4a2408"/>
+    <rect x="232" y="424" width="48" height="32" fill="#ffd34d"/>
+    <rect x="248" y="312" width="16" height="16" fill="#e8304a"/>
+  </g>
+</svg>
