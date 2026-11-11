@@ -9,6 +9,7 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [app06 ランチャー](app06/index.html) | app06 のアプリをホーム画面風に並べたランチャー |
 | [そら模様](app06/weather/weather.html) | 現在地の天気・気温・湿度・降水確率・気圧・花粉・黄砂・PM2.5 を表示 |
 | [ゲレンデ積雪](app06/snow/snow.html) | 地域からスキー場を選び、推定積雪・新雪・7日間の降雪予報と近くのアメダス積雪を表示。お気に入り3件まで登録 |
+| [EVOLVE](app06/evolve/evolve.html) | 遊ぶほどゲームそのものが進化するシューティング。クラシック → 自由移動 → 色とビート → スプレッド → ロックオンレーザー → 巨大ボス → 無限へ |
 | [ピンボール](app06/pinball.html) / [コップの水](app06/cup.html) / [Gメーター](app06/gmeter.html) / [現在地](app06/location.html) / [マップ](app06/map.html) / [サウンド](app06/visualizer.html) | app06 のその他のアプリ |
 
 ### そら模様（app06/weather）
@@ -26,6 +27,17 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 - 積雪・降雪の推定・予報: [Open-Meteo](https://open-meteo.com/)（気象モデル、APIキー不要）。スキー場の公式発表値とは異なることがあります
 - 実測: 気象庁アメダス（40km 以内で積雪を観測している最寄り地点）。出典: 気象庁ホームページ
 - スキー場の座標・標高は概略です。追加は `snow.html` の `RESORTS` に1行足すだけ
+
+### EVOLVE（app06/evolve）
+
+- 画面のどこでもドラッグで自機を移動、押している間オートショット（PC は矢印キー + Space、X で武器切替、P でポーズ）
+- 敵を倒すと GENE（遺伝子）が溜まり、一定数ごとにゲームが「進化」する
+  - 00 GENESIS: 横移動のみ・画面に弾1発の古典スタイル
+  - 01 RAPID / 02 FREE MOVE / 03 SWARM / 04 CHROMA（色・遠近グリッド・BGM）
+  - 05 SPREAD（3WAY）/ 06 LOCK-ON（押して捕捉 → 離してホーミングレーザー）/ 07 TITAN（ボス）/ 08 PULSE / 09 INFINITY 以降は無限
+- 敵のドット絵は毎ウェーブ手続き生成。効果音・BGM は Web Audio で合成（進化に合わせてパートが増える）
+- ハイスコアと最高到達 EVO は端末内に保存。オフラインでも遊べます
+- iPhone の消音スイッチがオンだと音が出ません
 
 ## ローカルで動かす
 
