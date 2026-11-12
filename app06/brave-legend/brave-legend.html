@@ -1412,6 +1412,8 @@ async function shopBuy(list) {
       const j = await choose(opts, { title: `${it.n}　${it.p}G\n${it.sl === 'w' ? 'こうげき' : 'しゅび'}+${it.v}${it.d ? '　' + it.d : ''}\nだれが そうびしますか？` });
       if (j < 0) continue;
       if (G.gold < it.p) { sfx('no'); await msg('おかねが たりないようですね。'); continue; }
+      const who = j < G.party.length ? `${G.party[j].name}が そうびする ` : '';
+      if (!await yesno(`${who}${it.n}は ${it.p.toLocaleString()}ゴールドです。\nおかいあげに なりますか？`)) continue;
       G.gold -= it.p; sfx('coin');
       if (j < G.party.length) {
         const c = G.party[j], old = c.eq[it.sl]; c.eq[it.sl] = it.id;
@@ -1425,7 +1427,8 @@ async function shopBuy(list) {
       const j = await choose(qs.map(q => ({ t: `${q}こ`, s: (it.p * q).toLocaleString() + 'G' })), { title: it.n + '　いくつ かいますか？' }); if (j < 0) continue;
       const cost = it.p * qs[j];
       if (G.gold < cost) { sfx('no'); await msg('おかねが たりないようですね。'); continue; }
-      G.gold -= cost; addBag(it.id, qs[j]); sfx('coin');
+      if (!await yesno(`${it.n}を ${qs[j]}こで ${cost.toLocaleString()}ゴールドです。\nおかいあげに なりますか？`)) continue;
+      G.gold -= cost; addBag(it.id, qs[j]); sfx('coin'); await msg('まいど ありがとうございます！');
     }
   }
 }
@@ -1457,6 +1460,7 @@ async function church() {
       const pz = [...G.party, ...G.reserve].filter(c => c.st.poison);
       if (!pz.length) { await msg('どくに おかされた なかまは いないようですね。'); continue; }
       if (G.gold < 10 * pz.length) { await msg('きふが たりないようですね。'); continue; }
+      if (!await yesno(`どくを なおすには ${10 * pz.length}Gの きふが ひつようです。\nよろしいですか？`)) continue;
       G.gold -= 10 * pz.length; pz.forEach(c => delete c.st.poison); sfx('heal'); await msg(`${10 * pz.length}Gの きふで みんなの どくを なおしました。`); hud();
     }
   }
@@ -1483,6 +1487,7 @@ async function partyHouse() {
     if (r === 2) {
       if (G.gold < 100) { await msg('とうろくには 100G ひつようです。'); continue; }
       const j = await choose(HUMAN_JOBS.map(k => CLS[k].n), { title: 'どの職業の なかまを とうろく？' }); if (j < 0) continue;
+      if (!await yesno(`${CLS[HUMAN_JOBS[j]].n}の なかまの とうろくには 100ゴールド かかります。\nよろしいですか？`)) continue;
       const cls = HUMAN_JOBS[j], c = mkChar(pick(NAMES[cls]), cls);
       // 平均レベルの半分くらいまで鍛えて来てくれる
       const avg = Math.floor(G.party.reduce((a, b) => a + b.lv, 0) / G.party.length / 2);
@@ -2138,6 +2143,7 @@ async function casino() {
       const j = await choose(qs.map(q => ({ t: `${q}枚`, s: (q * COIN_PRICE).toLocaleString() + 'G', dis: r === 2 ? G.gold < q * COIN_PRICE : G.coins < q })), { title: r === 2 ? 'なんまい 買いますか？' : 'なんまい 換金しますか？' });
       if (j < 0) continue;
       const q = qs[j];
+      if (r === 2 && !await yesno(`コイン ${q}枚を ${(q * COIN_PRICE).toLocaleString()}ゴールドで 買いますか？`)) continue;
       if (r === 2) { G.gold -= q * COIN_PRICE; G.coins += q; } else { G.coins -= q; G.gold += q * COIN_PRICE; }
       sfx('coin'); save();
     }
