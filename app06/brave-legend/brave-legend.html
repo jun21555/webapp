@@ -86,6 +86,8 @@
   .menu .ttl{font-size:13px;color:#ffd34d;padding:2px 6px 4px;border-bottom:1px solid rgba(255,255,255,.4);margin-bottom:4px;white-space:pre-wrap}
   .menu .it{display:flex;align-items:center;min-height:44px;padding:4px 6px 4px 22px;position:relative;border-radius:4px;cursor:pointer;gap:8px}
   .menu .it .sub{margin-left:auto;font-size:13px;opacity:.85;white-space:nowrap;padding-left:8px}
+  .menu .it .sub.price{font-size:18px;opacity:1;color:#ffe9a8}
+  .menu .ttl .gl{display:block;font-size:19px;color:#fff;margin-top:3px;letter-spacing:.06em}
   .menu .it.sel::before{content:"▶";position:absolute;left:4px;font-size:12px;animation:blink .8s steps(2) infinite}
   .menu .it.dis{opacity:.4}
   .menu .it:active{background:rgba(255,255,255,.15)}
@@ -801,10 +803,13 @@ function choose(items, opt = {}) {
     const w = el('div', 'win menu' + (opt.grid ? ' grid2' : ''));
     place(w, opt.pos || {});
     if (!opt.pos || !opt.pos.width) w.style.right = 'calc(env(safe-area-inset-right) + 8px)';
-    if (opt.title) w.append(el('div', 'ttl', esc(opt.title)));
+    // 所持金の行は大きく表示
+    if (opt.title) w.append(el('div', 'ttl', esc(opt.title).replace(/^((?:所持金|ねだん).*)$/gm, '<span class="gl">$1</span>')));
     const rows = items.map((it, i) => {
       const r = el('div', 'it' + (it.dis ? ' dis' : ''));
-      r.innerHTML = `<span>${esc(it.t)}</span>${it.s != null ? `<span class="sub">${esc(it.s)}</span>` : ''}`;
+      // 値段（○○G・○○枚）は大きく表示
+      const price = it.s != null && /^[\d,]+ ?(G|枚)$/.test(String(it.s));
+      r.innerHTML = `<span>${esc(it.t)}</span>${it.s != null ? `<span class="sub${price ? ' price' : ''}">${esc(it.s)}</span>` : ''}`;
       r.addEventListener('click', () => { if (sel === i) fin(i); else { setSel(i); if (!opt.dbl) fin(i); } });
       w.append(r); return r;
     });
@@ -1103,18 +1108,45 @@ const HEADPAL = {
   jester: { A: '#ff4f8f', a: '#c02a6a' }, thief: { A: '#8a1f1f', a: '#5a1010' }, sage: { R: '#2ad6a0' },
 };
 function shade(hex, f) { const n = parseInt(hex.slice(1), 16); const r = (n >> 16) * f, g = (n >> 8 & 255) * f, b = (n & 255) * f; return `rgb(${r | 0},${g | 0},${b | 0})`; }
+// 横向き（右向き）用のパーツ
+const SIDEFACE = ['..OHHHSSSSESSO..', '..OHHHSSSSESSSO.'];
+const SIDEBODY = [
+  '..OhHHsSSSSSsO..',
+  '...OHHsSSSSsO...',
+  '.....OsSSsO.....',
+  '....OCCCCCCO....',
+  '....OCcCCCCO....',
+  '....OCCCCCSO....',
+  '....OCCCCCSO....',
+  '....OBBBGBBO....',
+  '....OCCCCCCO....',
+  '....OccCCccO....'];
+const SIDELEGS = [['.....OLLLLO.....', '.....OOOOOOO....'], ['....OLLO.OLLO...', '...OOOO..OOOOO..']];
 const SPRCACHE = {};
-function sprite(cls, fr) {
-  const key = cls + fr; if (SPRCACHE[key]) return SPRCACHE[key];
+// dir: 0上(後ろ姿) 1右 2下(正面) 3左
+function spriteRows(cls, dir, fr) {
+  const head = HEADS[cls] || HEADS.base;
+  if (dir === 2) return [...head, ...FACE, ...BODY, ...LEGS[fr]];
+  if (dir === 0) {
+    const h = head.map((r, y) => y < 5 ? r.replace(/R/g, 'G') : r.replace(/[SsE]/g, 'H'));
+    const body = BODY.map((r, y) => y === 0 ? '..OhHHHHHHHHhO..' : y === 1 ? '...OhHHHHHHhO...' : r.replace(/G/g, 'B'));
+    return [...h, '..OHHHHHHHHHHO..', '..OHHHHHHHHHHO..', ...body, ...LEGS[fr]];
+  }
+  const h = head.map((r, y) => y < 5 ? r : r.split('').map((c, x) => x >= 3 && x <= 5 && 'SsE'.includes(c) ? 'H' : c).join(''));
+  return [...h, ...SIDEFACE, ...SIDEBODY, ...SIDELEGS[fr]];
+}
+function sprite(cls, fr, dir = 2) {
+  const key = cls + fr + dir; if (SPRCACHE[key]) return SPRCACHE[key];
   const k = CLS[cls], hp = HEADPAL[cls] || {};
   const pal = { O: '#1a1020', H: k.hair, h: shade(k.hair, .7), S: '#ffd2a8', s: '#e8a87c', E: '#1a1020', C: k.cloth, c: shade(k.cloth, .72), B: '#5a3a1a', G: '#ffd34d', R: '#e8304a', L: '#4a3020', A: '#888', a: '#555', W: '#ffffff', ...hp };
-  const rows = [...(HEADS[cls] || HEADS.base), ...FACE, ...BODY, ...LEGS[fr]];
+  const rows = spriteRows(cls, dir === 3 ? 1 : dir, fr);
   const cv2 = document.createElement('canvas'); cv2.width = 16; cv2.height = 20;
   const g = cv2.getContext('2d');
+  if (dir === 3) { g.translate(16, 0); g.scale(-1, 1); }   // 左向きは右向きを反転
   rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.' && pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(x, y, 1, 1); } }));
   return SPRCACHE[key] = cv2;
 }
-function drawPerson(c, ch, sx, sy, s, fr) {
+function drawPerson(c, ch, sx, sy, s, fr, dir = 2) {
   if (ch.mon) {
     c.font = `${s * .78}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText(EN[ch.mon].e, sx + s / 2, sy + s / 2 + (fr ? -1 : 1)); return;
@@ -1123,7 +1155,7 @@ function drawPerson(c, ch, sx, sy, s, fr) {
   if (ch.hp <= 0) c.globalAlpha = .45;
   c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(sx + s / 2, oy + h * .98, w * .38, h * .06, 0, 0, 7); c.fill();
   c.imageSmoothingEnabled = false;
-  c.drawImage(sprite(ch.cls, fr), Math.round(ox), Math.round(oy), Math.round(w), Math.round(h));
+  c.drawImage(sprite(ch.cls, fr, dir), Math.round(ox), Math.round(oy), Math.round(w), Math.round(h));
   c.globalAlpha = 1;
 }
 function curPos() {
@@ -1147,7 +1179,7 @@ function render(t) {
   const walk = Math.floor(t / 260) % 2;
   for (let i = G.party.length - 1; i >= 0; i--) {
     const p = P[i] || P[0];
-    drawPerson(cx, G.party[i], ox + p[0] * TS, oy + p[1] * TS, TS, walk);
+    drawPerson(cx, G.party[i], ox + p[0] * TS, oy + p[1] * TS, TS, walk, (S.face && S.face[i] != null) ? S.face[i] : 2);
   }
   if (G.lair) {
     const g = cx.createRadialGradient(ccx, ccy, TS * 1.2, ccx, ccy, TS * 4.2);
@@ -1174,6 +1206,7 @@ function statBox(c, i, act) {
 function resetTrail() {
   const p = G.lair ? [G.lair.x, G.lair.y] : [G.x, G.y];
   S.pos = G.party.map(() => p.slice()); S.from = S.pos.map(a => a.slice()); S.to = S.pos.map(a => a.slice()); S.moving = false;
+  S.face = G.party.map((_, i) => (S.face && S.face[i] != null) ? S.face[i] : 2);
 }
 function passable(x, y) {
   const c = tileAt(x, y);
@@ -1184,11 +1217,13 @@ function tryStep(d) {
   if (S.busy) return;
   const cur = G.lair ? [G.lair.x, G.lair.y] : [G.x, G.y];
   const nx = cur[0] + [0, 1, 0, -1][d], ny = cur[1] + [-1, 0, 1, 0][d];
+  if (S.face) S.face[0] = d;
   if (!passable(nx, ny)) { if (!S.bump || performance.now() - S.bump > 300) { sfx('step'); S.bump = performance.now(); } return; }
   S.from = S.pos.map(a => a.slice());
   S.to = [[nx, ny], ...S.pos.slice(0, G.party.length - 1)];
   while (S.to.length < G.party.length) S.to.push([nx, ny]);
   if (G.lair) { G.lair.x = nx; G.lair.y = ny; } else { G.x = nx; G.y = ny; }
+  S.face = S.to.map((t, i) => { const f = S.from[i] || t, dx = t[0] - f[0], dy = t[1] - f[1]; return dx > 0 ? 1 : dx < 0 ? 3 : dy > 0 ? 2 : dy < 0 ? 0 : (S.face && S.face[i] != null ? S.face[i] : 2); });
   S.moving = true; S.t0 = performance.now(); S.dur = 150;
 }
 async function onArrive() {
@@ -1254,7 +1289,7 @@ async function fieldMenuInner() {
   hud();
   while (true) {
     const r = await choose(['じゅもん', 'どうぐ', 'そうび', 'つよさ', 'ならびかえ', 'きろく', 'せってい', 'あそびかた'],
-      { grid: true, title: `${placeName()}　${G.gold.toLocaleString()} G` });
+      { grid: true, title: `${placeName()}\n${gstr()}` });
     if (r < 0) return;
     if (r === 0) { if (await fieldSpell() === 'warp') return arriveFacility(); }
     else if (r === 1) { if (await fieldItem() === 'warp') return arriveFacility(); }
@@ -1456,7 +1491,7 @@ async function shopBuy(list) {
         const d = it.v - eqv(c, it.sl); return { t: c.name, s: `${it.sl === 'w' ? 'こうげき' : 'しゅび'} ${d >= 0 ? '+' : ''}${d}` };
       });
       opts.push({ t: 'ふくろに いれる' });
-      const j = await choose(opts, { title: `${it.n}　${it.p}G\n${it.sl === 'w' ? 'こうげき' : 'しゅび'}+${it.v}${it.d ? '　' + it.d : ''}\nだれが そうびしますか？\n${gstr()}` });
+      const j = await choose(opts, { title: `${it.n}　${it.sl === 'w' ? 'こうげき' : 'しゅび'}+${it.v}\nねだん ${it.p.toLocaleString()} G${it.d ? '　' + it.d : ''}\nだれが そうびしますか？\n${gstr()}` });
       if (j < 0) continue;
       if (G.gold < it.p) { sfx('no'); await msg('おかねが たりないようですね。'); continue; }
       const who = j < G.party.length ? `${G.party[j].name}が そうびする ` : '';
