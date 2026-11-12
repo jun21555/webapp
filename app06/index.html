@@ -52,9 +52,22 @@
   .dots{display:flex;justify-content:center;gap:7px;margin:40px 0 0}
   .dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4)}
   .dots i:first-child{background:#fff}
+  /* 更新（リロード）ボタン */
+  #reload{position:fixed;z-index:10;top:calc(env(safe-area-inset-top) + 10px);right:calc(env(safe-area-inset-right) + 12px);
+    width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.35);padding:0;cursor:pointer;
+    background:rgba(255,255,255,.18);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);color:#fff;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.25);
+    transition:transform .15s ease,background .15s ease;-webkit-tap-highlight-color:transparent}
+  #reload:active{transform:scale(.88);background:rgba(255,255,255,.3)}
+  #reload svg{width:22px;height:22px}
+  #reload.spin svg{animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
+<button id="reload" type="button" aria-label="ページを更新">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+</button>
 <header>
   <div id="date"></div>
   <div id="time">--:--</div>
@@ -220,6 +233,18 @@
     document.getElementById('date').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日('+days[d.getDay()]+')';
   }
   tick(); setInterval(tick,10000);
+
+  // 更新ボタン：各アプリの Service Worker にも更新を確認させてから再読み込み
+  document.getElementById('reload').addEventListener('click',async e=>{
+    e.currentTarget.classList.add('spin');
+    try{
+      if('serviceWorker' in navigator){
+        const rs=await navigator.serviceWorker.getRegistrations();
+        await Promise.race([Promise.all(rs.map(r=>r.update().catch(()=>{}))),new Promise(r=>setTimeout(r,1500))]);
+      }
+    }catch(_){}
+    location.reload();
+  });
 </script>
 </body>
 </html>
