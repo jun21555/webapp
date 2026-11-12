@@ -37,19 +37,19 @@
   /* ---- DQ風ウィンドウ ---- */
   .win{background:#000;border:3px solid #fff;border-radius:8px;box-shadow:0 0 0 2px #000,0 6px 18px rgba(0,0,0,.6);
     padding:10px 12px;color:#fff;line-height:1.55}
-  #hud{position:absolute;z-index:20;top:calc(env(safe-area-inset-top) + 6px);left:calc(env(safe-area-inset-left) + 58px);
-    right:calc(env(safe-area-inset-right) + 58px);display:flex;gap:4px;pointer-events:none}
-  .pbox{flex:1;min-width:0;background:rgba(0,0,0,.82);border:2px solid #fff;border-radius:6px;padding:2px 5px 4px;font-size:12px;line-height:1.3}
+  #hud{position:absolute;z-index:20;top:calc(env(safe-area-inset-top) + 58px);left:calc(env(safe-area-inset-left) + 6px);
+    right:calc(env(safe-area-inset-right) + 6px);display:flex;gap:5px;pointer-events:none}
+  .pbox{flex:1;min-width:0;background:rgba(0,0,0,.85);border:3px solid #fff;border-radius:8px;padding:3px 6px 6px;font-size:22px;line-height:1.15}
   .pbox .ln{display:flex;justify-content:space-between;align-items:baseline}
-  .pbox .ln small{font-size:10px;opacity:.85}
-  .pbox .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid rgba(255,255,255,.5);margin-bottom:2px}
+  .pbox .ln small{font-size:14px;opacity:.85}
+  .pbox .nm{font-size:16px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid rgba(255,255,255,.5);margin-bottom:3px}
   .pbox.low{color:#ffb84d;border-color:#ffb84d}
   .pbox.dead{color:#ff5252;border-color:#ff5252}
-  .pbox .bar{height:3px;background:#333;margin-top:1px;border-radius:2px;overflow:hidden}
+  .pbox .bar{height:6px;background:#333;margin:2px 0 3px;border-radius:3px;overflow:hidden}
   .pbox .bar i{display:block;height:100%;background:#4cff7a}
   .pbox .bar.mp i{background:#4cc3ff}
-  .pbox.act{box-shadow:0 0 0 2px #ffd34d}
-  #maptitle{position:absolute;z-index:19;left:50%;top:calc(env(safe-area-inset-top) + 74px);transform:translateX(-50%);
+  .pbox.act{box-shadow:0 0 0 3px #ffd34d}
+  #maptitle{position:absolute;z-index:19;left:50%;top:calc(env(safe-area-inset-top) + 180px);transform:translateX(-50%);
     padding:6px 14px;font-size:14px;white-space:nowrap;transition:opacity .6s;opacity:0;pointer-events:none}
   #maptitle.show{opacity:1}
 
@@ -81,7 +81,7 @@
     bottom:calc(env(safe-area-inset-bottom) + 10px + var(--pb));min-height:118px;font-size:16px;white-space:pre-wrap;z-index:5}
   .msg .nx{position:absolute;right:12px;bottom:6px;animation:blink .8s steps(2) infinite}
   @keyframes blink{50%{opacity:0}}
-  .menu{position:absolute;max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 84px - var(--pb));overflow-y:auto;
+  .menu{position:absolute;max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 180px - var(--pb));overflow-y:auto;
     -webkit-overflow-scrolling:touch;padding:6px 8px;z-index:6;overscroll-behavior:contain}
   .menu .ttl{font-size:13px;color:#ffd34d;padding:2px 6px 4px;border-bottom:1px solid rgba(255,255,255,.4);margin-bottom:4px;white-space:pre-wrap}
   .menu .it{display:flex;align-items:center;min-height:44px;padding:4px 6px 4px 22px;position:relative;border-radius:4px;cursor:pointer;gap:8px}
@@ -101,9 +101,9 @@
   /* ---- 戦闘 ---- */
   #battle{position:absolute;inset:0;z-index:25;overflow:hidden}
   #bbg{position:absolute;inset:0}
-  #bparty{position:absolute;z-index:3;top:calc(env(safe-area-inset-top) + 6px);left:calc(env(safe-area-inset-left) + 58px);
-    right:calc(env(safe-area-inset-right) + 58px);display:flex;gap:4px}
-  #benemies{position:absolute;z-index:2;left:0;right:0;top:calc(env(safe-area-inset-top) + 92px);bottom:calc(env(safe-area-inset-bottom) + 300px);
+  #bparty{position:absolute;z-index:3;top:calc(env(safe-area-inset-top) + 58px);left:calc(env(safe-area-inset-left) + 6px);
+    right:calc(env(safe-area-inset-right) + 6px);display:flex;gap:5px}
+  #benemies{position:absolute;z-index:2;left:0;right:0;top:calc(env(safe-area-inset-top) + 210px);bottom:calc(env(safe-area-inset-bottom) + 300px);
     display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:center;align-content:center;gap:4px 10px;padding:0 10px}
   .en{position:relative;display:flex;flex-direction:column;align-items:center;transition:opacity .5s,transform .2s;cursor:pointer}
   .en .sp{line-height:1;filter:drop-shadow(0 4px 0 rgba(0,0,0,.35))}
@@ -125,7 +125,7 @@
   @keyframes bfx{0%{opacity:.85}100%{opacity:0}}
   #bmsg{position:absolute;z-index:5;left:calc(env(safe-area-inset-left) + 8px);right:calc(env(safe-area-inset-right) + 8px);
     bottom:calc(env(safe-area-inset-bottom) + 10px);height:150px;font-size:15px;overflow:hidden;white-space:pre-wrap}
-  #bauto{position:absolute;z-index:45;right:calc(env(safe-area-inset-right) + 10px);top:calc(env(safe-area-inset-top) + 84px);
+  #bauto{position:absolute;z-index:45;right:calc(env(safe-area-inset-right) + 10px);top:calc(env(safe-area-inset-top) + 174px);
     min-width:70px;height:40px;border-radius:20px;background:#000;border:2px solid #fff;color:#fff;font:14px inherit;padding:0 12px}
   #bauto.on{background:#ffd34d;color:#000;border-color:#ffd34d}
   .dmgpop{position:absolute;z-index:8;font-size:22px;font-weight:700;color:#fff;text-shadow:0 0 3px #000,2px 2px 0 #000;pointer-events:none;
@@ -756,7 +756,7 @@ addEventListener('keyup', e => { const k = KEYMAP[e.key]; if (k in DIRK) held.de
 const UIL = $('#ui');
 function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const TOPY = 'calc(env(safe-area-inset-top) + 76px)';
+const TOPY = 'calc(env(safe-area-inset-top) + 172px)';
 function place(e, p = {}) {
   const d = { left: 'calc(env(safe-area-inset-left) + 8px)', top: TOPY };
   Object.assign(e.style, d, p);
@@ -1070,25 +1070,60 @@ function drawTile(c, x, y, sx, sy, s, t) {
     }
   }
 }
-// ドット絵キャラ（8x10）
-const PERSON = [
-  '..HHHH..', '.HHHHHH.', '.HSSSSH.', '..SESE..', '..SSSS..', '.CCCCCC.', 'SCCCCCCS', '.CCBBCC.', '..L..L..', '..L..L..'];
-const PERSON2 = ['..HHHH..', '.HHHHHH.', '.HSSSSH.', '..SESE..', '..SSSS..', '.CCCCCC.', 'SCCCCCCS', '.CCBBCC.', '.L....L.', '.L....L.'];
+// ドット絵キャラ（16x20）
+// O輪郭 H髪 h髪影 S肌 s肌影 E目 C服 c服影 B帯 G金 R宝石 L靴 A帽子/兜 a帽子影 W光
+const BODY = [
+  '..OsSSSSSSSSsO..',
+  '...OsSSSSSSsO...',
+  '....OOsSSsOO....',
+  '...OCCCCCCCCO...',
+  '..OCCCcCCcCCCO..',
+  '.OSOCCCCCCCCOSO.',
+  '.OSOCCCCCCCCOSO.',
+  '..OOBBBGGBBBOO..',
+  '...OCCCCCCCCO...',
+  '...OccCOOCccO...'];
+const LEGS = [['...OLLLO.OLLLO..', '...OOOO..OOOO...'], ['..OLLLO...OLLLO.', '..OOOO.....OOOO.']];
+const FACE = ['..OSSSESSESSSO..', '..OSSSESSESSSO..'];
+const HEADS = {
+  base: ['......OOOO......', '....OOHHHHOO....', '...OHHHHHHHHO...', '..OHHHHHHHHHHO..', '..OHHhHHHHhHHO..', '..OHSSSSSSSSHO..'],
+  hero: ['....O.OOOO.O....', '...OHOHHHHOHO...', '...OHHHHHHHHO...', '..OHHHHHHHHHHO..', '..OGGGGRRGGGGO..', '..OHSSSSSSSSHO..'],
+  warrior: ['......OOOO......', '....OOAAAAOO....', '...OAAAWAAAAO...', '..OAAAAAAAAAAO..', '..OaaaaaaaaaaO..', '..OaSSSSSSSSaO..'],
+  monk: ['......OOOO......', '....OOHHHHOO....', '...OHHHHHHHHO...', '..OHHHHHHHHHHO..', '..ORRRRRRRRRRO..', '..OHSSSSSSSSHO..'],
+  priest: ['.....OOOOOO.....', '....OAAAAAAO....', '...OAAAGGAAAO...', '..OAAAAGGAAAAO..', '..OaaaaaaaaaaO..', '..OaSSSSSSSSaO..'],
+  mage: ['.......OO.......', '......OAAO......', '.....OAAAAO.....', '....OAAGAAAO....', '.OAAAAAAAAAAAAO.', '..OHSSSSSSSSHO..'],
+  merchant: ['......OOOO......', '....OOAAAAOO....', '...OAAAAAAAAO...', '..OAAAAAAAAAAO..', '.OaaaaaaaaaaaaO.', '..OHSSSSSSSSHO..'],
+  jester: ['.OO..........OO.', '.OGO........OGO.', '..OAAOOOOOOAAO..', '..OAAAAAAAAAAO..', '..OaaaaaaaaaaO..', '..OHSSSSSSSSHO..'],
+  thief: ['......OOOO......', '....OOAAAAOO....', '...OAAAAAAAAO...', '..OAAAAAAAAAAOAO', '..OaaaaaaaaaaOO.', '..OHSSSSSSSSHO..'],
+  sage: ['......OOOO......', '....OOHHHHOO....', '...OHHHHHHHHO...', '..OHHHHHHHHHHO..', '..OGGGGRRGGGGO..', '.OHHSSSSSSSSHHO.'],
+};
+const HEADPAL = {
+  hero: { R: '#e8304a' }, warrior: { A: '#c8d0da', a: '#8a94a0' }, monk: { R: '#d62828' },
+  priest: { A: '#f4f4fa', a: '#c8c8d8' }, mage: { A: '#5a2a9a', a: '#3a1a6a' }, merchant: { A: '#2f8a3e', a: '#1f5a28' },
+  jester: { A: '#ff4f8f', a: '#c02a6a' }, thief: { A: '#8a1f1f', a: '#5a1010' }, sage: { R: '#2ad6a0' },
+};
+function shade(hex, f) { const n = parseInt(hex.slice(1), 16); const r = (n >> 16) * f, g = (n >> 8 & 255) * f, b = (n & 255) * f; return `rgb(${r | 0},${g | 0},${b | 0})`; }
+const SPRCACHE = {};
+function sprite(cls, fr) {
+  const key = cls + fr; if (SPRCACHE[key]) return SPRCACHE[key];
+  const k = CLS[cls], hp = HEADPAL[cls] || {};
+  const pal = { O: '#1a1020', H: k.hair, h: shade(k.hair, .7), S: '#ffd2a8', s: '#e8a87c', E: '#1a1020', C: k.cloth, c: shade(k.cloth, .72), B: '#5a3a1a', G: '#ffd34d', R: '#e8304a', L: '#4a3020', A: '#888', a: '#555', W: '#ffffff', ...hp };
+  const rows = [...(HEADS[cls] || HEADS.base), ...FACE, ...BODY, ...LEGS[fr]];
+  const cv2 = document.createElement('canvas'); cv2.width = 16; cv2.height = 20;
+  const g = cv2.getContext('2d');
+  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch !== '.' && pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(x, y, 1, 1); } }));
+  return SPRCACHE[key] = cv2;
+}
 function drawPerson(c, ch, sx, sy, s, fr) {
   if (ch.mon) {
     c.font = `${s * .78}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText(EN[ch.mon].e, sx + s / 2, sy + s / 2 + (fr ? -1 : 1)); return;
   }
-  const k = CLS[ch.cls], p = Math.floor(s / 11), ox = sx + (s - p * 8) / 2, oy = sy + (s - p * 10) / 2 - 1;
-  const pal = { H: k.hair, S: '#ffd2a8', E: '#222', C: k.cloth, B: '#5a3a1a', L: '#3a2a20' };
-  if (ch.hp <= 0) { c.globalAlpha = .45; }
-  const rows = fr ? PERSON2 : PERSON;
-  c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(sx + s / 2, oy + p * 10, p * 3.5, p * 1.1, 0, 0, 7); c.fill();
-  for (let y = 0; y < 10; y++) for (let x = 0; x < 8; x++) {
-    const ch2 = rows[y][x]; if (ch2 === '.') continue;
-    c.fillStyle = pal[ch2]; c.fillRect(ox + x * p, oy + y * p, p, p);
-  }
-  if (ch.hero) { c.fillStyle = '#ffd34d'; c.fillRect(ox + 2 * p, oy - p, 4 * p, p); c.fillRect(ox + 3 * p, oy - 2 * p, 2 * p, p); }
+  const h = s * 1.02, w = h * .8, ox = sx + (s - w) / 2, oy = sy + s - h - s * .04;
+  if (ch.hp <= 0) c.globalAlpha = .45;
+  c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(sx + s / 2, oy + h * .98, w * .38, h * .06, 0, 0, 7); c.fill();
+  c.imageSmoothingEnabled = false;
+  c.drawImage(sprite(ch.cls, fr), Math.round(ox), Math.round(oy), Math.round(w), Math.round(h));
   c.globalAlpha = 1;
 }
 function curPos() {
@@ -1105,7 +1140,7 @@ function render(t) {
   cx.setTransform(DPR, 0, 0, DPR, 0, 0);
   cx.fillStyle = '#000'; cx.fillRect(0, 0, VW, VH);
   const [px, py] = P[0];
-  const ccx = VW / 2, ccy = Math.round(VH * .44);
+  const ccx = VW / 2, ccy = Math.round((VH - 40) / 2);
   const ox = ccx - (px + .5) * TS, oy = ccy - (py + .5) * TS;
   const x0 = Math.floor(-ox / TS) - 1, y0 = Math.floor(-oy / TS) - 1, x1 = x0 + Math.ceil(VW / TS) + 2, y1 = y0 + Math.ceil(VH / TS) + 2;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) drawTile(cx, x, y, Math.floor(ox + x * TS), Math.floor(oy + y * TS), TS + 1, t);

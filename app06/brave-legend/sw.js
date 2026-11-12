@@ -1,5 +1,5 @@
 // 勇者の伝説 Service Worker: アプリ一式をキャッシュしてオフラインでも遊べるようにする
-const CACHE = 'brave-legend-v4';
+const CACHE = 'brave-legend-v5';
 const SHELL = ['brave-legend.html', 'manifest.webmanifest', 'favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
