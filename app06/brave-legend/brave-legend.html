@@ -774,9 +774,9 @@ function msg(text, opt = {}) {
       const t = pages[pi]; let i = 0; full = false; box.textContent = '';
       clearInterval(tm);
       tm = setInterval(() => {
-        i += 2; box.textContent = t.slice(0, i);
+        i += 1; box.textContent = t.slice(0, i);
         if (i >= t.length) { clearInterval(tm); done(); }
-      }, 22);
+      }, 45);
     };
     const done = () => { full = true; box.textContent = pages[pi]; box.append(el('span', 'nx', '▼')); };
     const h = {
@@ -844,11 +844,9 @@ let keepBox = null;
 function msgKeep(text) { closeKeep(); keepBox = el('div', 'win msg'); keepBox.textContent = text; UIL.append(keepBox); keepBox.style.zIndex = 5; return Promise.resolve(); }
 function closeKeep() { if (keepBox) { keepBox.remove(); keepBox = null; } }
 function panel(html, p = {}) { const e = el('div', 'win info', html); place(e, p); if (!p.width) e.style.right = 'calc(env(safe-area-inset-right) + 8px)'; UIL.append(e); return e; }
-function goldWin() {
-  const e = el('div', 'win gold'); e.style.right = 'calc(env(safe-area-inset-right) + 8px)'; e.style.bottom = 'calc(env(safe-area-inset-bottom) + 140px + var(--pb))';
-  const upd = () => e.innerHTML = `${G.gold.toLocaleString()} G` + (S.casino ? `<br>${G.coins.toLocaleString()} 枚` : '');
-  upd(); e.upd = upd; UIL.append(e); return e;
-}
+// 所持金（メニューのタイトルなどに表示）
+const gstr = () => `所持金 ${G.gold.toLocaleString()} G` + (S.casino ? `　コイン ${G.coins.toLocaleString()} 枚` : '');
+function goldWin() { return { remove() { }, upd() { } }; }
 function fade(on, white) {
   const f = $('#fade'); f.classList.toggle('white', !!white); f.classList.toggle('on', on); return sleep(380);
 }
@@ -1381,7 +1379,7 @@ async function enterTown(mi) {
     if (T.casino) opts.push('カジノ');
     opts.push('町を出る');
     const gw = goldWin();
-    const r = await choose(opts, { title: T.n, cancel: true });
+    const r = await choose(opts, { title: `${T.n}\n${gstr()}`, cancel: true });
     gw.remove();
     const o = opts[r];
     if (r < 0 || o === '町を出る') break;
@@ -1397,7 +1395,7 @@ async function enterTown(mi) {
 }
 async function inn(p) {
   const cost = p * G.party.length;
-  if (!await yesno(`旅人の宿へ ようこそ。\nひとばん ${cost}ゴールドですが おとまりに なりますか？`)) return;
+  if (!await yesno(`旅人の宿へ ようこそ。\nひとばん ${cost}ゴールドですが おとまりに なりますか？\n（${gstr()}）`)) return;
   if (G.gold < cost) { await msg('おかねが たりないようですね。'); return; }
   G.gold -= cost;
   await fade(true); bgm(null); sfx('inn'); await sleep(2100);
@@ -1407,14 +1405,14 @@ async function inn(p) {
 }
 async function shop(list, title) {
   while (true) {
-    const a = await choose(['かう', 'うる'], { title }); if (a < 0) return;
+    const a = await choose(['かう', 'うる'], { title: `${title}\n${gstr()}` }); if (a < 0) return;
     if (a === 0) await shopBuy(list); else await shopSell();
   }
 }
 async function shopBuy(list) {
   while (true) {
     const gw = goldWin();
-    const i = await choose(list.map(id => ({ t: IT[id].n, s: IT[id].p.toLocaleString() + 'G' })), { title: 'なにを かいますか？' });
+    const i = await choose(list.map(id => ({ t: IT[id].n, s: IT[id].p.toLocaleString() + 'G' })), { title: `なにを かいますか？\n${gstr()}` });
     gw.remove(); if (i < 0) return;
     const it = IT[list[i]];
     if (it.sl) {
@@ -1423,11 +1421,11 @@ async function shopBuy(list) {
         const d = it.v - eqv(c, it.sl); return { t: c.name, s: `${it.sl === 'w' ? 'こうげき' : 'しゅび'} ${d >= 0 ? '+' : ''}${d}` };
       });
       opts.push({ t: 'ふくろに いれる' });
-      const j = await choose(opts, { title: `${it.n}　${it.p}G\n${it.sl === 'w' ? 'こうげき' : 'しゅび'}+${it.v}${it.d ? '　' + it.d : ''}\nだれが そうびしますか？` });
+      const j = await choose(opts, { title: `${it.n}　${it.p}G\n${it.sl === 'w' ? 'こうげき' : 'しゅび'}+${it.v}${it.d ? '　' + it.d : ''}\nだれが そうびしますか？\n${gstr()}` });
       if (j < 0) continue;
       if (G.gold < it.p) { sfx('no'); await msg('おかねが たりないようですね。'); continue; }
       const who = j < G.party.length ? `${G.party[j].name}が そうびする ` : '';
-      if (!await yesno(`${who}${it.n}は ${it.p.toLocaleString()}ゴールドです。\nおかいあげに なりますか？`)) continue;
+      if (!await yesno(`${who}${it.n}は ${it.p.toLocaleString()}ゴールドです。\nおかいあげに なりますか？　（${gstr()}）`)) continue;
       G.gold -= it.p; sfx('coin');
       if (j < G.party.length) {
         const c = G.party[j], old = c.eq[it.sl]; c.eq[it.sl] = it.id;
@@ -1438,10 +1436,10 @@ async function shopBuy(list) {
       } else { addBag(it.id); await msg(`${it.n}を ふくろに いれた。`); }
     } else {
       const qs = [1, 5, 10];
-      const j = await choose(qs.map(q => ({ t: `${q}こ`, s: (it.p * q).toLocaleString() + 'G' })), { title: it.n + '　いくつ かいますか？' }); if (j < 0) continue;
+      const j = await choose(qs.map(q => ({ t: `${q}こ`, s: (it.p * q).toLocaleString() + 'G' })), { title: `${it.n}　いくつ かいますか？\n${gstr()}` }); if (j < 0) continue;
       const cost = it.p * qs[j];
       if (G.gold < cost) { sfx('no'); await msg('おかねが たりないようですね。'); continue; }
-      if (!await yesno(`${it.n}を ${qs[j]}こで ${cost.toLocaleString()}ゴールドです。\nおかいあげに なりますか？`)) continue;
+      if (!await yesno(`${it.n}を ${qs[j]}こで ${cost.toLocaleString()}ゴールドです。\nおかいあげに なりますか？　（${gstr()}）`)) continue;
       G.gold -= cost; addBag(it.id, qs[j]); sfx('coin'); await msg('まいど ありがとうございます！');
     }
   }
@@ -1451,7 +1449,7 @@ async function shopSell() {
     const ids = bagIds().filter(id => sellPrice(id) > 0);
     if (!ids.length) { await msg('うれる ものを もっていないようですね。'); return; }
     const gw = goldWin();
-    const i = await choose(ids.map(id => ({ t: `${IT[id].n} ×${G.bag[id]}`, s: sellPrice(id).toLocaleString() + 'G' })), { title: 'なにを うりますか？' });
+    const i = await choose(ids.map(id => ({ t: `${IT[id].n} ×${G.bag[id]}`, s: sellPrice(id).toLocaleString() + 'G' })), { title: `なにを うりますか？\n${gstr()}` });
     gw.remove(); if (i < 0) return;
     const id = ids[i];
     if (await yesno(`${IT[id].n}を ${sellPrice(id)}Gで かいとりましょう。よろしいですか？`)) { takeBag(id); G.gold += sellPrice(id); sfx('coin'); }
@@ -1459,7 +1457,7 @@ async function shopSell() {
 }
 async function church() {
   while (true) {
-    const r = await choose(['おいのり（きろく）', 'いきかえらせる', 'どくを なおす'], { title: '教会　神の家へ ようこそ。' }); if (r < 0) return;
+    const r = await choose(['おいのり（きろく）', 'いきかえらせる', 'どくを なおす'], { title: `教会　神の家へ ようこそ。\n${gstr()}` }); if (r < 0) return;
     if (r === 0) { save(); sfx('heal'); const nx = G.party.map(c => `${c.name}：つぎのレベルまで ${c.lv >= 99 ? '－' : expFor(c.lv + 1) - c.exp}`); await msg(['ぼうけんのしょに きろくしました。', nx.join('\n')]); }
     if (r === 1) {
       const dead = [...G.party, ...G.reserve].filter(c => c.hp <= 0);
@@ -1707,7 +1705,7 @@ async function fallToUra() {
    ========================================================= */
 const BT = { en: [], auto: false, ctrl: null };
 const bmsgEl = $('#bmsg');
-const DELAY = () => [380, 700, 1100][G.set.spd];
+const DELAY = () => [750, 1100, 1600][G.set.spd];
 let bskip = false;
 $('#battle').addEventListener('pointerdown', () => { bskip = true; });
 function bclear() { bmsgEl.textContent = ''; }
@@ -1826,7 +1824,7 @@ async function inputCommands() {
     BT.ctrl = {};
     const opts = ['こうげき', 'じゅもん', 'ぼうぎょ', 'どうぐ']; if (i === first) opts.push('にげる');
     const r = await choose(opts.map(o => o === 'じゅもん' && !c.sp.length ? { t: o, dis: true } : o),
-      { title: c.name, pos: { top: 'auto', bottom: 'calc(env(safe-area-inset-bottom) + 10px)', width: '46%', height: '150px' }, cancel: i !== first, ctrl: BT.ctrl });
+      { title: c.name, grid: true, pos: { top: 'auto', bottom: 'calc(env(safe-area-inset-bottom) + 10px)' }, cancel: i !== first, ctrl: BT.ctrl });
     if (r === -2) { for (let j = i; j < P.length; j++) if (can(j)) cmds[j] = aiCmd(P[j]); break; }
     if (r < 0) { let j = i - 1; while (j >= first && !can(j)) j--; i = Math.max(first, j); continue; }
     const o = opts[r];
@@ -2147,14 +2145,14 @@ async function casino() {
   S.casino = true; bgm('town');
   while (true) {
     const gw = goldWin();
-    const r = await choose(['スロット', 'ハイ＆ロー', 'コインを買う（1枚20G）', 'コインを換金（1枚20G）', '景品交換', 'カジノを出る'], { title: 'カジノへ ようこそ！' });
+    const r = await choose(['スロット', 'ハイ＆ロー', 'コインを買う（1枚20G）', 'コインを換金（1枚20G）', '景品交換', 'カジノを出る'], { title: `カジノへ ようこそ！\n${gstr()}` });
     gw.remove();
     if (r < 0 || r === 5) break;
     if (r === 0) await slotGame();
     if (r === 1) await highLow();
     if (r === 2 || r === 3) {
       const qs = [10, 50, 100, 500, 1000];
-      const j = await choose(qs.map(q => ({ t: `${q}枚`, s: (q * COIN_PRICE).toLocaleString() + 'G', dis: r === 2 ? G.gold < q * COIN_PRICE : G.coins < q })), { title: r === 2 ? 'なんまい 買いますか？' : 'なんまい 換金しますか？' });
+      const j = await choose(qs.map(q => ({ t: `${q}枚`, s: (q * COIN_PRICE).toLocaleString() + 'G', dis: r === 2 ? G.gold < q * COIN_PRICE : G.coins < q })), { title: (r === 2 ? 'なんまい 買いますか？' : 'なんまい 換金しますか？') + '\n' + gstr() });
       if (j < 0) continue;
       const q = qs[j];
       if (r === 2 && !await yesno(`コイン ${q}枚を ${(q * COIN_PRICE).toLocaleString()}ゴールドで 買いますか？`)) continue;
@@ -2163,7 +2161,7 @@ async function casino() {
     }
     if (r === 4) {
       const gw2 = goldWin();
-      const j = await choose(PRIZES.map(([id, c]) => ({ t: IT[id].n, s: c.toLocaleString() + '枚', dis: G.coins < c })), { title: '景品交換所' });
+      const j = await choose(PRIZES.map(([id, c]) => ({ t: IT[id].n, s: c.toLocaleString() + '枚', dis: G.coins < c })), { title: `景品交換所\n${gstr()}` });
       gw2.remove(); if (j < 0) continue;
       const [id, c] = PRIZES[j];
       const it = IT[id];
