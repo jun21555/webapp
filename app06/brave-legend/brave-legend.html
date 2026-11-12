@@ -54,7 +54,10 @@
   #maptitle.show{opacity:1}
 
   /* ---- コントローラー ---- */
-  #ctrl{position:absolute;z-index:30;left:0;right:0;bottom:0;height:calc(196px + env(safe-area-inset-bottom));
+  /* コントローラーを表示中は、メッセージや確認ウィンドウをその上に出して十字キー・A・Bでメニュー操作できるようにする */
+  #app{--pb:0px}
+  #app:has(#ctrl:not([hidden])){--pb:200px}
+  #ctrl{position:absolute;z-index:45;left:0;right:0;bottom:0;height:calc(196px + env(safe-area-inset-bottom));
     padding:0 calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 14px) calc(env(safe-area-inset-left) + 14px);
     display:flex;align-items:flex-end;justify-content:space-between;pointer-events:none}
   #dpad{position:relative;width:162px;height:162px;pointer-events:auto;touch-action:none}
@@ -75,10 +78,10 @@
   #ui{position:absolute;inset:0;z-index:40;pointer-events:none}
   #ui>*{pointer-events:auto}
   .msg{position:absolute;left:calc(env(safe-area-inset-left) + 8px);right:calc(env(safe-area-inset-right) + 8px);
-    bottom:calc(env(safe-area-inset-bottom) + 10px);min-height:118px;font-size:16px;white-space:pre-wrap;z-index:5}
+    bottom:calc(env(safe-area-inset-bottom) + 10px + var(--pb));min-height:118px;font-size:16px;white-space:pre-wrap;z-index:5}
   .msg .nx{position:absolute;right:12px;bottom:6px;animation:blink .8s steps(2) infinite}
   @keyframes blink{50%{opacity:0}}
-  .menu{position:absolute;max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 80px);overflow-y:auto;
+  .menu{position:absolute;max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 84px - var(--pb));overflow-y:auto;
     -webkit-overflow-scrolling:touch;padding:6px 8px;z-index:6;overscroll-behavior:contain}
   .menu .ttl{font-size:13px;color:#ffd34d;padding:2px 6px 4px;border-bottom:1px solid rgba(255,255,255,.4);margin-bottom:4px;white-space:pre-wrap}
   .menu .it{display:flex;align-items:center;min-height:44px;padding:4px 6px 4px 22px;position:relative;border-radius:4px;cursor:pointer;gap:8px}
@@ -725,11 +728,22 @@ addEventListener('keyup', e => { const k = KEYMAP[e.key]; if (k in DIRK) held.de
     if (Math.hypot(dx, dy) < 14) return null;
     return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
   };
+  let rep = 0;
   const setDir = d => {
     if (d === cur) return;
     if (cur != null) held.delete(cur);
+    clearTimeout(rep);
     cur = d; dp.querySelectorAll('.d').forEach(el => el.classList.toggle('on', +el.dataset.d === d));
-    if (d != null) { held.add(d); if (topH()) press(['up', 'right', 'down', 'left'][d]); }
+    if (d != null) {
+      held.add(d);
+      // メニューが開いているときは1回押すごとにカーソル移動、長押しで連続移動
+      if (topH()) {
+        const k = ['up', 'right', 'down', 'left'][d];
+        press(k);
+        const again = () => { if (cur === d && topH()) { press(k); rep = setTimeout(again, 110); } };
+        rep = setTimeout(again, 380);
+      }
+    }
   };
   dp.addEventListener('pointerdown', e => { e.preventDefault(); dp.setPointerCapture(e.pointerId); setDir(dirAt(e.clientX, e.clientY)); });
   dp.addEventListener('pointermove', e => { if (cur !== undefined && e.buttons) setDir(dirAt(e.clientX, e.clientY)); });
@@ -824,14 +838,14 @@ function choose(items, opt = {}) {
     HS.push(h); setSel(sel);
   });
 }
-const yesno = async (q) => { if (q) await msgKeep(q); const r = await choose(['はい', 'いいえ'], { pos: { left: 'auto', right: 'calc(env(safe-area-inset-right) + 8px)', top: 'auto', bottom: 'calc(env(safe-area-inset-bottom) + 140px)', width: '140px' } }); closeKeep(); return r === 0; };
+const yesno = async (q) => { if (q) await msgKeep(q); const r = await choose(['はい', 'いいえ'], { pos: { left: 'auto', right: 'calc(env(safe-area-inset-right) + 8px)', top: 'auto', bottom: 'calc(env(safe-area-inset-bottom) + 140px + var(--pb))', width: '140px' } }); closeKeep(); return r === 0; };
 // 選択肢と一緒に出しておくメッセージ
 let keepBox = null;
 function msgKeep(text) { closeKeep(); keepBox = el('div', 'win msg'); keepBox.textContent = text; UIL.append(keepBox); keepBox.style.zIndex = 5; return Promise.resolve(); }
 function closeKeep() { if (keepBox) { keepBox.remove(); keepBox = null; } }
 function panel(html, p = {}) { const e = el('div', 'win info', html); place(e, p); if (!p.width) e.style.right = 'calc(env(safe-area-inset-right) + 8px)'; UIL.append(e); return e; }
 function goldWin() {
-  const e = el('div', 'win gold'); e.style.right = 'calc(env(safe-area-inset-right) + 8px)'; e.style.bottom = 'calc(env(safe-area-inset-bottom) + 140px)';
+  const e = el('div', 'win gold'); e.style.right = 'calc(env(safe-area-inset-right) + 8px)'; e.style.bottom = 'calc(env(safe-area-inset-bottom) + 140px + var(--pb))';
   const upd = () => e.innerHTML = `${G.gold.toLocaleString()} G` + (S.casino ? `<br>${G.coins.toLocaleString()} 枚` : '');
   upd(); e.upd = upd; UIL.append(e); return e;
 }
