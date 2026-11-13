@@ -82,14 +82,15 @@
   /* ---------- 現在地ダッシュボード ---------- */
   .dash{background:var(--panel);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;position:relative}
   .dash .grid{display:grid;grid-template-columns:1fr;gap:8px 16px;align-items:center}
-  .dash .clock{text-align:left}
+  .dash{text-align:center}
+  .dash .clock{text-align:center}
   #dDate{font-size:17px;color:var(--sub);letter-spacing:.05em}
   #dTime{font-size:72px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.02em}
-  .dash .place{text-align:left;min-width:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .dash .place{text-align:center;min-width:0;display:flex;align-items:baseline;justify-content:center;gap:10px;flex-wrap:wrap}
   #dPref{font-size:16px;color:var(--sub)}
   #dCity{font-size:36px;font-weight:800;line-height:1.2;overflow-wrap:anywhere;
-    background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
-  .dash .sub{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 14px;
+    background:linear-gradient(90deg,#4da3ff,#5ad1ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .dash .sub{display:flex;flex-wrap:wrap;justify-content:center;column-gap:28px;align-items:center;gap:6px 14px;
     border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
   .dash .wx{display:flex;align-items:center;gap:8px}
   #dIcon{font-size:40px;line-height:1}
