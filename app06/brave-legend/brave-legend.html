@@ -105,12 +105,12 @@
   #bbg{position:absolute;inset:0}
   #bparty{position:absolute;z-index:3;top:calc(env(safe-area-inset-top) + 58px);left:calc(env(safe-area-inset-left) + 6px);
     right:calc(env(safe-area-inset-right) + 6px);display:flex;gap:5px}
-  #benemies{position:absolute;z-index:2;left:0;right:0;top:calc(env(safe-area-inset-top) + 210px);bottom:calc(env(safe-area-inset-bottom) + 300px);
+  #benemies{position:absolute;z-index:2;left:0;right:0;top:calc(env(safe-area-inset-top) + 210px);bottom:calc(env(safe-area-inset-bottom) + 290px);
     display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:center;align-content:center;gap:4px 10px;padding:0 10px}
   .en{position:relative;display:flex;flex-direction:column;align-items:center;transition:opacity .5s,transform .2s;cursor:pointer}
   .en .sp{line-height:1;filter:drop-shadow(0 4px 0 rgba(0,0,0,.35))}
   .en .sp span{display:inline-block}
-  .en .tag{font-size:11px;background:rgba(0,0,0,.6);padding:1px 6px;border-radius:4px;margin-top:2px;white-space:nowrap}
+  .en .tag{font-size:17px;background:rgba(0,0,0,.65);padding:2px 8px;border-radius:6px;margin-top:4px;white-space:nowrap}
   .en .hpb{width:48px;height:3px;background:rgba(0,0,0,.5);margin-top:2px;border-radius:2px;overflow:hidden}
   .en .hpb i{display:block;height:100%;background:#ff6b6b}
   .en.dead{opacity:0;transform:scale(.6);pointer-events:none}
@@ -126,7 +126,11 @@
   .bfx.on{animation:bfx .45s}
   @keyframes bfx{0%{opacity:.85}100%{opacity:0}}
   #bmsg{position:absolute;z-index:5;left:calc(env(safe-area-inset-left) + 8px);right:calc(env(safe-area-inset-right) + 8px);
-    bottom:calc(env(safe-area-inset-bottom) + 10px);height:150px;font-size:15px;overflow:hidden;white-space:pre-wrap}
+    bottom:calc(env(safe-area-inset-bottom) + 10px);height:200px;font-size:20px;line-height:1.5;overflow:hidden;white-space:pre-wrap}
+  /* 戦闘中のコマンド・選択肢は大きく */
+  #app:has(#battle:not([hidden])) .menu .it{font-size:22px;min-height:50px}
+  #app:has(#battle:not([hidden])) .menu .ttl{font-size:16px}
+  #app:has(#battle:not([hidden])) .menu .it .sub{font-size:16px}
   #bauto{position:absolute;z-index:45;right:calc(env(safe-area-inset-right) + 10px);top:calc(env(safe-area-inset-top) + 174px);
     min-width:70px;height:40px;border-radius:20px;background:#000;border:2px solid #fff;color:#fff;font:14px inherit;padding:0 12px}
   #bauto.on{background:#ffd34d;color:#000;border-color:#ffd34d}
@@ -1781,7 +1785,7 @@ $('#battle').addEventListener('pointerdown', () => { bskip = true; });
 function bclear() { bmsgEl.textContent = ''; }
 async function bm(t, w = 1) {
   const lines = (bmsgEl.textContent ? bmsgEl.textContent + '\n' : '') + t;
-  bmsgEl.textContent = lines.split('\n').slice(-6).join('\n');
+  bmsgEl.textContent = lines.split('\n').slice(-5).join('\n');
   bskip = false;
   const end = performance.now() + DELAY() * w;
   while (performance.now() < end && !bskip) await sleep(30);
