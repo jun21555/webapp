@@ -78,11 +78,59 @@
   details summary::-webkit-details-marker{display:none}
   details[open] summary{margin-bottom:8px}
   .backup textarea{font-size:12px;font-family:ui-monospace,Menlo,monospace;min-height:90px}
+
+  /* ---------- 現在地ダッシュボード ---------- */
+  .dash{background:var(--panel);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;position:relative}
+  .dash .grid{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:center}
+  .dash .clock{text-align:left}
+  #dDate{font-size:13px;color:var(--sub);letter-spacing:.05em}
+  #dTime{font-size:52px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .dash .place{text-align:right;min-width:0}
+  #dPref{font-size:12px;color:var(--sub)}
+  #dCity{font-size:24px;font-weight:800;line-height:1.2;overflow-wrap:anywhere;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .dash .sub{grid-column:1/3;display:flex;justify-content:space-between;align-items:center;gap:10px;
+    border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
+  .dash .wx{display:flex;align-items:center;gap:8px}
+  #dIcon{font-size:28px;line-height:1}
+  #dTemp{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+  #dWtext{font-size:13px;color:var(--sub)}
+  #dElev{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #dElev small{font-size:12px;color:var(--sub);margin-right:4px;font-weight:400}
+  #dStatus{font-size:11px;color:#5d6270;margin-top:8px;min-height:1em}
+  #dStatus.err{color:var(--accent2)}
+  #dStart{position:absolute;inset:0;border-radius:var(--radius);background:rgba(23,25,32,.94);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:12px}
+  #dStart .hint{margin:0}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header><h1><span>Mix</span></h1></header>
+
+  <div class="dash" id="dash">
+    <div class="grid">
+      <div class="clock">
+        <div id="dDate">--</div>
+        <div id="dTime">--:--</div>
+      </div>
+      <div class="place">
+        <div id="dPref">&nbsp;</div>
+        <div id="dCity">現在地</div>
+      </div>
+      <div class="sub">
+        <div class="wx">
+          <span id="dIcon">·</span><span id="dTemp">--°</span><span id="dWtext"></span>
+        </div>
+        <div id="dElev">&nbsp;</div>
+      </div>
+    </div>
+    <div id="dStatus">&nbsp;</div>
+    <div id="dStart">
+      <button class="btn primary" id="dStartBtn">現在地・天気を表示</button>
+      <div class="hint">タップすると位置情報の許可を求めます。表示中は画面が自動で消えないようにします。</div>
+    </div>
+  </div>
 
   <div class="player-box">
     <div id="player"></div>
@@ -474,6 +522,185 @@
   // 起動時にタイトル未取得の曲を補完
   S.lists.forEach(function(l){ l.tracks.forEach(function(t){ if (!t.title) fillMeta(t); }); });
   render(); renderNow();
+})();
+</script>
+
+<!-- 国土地理院の市区町村コード→名称の対応表（GSI.MUNI_ARRAY） -->
+<script src="https://maps.gsi.go.jp/js/muni.js"></script>
+<script>
+// ===================== 現在地ダッシュボード =====================
+(() => {
+  "use strict";
+  const DASH_KEY = "mix-dash-enabled";
+  const LOCATION_INTERVAL = 60 * 1000;      // 現在地：1分ごと
+  const WEATHER_INTERVAL  = 5 * 60 * 1000;  // 天気：5分ごと
+
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2, '0');
+  const WEEK = ['日','月','火','水','木','金','土'];
+
+  let lastPos = null, lastElevPos = null, lastWeatherAt = 0, lastWeatherPos = null;
+  let wakeLock = null, timer = null, started = false;
+
+  // ---- 時計 ----
+  function tick() {
+    const d = new Date();
+    $('dDate').textContent = `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}（${WEEK[d.getDay()]}）`;
+    $('dTime').textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  function status(msg, isErr = false) {
+    $('dStatus').textContent = msg;
+    $('dStatus').className = isErr ? 'err' : '';
+  }
+
+  function distance(a, b) {
+    const R = 6371000, rad = x => x * Math.PI / 180;
+    const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+    const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon/2)**2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+
+  // ---- 逆ジオコーディング（国土地理院 → 失敗時 OpenStreetMap）----
+  async function reverseGeocode(lat, lon) {
+    try {
+      const r = await fetch(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat}&lon=${lon}`);
+      const j = await r.json();
+      const code = j && j.results && j.results.muniCd;
+      const table = window.GSI && GSI.MUNI_ARRAY;
+      if (code && table) {
+        const v = table[code] || table[String(parseInt(code, 10))];
+        if (v) {
+          const [, pref, , muni] = v.split(',');
+          return { pref, city: muni.replace(/[\s　]+/g, ' ').trim() };
+        }
+      }
+    } catch (e) { /* フォールバックへ */ }
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14&accept-language=ja`);
+    const j = await r.json();
+    const a = j.address || {};
+    const city = [a.city || a.town || a.village || a.county || '', a.city_district || a.suburb || '']
+      .filter(Boolean).join(' ');
+    return { pref: a.province || a.state || '', city: city || j.name || '不明' };
+  }
+
+  // ---- 標高（国土地理院 → 失敗時 Open-Meteo）----
+  async function getElevation(lat, lon) {
+    try {
+      const r = await fetch(`https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=${lon}&lat=${lat}&outtype=JSON`);
+      const j = await r.json();
+      const e = parseFloat(j.elevation);
+      if (!isNaN(e)) return e;
+    } catch (e) { /* フォールバックへ */ }
+    const j = await (await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`)).json();
+    return j.elevation[0];
+  }
+
+  // ---- 天気（Open-Meteo）----
+  const WMO = {
+    0:['☀️','快晴'], 1:['🌤️','晴れ'], 2:['⛅','晴れ時々曇り'], 3:['☁️','曇り'],
+    45:['🌫️','霧'], 48:['🌫️','霧（着氷）'],
+    51:['🌦️','弱い霧雨'], 53:['🌦️','霧雨'], 55:['🌧️','強い霧雨'],
+    56:['🌧️','着氷性の霧雨'], 57:['🌧️','着氷性の霧雨'],
+    61:['🌧️','弱い雨'], 63:['🌧️','雨'], 65:['🌧️','強い雨'],
+    66:['🌧️','着氷性の雨'], 67:['🌧️','着氷性の強い雨'],
+    71:['🌨️','弱い雪'], 73:['🌨️','雪'], 75:['❄️','強い雪'], 77:['🌨️','霧雪'],
+    80:['🌦️','にわか雨'], 81:['🌧️','強いにわか雨'], 82:['⛈️','激しいにわか雨'],
+    85:['🌨️','にわか雪'], 86:['❄️','強いにわか雪'],
+    95:['⛈️','雷雨'], 96:['⛈️','雷雨（ひょう）'], 99:['⛈️','激しい雷雨（ひょう）'],
+  };
+  async function updateWeather(lat, lon) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+      `&current=temperature_2m,weather_code,is_day&timezone=auto`;
+    const c = (await (await fetch(url)).json()).current;
+    let [icon, text] = WMO[c.weather_code] || ['·', '—'];
+    if (!c.is_day && c.weather_code <= 1) icon = '🌙';
+    $('dIcon').textContent = icon;
+    $('dTemp').textContent = `${Math.round(c.temperature_2m)}°`;
+    $('dWtext').textContent = text;
+  }
+
+  function getPosition() {
+    return new Promise((res, rej) =>
+      navigator.geolocation.getCurrentPosition(res, rej,
+        { enableHighAccuracy: false, maximumAge: 30000, timeout: 20000 }));
+  }
+
+  async function update() {
+    let pos;
+    try {
+      const p = await getPosition();
+      pos = { lat: +p.coords.latitude.toFixed(5), lon: +p.coords.longitude.toFixed(5) };
+    } catch (e) {
+      status(e.code === 1 ? '位置情報が許可されていません（設定 > プライバシー > 位置情報サービス）'
+                          : '位置を取得できませんでした。再試行します…', true);
+      return;
+    }
+    if (!lastPos || distance(lastPos, pos) > 200) {
+      try {
+        const { pref, city } = await reverseGeocode(pos.lat, pos.lon);
+        $('dPref').textContent = pref || ' ';
+        $('dCity').textContent = city;
+        lastPos = pos;
+      } catch (e) { status('住所を取得できませんでした（通信を確認）', true); }
+    }
+    if (!lastElevPos || distance(lastElevPos, pos) > 50) {
+      try {
+        const e = await getElevation(pos.lat, pos.lon);
+        $('dElev').innerHTML = `<small>標高</small>${Math.round(e).toLocaleString('ja-JP')} m`;
+        lastElevPos = pos;
+      } catch (e) { /* 次回再試行 */ }
+    }
+    const now = Date.now();
+    if (now - lastWeatherAt >= WEATHER_INTERVAL || !lastWeatherPos || distance(lastWeatherPos, pos) > 5000) {
+      try {
+        await updateWeather(pos.lat, pos.lon);
+        lastWeatherAt = now; lastWeatherPos = pos;
+      } catch (e) { status('天気を取得できませんでした（通信を確認）', true); return; }
+    }
+    const d = new Date();
+    status(`更新 ${pad(d.getHours())}:${pad(d.getMinutes())}${wakeLock ? '' : '　※画面の自動ロック防止が無効'}`);
+  }
+
+  // ---- 画面を消さない ----
+  async function keepAwake() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    } catch (e) { wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (started && document.visibilityState === 'visible') { keepAwake(); update(); }
+  });
+
+  // ---- 開始 ----
+  async function start() {
+    $('dStart').style.display = 'none';
+    if (!('geolocation' in navigator)) { status('この端末は位置情報に対応していません', true); return; }
+    started = true;
+    try { localStorage.setItem(DASH_KEY, "1"); } catch (e) {}
+    $('dCity').textContent = '位置を取得中…';
+    await keepAwake();
+    update();
+    clearInterval(timer);
+    timer = setInterval(update, LOCATION_INTERVAL);
+  }
+  $('dStartBtn').addEventListener('click', start);
+
+  // 前回表示していたら自動で開始（画面ロック防止は最初のタップで有効化）
+  let enabled = false;
+  try { enabled = localStorage.getItem(DASH_KEY) === "1"; } catch (e) {}
+  if (enabled) {
+    start();
+    document.addEventListener('click', function once() {
+      document.removeEventListener('click', once, true);
+      if (!wakeLock) keepAwake();
+    }, true);
+  }
 })();
 </script>
 </body>
