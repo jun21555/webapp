@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ゆで卵">
+<meta name="theme-color" content="#fff6e3">
+<title>ゆで卵タイマー</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --bg1:#fff6e3; --bg2:#ffe3ad; --ink:#4a3416; --dim:#9a7a50;
+    --acc:#ff9a1f; --acc2:#e27200; --card:rgba(255,255,255,.75);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{background:var(--bg2)}
+  html,body{margin:0;min-height:100%}
+  body{
+    min-height:100dvh;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    background:radial-gradient(120% 50% at 50% 0%,#fffdf6 0%,transparent 60%),linear-gradient(180deg,var(--bg1),var(--bg2));
+    display:flex;flex-direction:column;align-items:center;
+    padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 18px) calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 18px);
+    -webkit-user-select:none;user-select:none;
+  }
+  header{width:100%;max-width:440px;display:flex;align-items:center;gap:10px;min-height:52px}
+  .round{width:44px;height:44px;flex:0 0 44px;border-radius:50%;border:none;padding:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;color:var(--ink);text-decoration:none;font-family:inherit;
+    background:var(--card);box-shadow:0 2px 10px rgba(140,90,20,.15);transition:transform .12s}
+  .round:active{transform:scale(.88)}
+  .round svg{width:22px;height:22px}
+  h1{flex:1;margin:0;font-size:18px;font-weight:800;text-align:center;letter-spacing:.04em}
+  main{width:100%;max-width:440px;display:flex;flex-direction:column;align-items:stretch;gap:16px;padding-top:6px}
+  [hidden]{display:none!important}
+
+  /* 卵の断面 */
+  .stage{position:relative;background:var(--card);border-radius:28px;padding:16px 16px 18px;
+    box-shadow:0 6px 22px rgba(140,90,20,.13);display:flex;flex-direction:column;align-items:center}
+  .badge{align-self:flex-start;font-size:12px;font-weight:700;color:#fff;background:var(--acc);border-radius:999px;padding:4px 10px}
+  .running .badge{background:#e2483a}
+  .done .badge{background:#2fa84f}
+  .egg{width:min(46vw,180px);aspect-ratio:200/250;margin:2px 0 6px}
+  .egg svg{display:block;width:100%;height:100%;overflow:visible}
+  .done .egg{animation:wobble .9s ease-in-out infinite alternate}
+  @keyframes wobble{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+  .sname{font-size:24px;font-weight:800;letter-spacing:.03em;text-align:center}
+  .sdesc{margin-top:4px;font-size:14px;line-height:1.5;color:var(--dim);text-align:center;min-height:42px}
+
+  .clock{text-align:center}
+  .time{font-size:clamp(52px,17vw,68px);font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .sub{margin-top:6px;font-size:14px;color:var(--dim);font-weight:600}
+  .done .time{color:#2fa84f}
+
+  .bar{position:relative;height:12px;border-radius:6px;background:rgba(226,114,0,.15);overflow:hidden}
+  .bar i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:6px;background:linear-gradient(90deg,#ffc04a,var(--acc2));transition:width .25s linear}
+
+  /* 時間を選ぶ */
+  .adjust{display:flex;align-items:center;gap:12px}
+  .adjust .round{font-size:24px;font-weight:700}
+  input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:44px;background:transparent;margin:0}
+  input[type=range]::-webkit-slider-runnable-track{height:10px;border-radius:5px;background:linear-gradient(90deg,#fff1c9,#ffcf5a 40%,#f2b632)}
+  input[type=range]::-moz-range-track{height:10px;border-radius:5px;background:linear-gradient(90deg,#fff1c9,#ffcf5a 40%,#f2b632)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;margin-top:-11px;border-radius:50%;background:#fff;border:3px solid var(--acc);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+  input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#fff;border:3px solid var(--acc)}
+  .presets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .preset{min-height:96px;border:2px solid transparent;border-radius:18px;background:var(--card);cursor:pointer;font-family:inherit;color:var(--ink);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px;
+    box-shadow:0 3px 10px rgba(140,90,20,.12);transition:transform .12s}
+  .preset:active{transform:scale(.94)}
+  .preset.on{border-color:var(--acc);background:#fff}
+  .preset svg{width:30px;height:38px}
+  .preset b{font-size:15px;font-variant-numeric:tabular-nums}
+  .preset span{font-size:11px;font-weight:700;color:var(--dim)}
+
+  .action{width:100%;min-height:62px;border:none;border-radius:20px;font-family:inherit;font-weight:800;font-size:21px;cursor:pointer;
+    color:#fff;background:linear-gradient(180deg,#ffb043,var(--acc2));box-shadow:0 8px 18px rgba(226,114,0,.3),inset 0 1px 0 rgba(255,255,255,.35);transition:transform .12s}
+  .action:active{transform:scale(.96)}
+  .action.ghost{background:#fff;color:var(--ink);box-shadow:0 6px 16px rgba(140,90,20,.15)}
+  .action.ok{background:linear-gradient(180deg,#4cc66b,#2a9a48);box-shadow:0 8px 18px rgba(42,154,72,.3)}
+
+  /* 早見表 */
+  h2{margin:8px 2px 0;font-size:16px;font-weight:800}
+  .note{margin:-8px 2px 0;font-size:12px;color:var(--dim);line-height:1.5}
+  .chart{display:flex;flex-direction:column;background:var(--card);border-radius:20px;overflow:hidden;box-shadow:0 3px 12px rgba(140,90,20,.1)}
+  .row{display:flex;align-items:center;gap:12px;padding:8px 14px;min-height:64px;border:none;background:none;text-align:left;font-family:inherit;color:inherit;cursor:pointer;width:100%}
+  .row+.row{border-top:1px solid rgba(140,90,20,.1)}
+  .row:active{background:rgba(255,154,31,.12)}
+  .row.cur{background:rgba(255,154,31,.16)}
+  .row svg{flex:0 0 38px;width:38px;height:48px}
+  .row .t{flex:0 0 52px;font-weight:800;font-size:16px;font-variant-numeric:tabular-nums}
+  .row .d{flex:1;font-size:12.5px;line-height:1.4;color:var(--dim)}
+  .row .d b{display:block;font-size:14.5px;color:var(--ink)}
+  .running .row,.done .row{cursor:default}
+
+  .card{width:100%;background:var(--card);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;
+    box-shadow:0 2px 10px rgba(140,90,20,.1);font-size:13px;line-height:1.45}
+  .card .ico{font-size:22px;flex:0 0 auto}
+  .card .txt{flex:1}
+  .card .txt b{display:block;font-size:14px}
+  .card button.btn{min-height:44px;min-width:44px;padding:0 14px;border:none;border-radius:12px;font-family:inherit;font-weight:700;font-size:14px;
+    background:var(--acc2);color:#fff;cursor:pointer;white-space:nowrap}
+  .toggle{position:relative;width:52px;height:32px;flex:0 0 52px;border-radius:16px;background:#dccbb0;border:none;padding:0;cursor:pointer;transition:background .2s}
+  .toggle::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}
+  .toggle[aria-checked="true"]{background:#34c759}
+  .toggle[aria-checked="true"]::after{left:23px}
+</style>
+</head>
+<body>
+<header>
+  <a class="round" href="../index.html" aria-label="ホームへ戻る">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg>
+  </a>
+  <h1>ゆで卵タイマー</h1>
+  <div style="width:44px"></div>
+</header>
+
+<main id="app">
+  <section class="stage" aria-live="polite">
+    <div class="badge" id="badge">仕上がりイメージ</div>
+    <div class="egg" id="egg"></div>
+    <div class="sname" id="sname">半熟</div>
+    <div class="sdesc" id="sdesc"></div>
+  </section>
+
+  <div class="clock">
+    <div class="time" id="time">7:00</div>
+    <div class="sub" id="sub">沸騰したお湯に入れてからの時間</div>
+  </div>
+
+  <div class="bar" id="bar" hidden><i id="barFill"></i></div>
+
+  <div id="setup">
+    <div class="adjust">
+      <button class="round" id="minus" type="button" aria-label="30秒短く">−</button>
+      <input type="range" id="range" min="180" max="900" step="15" value="420" aria-label="ゆで時間">
+      <button class="round" id="plus" type="button" aria-label="30秒長く">＋</button>
+    </div>
+    <div class="presets" id="presets" style="margin-top:12px"></div>
+  </div>
+
+  <button class="action" id="start" type="button">スタート</button>
+  <button class="action ghost" id="cancel" type="button" hidden>キャンセル</button>
+  <button class="action ok" id="ok" type="button" hidden>OK（冷水にとった）</button>
+
+  <h2>ゆで時間と卵の状態</h2>
+  <p class="note">沸騰したお湯に、冷蔵庫から出したMサイズの卵を入れた場合の目安です。常温の卵なら約1分短く、Lサイズなら約30秒長めに。タップでその時間にセットできます。</p>
+  <div class="chart" id="chart"></div>
+
+  <div class="card" id="notifCard">
+    <div class="ico">🔔</div>
+    <div class="txt"><b>プッシュ通知</b><span id="notifMsg"></span></div>
+    <button class="btn" id="notifBtn" type="button" hidden>オンにする</button>
+  </div>
+  <div class="card">
+    <div class="ico">🔊</div>
+    <div class="txt"><b>アラーム音</b><span>画面を閉じても鳴るよう、タイマー中は無音の音声を再生します</span></div>
+    <button class="toggle" id="soundToggle" role="switch" aria-checked="true" aria-label="アラーム音"></button>
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const KEY = 'boiledEggTimer.v1', SOUND_KEY = 'boiledEggTimer.sound', LAST_KEY = 'boiledEggTimer.last';
+  const MIN_SEC = 180, MAX_SEC = 900;
+
+  // ---------- 卵の状態（沸騰湯・冷蔵庫の卵・Mサイズの目安） ----------
+  const STAGES = [
+    { t: 0,   name: '生卵',         desc: 'まだ生のまま。白身も透明です' },
+    { t: 180, name: '白身ゆるゆる', desc: '白身の外側だけうっすら固まり、中はまだ生' },
+    { t: 240, name: '白身ぷるぷる', desc: '白身がやわらかく固まり始め、黄身は生のまま' },
+    { t: 300, name: 'とろとろ',     desc: '白身はぷるん。黄身は液状で、割るととろ〜り流れ出す' },
+    { t: 360, name: 'とろとろ半熟', desc: '黄身のふちだけ固まり、中心はとろとろ。味玉にぴったり' },
+    { t: 420, name: '半熟',         desc: '黄身がねっとりジャム状。サラダやおでんに' },
+    { t: 480, name: 'しっとり',     desc: '黄身の中心だけしっとりやわらか。お弁当にも' },
+    { t: 540, name: 'やや固ゆで',   desc: '黄身はほぼ固まり、中心がわずかにしっとり' },
+    { t: 600, name: '固ゆで',       desc: '黄身までしっかり。ほっくりしてサンドイッチ向き' },
+    { t: 720, name: 'ほくほく固ゆで', desc: '黄身がほろほろ粉っぽい。つぶしてタマゴサラダに' },
+    { t: 810, name: 'ゆですぎ',     desc: '黄身のまわりが緑がかり、白身がゴムのように固くなります' },
+  ];
+  const stageAt = sec => { let s = STAGES[0]; for (const x of STAGES) if (sec >= x.t) s = x; return s; };
+  const PRESETS = [300, 390, 480, 600];
+  const CHART = [180, 240, 300, 360, 420, 480, 540, 600, 720, 840];
+
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const mix = (c1, c2, k) => {
+    const p = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+    const a = p(c1), b = p(c2);
+    return '#' + a.map((x, i) => Math.round(x + (b[i] - x) * k).toString(16).padStart(2, '0')).join('');
+  };
+  let uid = 0;
+  // 経過秒数から卵の断面 SVG を描く
+  function eggSVG(sec){
+    const m = sec / 60, id = 'e' + (uid++);
+    const white = clamp((m - 2) / 3.2, 0, 1);                       // 白身の固まり具合
+    const liquid = m < 5 ? 1 : Math.pow(clamp(1 - (m - 5) / 5, 0, 1), 0.7); // 黄身の液状部分の割合
+    const R = 54, r = R * liquid;
+    const solid = m < 10 ? mix('#ffd250', '#f7d36a', clamp((m - 5) / 5, 0, 1)) : mix('#f7d36a', '#f1dc98', clamp((m - 10) / 3, 0, 1));
+    const green = clamp((m - 12) / 2.5, 0, 1);
+    const drip = m >= 3.5 ? clamp((6.5 - m) / 1.5, 0, 1) : 0;
+    const shine = liquid > 0.05 ? 0.55 * clamp(liquid * 1.4, 0, 1) : 0;
+    const egg = 'M100 8 C152 8 188 100 188 156 C188 212 150 244 100 244 C50 244 12 212 12 156 C12 100 48 8 100 8 Z';
+    return `<svg viewBox="0 0 200 250" aria-hidden="true">
+      <defs>
+        <radialGradient id="${id}y" cx=".4" cy=".36" r=".72"><stop offset="0" stop-color="#ffc83c"/><stop offset=".6" stop-color="#ffa010"/><stop offset="1" stop-color="#f08800"/></radialGradient>
+        <linearGradient id="${id}w" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1eadc"/></linearGradient>
+      </defs>
+      <path d="${egg}" fill="#e3eeea" stroke="#efe0c4" stroke-width="5"/>
+      <path d="${egg}" fill="url(#${id}w)" opacity="${white.toFixed(3)}"/>
+      <path d="${egg}" fill="none" stroke="#f3e2c2" stroke-width="5"/>
+      <circle cx="100" cy="150" r="${R + 3}" fill="none" stroke="#8b9a45" stroke-width="7" opacity="${(green * 0.85).toFixed(3)}"/>
+      <circle cx="100" cy="150" r="${R}" fill="${solid}"/>
+      <path d="M86 196 C84 214 90 232 100 236 C110 232 116 214 114 196 Z" fill="#ffa514" opacity="${drip.toFixed(3)}"/>
+      ${r > 0.5 ? `<circle cx="100" cy="150" r="${r.toFixed(2)}" fill="url(#${id}y)"/>` : ''}
+      <ellipse cx="${100 - r * 0.35}" cy="${150 - r * 0.38}" rx="${(r * 0.32).toFixed(2)}" ry="${(r * 0.2).toFixed(2)}" fill="#fff" opacity="${shine.toFixed(3)}" transform="rotate(-25 ${100 - r * 0.35} ${150 - r * 0.38})"/>
+    </svg>`;
+  }
+
+  const fmt = s => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  const fmtJa = s => { const mm = Math.floor(s / 60), ss = s % 60; return mm + '分' + (ss ? ss + '秒' : ''); };
+
+  // ---------- 状態 ----------
+  let state = load(); // {end, dur, notified} | null
+  let target = (() => { try { const v = +localStorage.getItem(LAST_KEY); return v >= MIN_SEC && v <= MAX_SEC ? v : 420; } catch (_) { return 420; } })();
+  let tickId = null, doneTimer = null, wakeLock = null;
+  let audio = null, audioUrl = null, actx = null, beepTimer = null;
+  let soundOn = (() => { try { return localStorage.getItem(SOUND_KEY) !== '0'; } catch (_) { return true; } })();
+  function load(){ try { return JSON.parse(localStorage.getItem(KEY)); } catch (_) { return null; } }
+  function save(){ try { state ? localStorage.setItem(KEY, JSON.stringify(state)) : localStorage.removeItem(KEY); } catch (_) {} }
+
+  // ---------- Service Worker ----------
+  let swReg = null;
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(r => { swReg = r; }).catch(() => {});
+
+  // ---------- 通知 ----------
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  function renderNotif(){
+    const btn = $('#notifBtn'), msg = $('#notifMsg');
+    btn.hidden = true;
+    if (!('Notification' in window)) {
+      msg.textContent = isIOS && !standalone
+        ? 'iPhoneでは、Safariの共有ボタン →「ホーム画面に追加」から開くと通知が使えます'
+        : 'このブラウザは通知に対応していません';
+      return;
+    }
+    const p = Notification.permission;
+    if (p === 'granted') msg.textContent = 'オン ✓ ゆで上がったら通知します';
+    else if (p === 'denied') msg.textContent = 'ブロック中。端末の設定でこのアプリの通知を許可してください';
+    else { msg.textContent = 'ゆで上がりを通知で受け取れます'; btn.hidden = false; }
+  }
+  async function askNotif(){
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    try { await Notification.requestPermission(); } catch (_) {}
+    renderNotif();
+  }
+  $('#notifBtn').addEventListener('click', askNotif);
+  async function notifyDone(){
+    if (!('Notification' in window) || Notification.permission !== 'granted' || !state) return;
+    const title = '🥚 ゆで上がり！';
+    const opts = { body: `${stageAt(state.dur).name}（${fmtJa(state.dur)}）にゆで上がりました。すぐ冷水にとってね！`,
+      icon: 'icon-192.png', badge: 'icon-192.png', tag: 'boiled-egg-timer', renotify: true, requireInteraction: true, vibrate: [300, 150, 300, 150, 600] };
+    try { const reg = swReg || (await navigator.serviceWorker.ready); await reg.showNotification(title, opts); }
+    catch (_) { try { new Notification(title, opts); } catch (__) {} }
+  }
+
+  // ---------- 音（無音＋アラームの WAV を再生して、画面ロック中も時間どおりに鳴らす） ----------
+  function makeAlarmWav(silenceSec){
+    const rate = 8000, alarmSec = 20;
+    const n = Math.round((silenceSec + alarmSec) * rate);
+    const buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+    w(36, 'data'); v.setUint32(40, n, true);
+    const data = new Uint8Array(buf, 44); data.fill(128);
+    const start = Math.round(silenceSec * rate);
+    for (let i = start; i < n; i++) {
+      const t = (i - start) / rate, cyc = t % 1.2;
+      const k = Math.floor(cyc / 0.18), inBeep = k < 4 && (cyc % 0.18) < 0.12;
+      if (inBeep) {
+        const env = Math.min(1, (cyc % 0.18) * 200, (0.12 - (cyc % 0.18)) * 200);
+        data[i] = 128 + Math.round(100 * env * (Math.sin(2 * Math.PI * 1568 * t) > 0 ? 1 : -1) * 0.6);
+      }
+    }
+    return new Blob([buf], { type: 'audio/wav' });
+  }
+  function startAudio(sec){
+    stopAudio();
+    if (!soundOn) return;
+    try {
+      audioUrl = URL.createObjectURL(makeAlarmWav(Math.max(0, sec)));
+      audio = new Audio(audioUrl); audio.preload = 'auto';
+      audio.play().catch(() => { audio = null; });
+      if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: 'ゆで卵タイマー', artist: fmtJa(state ? state.dur : 0), artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }] });
+    } catch (_) { audio = null; }
+  }
+  function stopAudio(){
+    if (audio) { try { audio.pause(); } catch (_) {} audio = null; }
+    if (audioUrl) { URL.revokeObjectURL(audioUrl); audioUrl = null; }
+    if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
+  }
+  function unlockCtx(){ try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (_) {} }
+  function beepFallback(){
+    if (!soundOn || !actx) return;
+    const ring = () => {
+      const t0 = actx.currentTime;
+      for (let k = 0; k < 4; k++) {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'square'; o.frequency.value = 1568;
+        g.gain.setValueAtTime(0, t0 + k * .18); g.gain.linearRampToValueAtTime(.15, t0 + k * .18 + .01);
+        g.gain.setValueAtTime(.15, t0 + k * .18 + .11); g.gain.linearRampToValueAtTime(0, t0 + k * .18 + .12);
+        o.connect(g).connect(actx.destination); o.start(t0 + k * .18); o.stop(t0 + k * .18 + .13);
+      }
+    };
+    ring(); let count = 1;
+    beepTimer = setInterval(() => { if (++count > 15) { clearInterval(beepTimer); beepTimer = null; return; } ring(); }, 1200);
+  }
+
+  // ---------- 画面スリープ防止 ----------
+  async function lockScreen(){
+    try { if ('wakeLock' in navigator && !wakeLock && document.visibilityState === 'visible') { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (_) {}
+  }
+  function unlockScreen(){ try { wakeLock && wakeLock.release(); } catch (_) {} wakeLock = null; }
+
+  // ---------- タイマー ----------
+  function start(){
+    unlockCtx();
+    state = { end: Date.now() + target * 1000, dur: target, notified: false };
+    save();
+    startAudio(target);
+    lockScreen();
+    if ('Notification' in window && Notification.permission === 'default') askNotif();
+    run();
+  }
+  function run(){
+    clearInterval(tickId); clearTimeout(doneTimer);
+    const left = state.end - Date.now();
+    if (left <= 0) return finish(true);
+    tickId = setInterval(render, 250);
+    doneTimer = setTimeout(() => finish(false), left);
+    render();
+  }
+  function finish(late){
+    clearInterval(tickId); clearTimeout(doneTimer);
+    if (!state) return;
+    const first = !state.notified;
+    state.notified = true; save();
+    if (first) {
+      notifyDone();
+      if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 600]);
+      if (!(audio && !audio.paused) && !late) beepFallback();
+    }
+    render();
+  }
+  function cancel(){
+    clearInterval(tickId); clearTimeout(doneTimer);
+    stopAudio(); unlockScreen();
+    state = null; save();
+    try { swReg && swReg.getNotifications && swReg.getNotifications({ tag: 'boiled-egg-timer' }).then(ns => ns.forEach(n => n.close())); } catch (_) {}
+    render();
+  }
+
+  // ---------- 時間の設定 ----------
+  function setTarget(sec){
+    if (state) return;
+    target = clamp(Math.round(sec / 15) * 15, MIN_SEC, MAX_SEC);
+    try { localStorage.setItem(LAST_KEY, target); } catch (_) {}
+    render();
+  }
+  $('#range').addEventListener('input', e => setTarget(+e.target.value));
+  $('#minus').addEventListener('click', () => setTarget(target - 30));
+  $('#plus').addEventListener('click', () => setTarget(target + 30));
+  $('#presets').innerHTML = PRESETS.map(s => `<button class="preset" type="button" data-sec="${s}">${eggSVG(s)}<b>${fmt(s)}</b><span>${stageAt(s).name}</span></button>`).join('');
+  $('#presets').addEventListener('click', e => { const b = e.target.closest('.preset'); if (b) setTarget(+b.dataset.sec); });
+  $('#chart').innerHTML = CHART.map(s => { const st = stageAt(s); return `<button class="row" type="button" data-sec="${s}">${eggSVG(s)}<span class="t">${fmt(s)}</span><span class="d"><b>${st.name}</b>${st.desc}</span></button>`; }).join('');
+  $('#chart').addEventListener('click', e => {
+    const b = e.target.closest('.row'); if (!b || state) return;
+    setTarget(+b.dataset.sec);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  // ---------- 描画 ----------
+  let lastEggKey = '';
+  function drawEgg(sec){
+    const key = Math.round(sec / 2); // 2秒刻みで更新
+    if (key === lastEggKey) return;
+    lastEggKey = key;
+    $('#egg').innerHTML = eggSVG(sec);
+  }
+  function render(){
+    const running = !!state && !state.notified, done = !!state && state.notified;
+    const app = $('#app');
+    app.classList.toggle('running', running);
+    app.classList.toggle('done', done);
+    $('#setup').hidden = !!state;
+    $('#start').hidden = !!state;
+    $('#cancel').hidden = !running;
+    $('#ok').hidden = !done;
+    $('#bar').hidden = !state;
+    const rowSec = state ? state.dur : target;
+    document.querySelectorAll('.row').forEach(r => r.classList.toggle('cur', +r.dataset.sec === stageAt(rowSec).t || +r.dataset.sec === rowSec));
+    document.querySelectorAll('.preset').forEach(p => p.classList.toggle('on', +p.dataset.sec === target));
+
+    if (!state) {
+      $('#range').value = target;
+      drawEgg(target);
+      const st = stageAt(target);
+      $('#badge').textContent = '仕上がりイメージ';
+      $('#sname').textContent = st.name; $('#sdesc').textContent = st.desc;
+      $('#time').textContent = fmt(target);
+      $('#sub').textContent = 'お湯が沸騰してから卵を入れてスタート';
+      document.title = 'ゆで卵タイマー';
+      return;
+    }
+    const left = Math.max(0, (state.end - Date.now()) / 1000);
+    const elapsed = done ? state.dur : clamp(state.dur - left, 0, state.dur);
+    $('#barFill').style.width = (elapsed / state.dur * 100) + '%';
+    drawEgg(elapsed);
+    const st = stageAt(elapsed), goal = stageAt(state.dur);
+    $('#sname').textContent = st.name; $('#sdesc').textContent = st.desc;
+    if (done) {
+      $('#badge').textContent = 'ゆで上がり！';
+      $('#time').textContent = 'できた！';
+      $('#sub').textContent = `${fmtJa(state.dur)}・すぐ冷水にとってね`;
+      document.title = '🥚 ゆで上がり！';
+    } else {
+      $('#badge').textContent = 'いまの卵';
+      $('#time').textContent = fmt(Math.ceil(left));
+      const endAt = new Date(state.end);
+      $('#sub').textContent = `${endAt.getHours()}:${String(endAt.getMinutes()).padStart(2, '0')} に「${goal.name}」でゆで上がり`;
+      document.title = fmt(Math.ceil(left)) + ' – ゆで卵タイマー';
+    }
+  }
+
+  $('#start').addEventListener('click', start);
+  $('#cancel').addEventListener('click', cancel);
+  $('#ok').addEventListener('click', cancel);
+
+  const st = $('#soundToggle');
+  st.setAttribute('aria-checked', soundOn);
+  st.addEventListener('click', () => {
+    soundOn = !soundOn; st.setAttribute('aria-checked', soundOn);
+    try { localStorage.setItem(SOUND_KEY, soundOn ? '1' : '0'); } catch (_) {}
+    if (!soundOn) stopAudio();
+    else if (state && !state.notified) { unlockCtx(); startAudio((state.end - Date.now()) / 1000); }
+  });
+
+  // 戻ってきたら残り時間を再計算（バックグラウンド中はタイマーが止まることがあるため）
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !state) return;
+    if (!state.notified) { lockScreen(); run(); } else render();
+  });
+
+  renderNotif();
+  if (state) { state.notified ? render() : run(); } else render();
+})();
+</script>
+</body>
+</html>
