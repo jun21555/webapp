@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb347"/>
+      <stop offset="1" stop-color="#ff5e3a"/>
+    </linearGradient>
+    <linearGradient id="cup" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset=".7" stop-color="#fff4e6"/>
+      <stop offset="1" stop-color="#f1dcc4"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- 湯気 -->
+  <g fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" opacity=".85">
+    <path d="M196 150 q-22 -30 0 -60 q22 -30 0 -60"/>
+    <path d="M256 140 q-22 -30 0 -60 q22 -30 0 -60" opacity=".9"/>
+    <path d="M316 150 q-22 -30 0 -60 q22 -30 0 -60"/>
+  </g>
+  <!-- カップ本体 -->
+  <path d="M120 196 H392 L360 430 Q356 452 334 452 H178 Q156 452 152 430 Z" fill="url(#cup)"/>
+  <!-- 帯 -->
+  <path d="M130 262 H382 L372 336 H140 Z" fill="#e8402a"/>
+  <path d="M141 344 H371 L368 362 H144 Z" fill="#ffd23f"/>
+  <!-- フタ（少しめくれ） -->
+  <path d="M104 178 Q256 150 408 178 L404 204 Q256 186 108 204 Z" fill="#fff" stroke="#f1dcc4" stroke-width="4"/>
+  <path d="M352 168 Q392 140 420 150 L412 182 Q384 176 360 186 Z" fill="#ffd23f"/>
+  <!-- 時計 -->
+  <circle cx="256" cy="300" r="52" fill="#fff" stroke="#c42d1b" stroke-width="10"/>
+  <path d="M256 300 V266 M256 300 L280 314" stroke="#c42d1b" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="256" cy="300" r="7" fill="#c42d1b"/>
+</svg>
