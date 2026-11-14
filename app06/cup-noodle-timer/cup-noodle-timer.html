@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="麺タイマー">
+<meta name="theme-color" content="#fff3e4">
+<title>カップ麺タイマー</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --bg1:#fff3e4; --bg2:#ffd9b3; --ink:#4a2a17; --dim:#9a6f55;
+    --red:#e8402a; --red2:#c42d1b; --yellow:#ffd23f; --card:rgba(255,255,255,.72);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    min-height:100dvh;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    background:radial-gradient(120% 60% at 50% 0%,#fffaf3 0%,transparent 60%),linear-gradient(180deg,var(--bg1),var(--bg2));
+    display:flex;flex-direction:column;align-items:center;
+    padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 18px) calc(env(safe-area-inset-bottom) + 18px) calc(env(safe-area-inset-left) + 18px);
+    -webkit-user-select:none;user-select:none;overscroll-behavior:none;
+  }
+  header{width:100%;max-width:440px;display:flex;align-items:center;gap:10px;min-height:52px}
+  .round{width:44px;height:44px;flex:0 0 44px;border-radius:50%;border:none;padding:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;color:var(--ink);text-decoration:none;
+    background:var(--card);box-shadow:0 2px 10px rgba(120,60,20,.15);transition:transform .12s}
+  .round:active{transform:scale(.88)}
+  .round svg{width:22px;height:22px}
+  h1{flex:1;margin:0;font-size:18px;font-weight:800;text-align:center;letter-spacing:.04em}
+
+  main{flex:1;width:100%;max-width:440px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+
+  .dial{position:relative;width:min(78vw,300px);aspect-ratio:1}
+  .dial>svg{position:absolute;inset:0;width:100%;height:100%}
+  .ring-bg{stroke:rgba(196,45,27,.12)}
+  .ring{stroke:var(--red);transition:stroke-dashoffset .25s linear;transform:rotate(-90deg);transform-origin:50% 50%}
+  .dial>svg.cup{inset:auto;left:50%;top:37%;width:40%;height:auto;transform:translate(-50%,-50%)}
+  .steam path{opacity:0}
+  .running .steam path,.done .steam path{animation:steam 2.4s ease-in-out infinite}
+  .steam path:nth-child(2){animation-delay:.8s!important}.steam path:nth-child(3){animation-delay:1.6s!important}
+  @keyframes steam{0%{opacity:0;transform:translateY(10px)}40%{opacity:.9}100%{opacity:0;transform:translateY(-18px)}}
+  .lid{transform-box:fill-box;transform-origin:90% 60%;transition:transform .6s cubic-bezier(.3,1.6,.5,1)}
+  .done .lid{transform:rotate(-28deg) translate(-6px,-14px)}
+  .done .ring{stroke-dashoffset:0!important}
+  .done .cup{animation:bounce .7s ease-in-out infinite alternate}
+  @keyframes bounce{to{transform:translate(-50%,-56%)}}
+  .time{position:absolute;left:0;right:0;bottom:19%;text-align:center;font-size:clamp(40px,13vw,54px);font-weight:800;
+    font-variant-numeric:tabular-nums;letter-spacing:.02em;line-height:1}
+  .sub{position:absolute;left:0;right:0;bottom:12%;text-align:center;font-size:13px;color:var(--dim);font-weight:600}
+  .done .time{color:var(--red);font-size:clamp(32px,10vw,42px)}
+
+  .presets{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%}
+  .preset{min-height:96px;border:none;border-radius:22px;cursor:pointer;color:#fff;font-family:inherit;
+    background:linear-gradient(180deg,#ff6a45,var(--red2));box-shadow:0 8px 18px rgba(196,45,27,.3),inset 0 1px 0 rgba(255,255,255,.35);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:transform .12s,filter .12s}
+  .preset:active{transform:scale(.95);filter:brightness(.92)}
+  .preset b{font-size:40px;line-height:1;font-weight:800}
+  .preset b small{font-size:20px;margin-left:2px}
+  .preset span{font-size:12px;opacity:.9;font-weight:600}
+  .preset.five{background:linear-gradient(180deg,#ffb23f,#f07a12);box-shadow:0 8px 18px rgba(240,122,18,.3),inset 0 1px 0 rgba(255,255,255,.35)}
+
+  .action{width:100%;min-height:60px;border:none;border-radius:20px;font-family:inherit;font-weight:800;font-size:20px;cursor:pointer;
+    background:#fff;color:var(--ink);box-shadow:0 6px 16px rgba(120,60,20,.15);transition:transform .12s}
+  .action:active{transform:scale(.96)}
+  .action.ok{background:linear-gradient(180deg,#ff6a45,var(--red2));color:#fff;font-size:22px}
+  [hidden]{display:none!important}
+
+  .card{width:100%;background:var(--card);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;
+    box-shadow:0 2px 10px rgba(120,60,20,.1);font-size:13px;line-height:1.45}
+  .card .ico{font-size:22px;flex:0 0 auto}
+  .card .txt{flex:1}
+  .card .txt b{display:block;font-size:14px}
+  .card button{min-height:44px;min-width:44px;padding:0 14px;border:none;border-radius:12px;font-family:inherit;font-weight:700;font-size:14px;
+    background:var(--red);color:#fff;cursor:pointer;white-space:nowrap}
+  .card button:active{transform:scale(.95)}
+  .toggle{position:relative;width:52px;height:32px;flex:0 0 52px;border-radius:16px;background:#d9c3b2;border:none;padding:0;cursor:pointer;transition:background .2s}
+  .toggle::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}
+  .toggle[aria-checked="true"]{background:#34c759}
+  .toggle[aria-checked="true"]::after{left:23px}
+  .settings{width:100%;display:flex;flex-direction:column;gap:10px}
+</style>
+</head>
+<body>
+<header>
+  <a class="round" href="../index.html" aria-label="ホームへ戻る">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg>
+  </a>
+  <h1>カップ麺タイマー</h1>
+  <div style="width:44px"></div>
+</header>
+
+<main>
+  <div class="dial" id="dial">
+    <svg viewBox="0 0 300 300" aria-hidden="true">
+      <circle class="ring-bg" cx="150" cy="150" r="136" fill="none" stroke-width="14"/>
+      <circle class="ring" id="ring" cx="150" cy="150" r="136" fill="none" stroke-width="14" stroke-linecap="round"/>
+    </svg>
+    <svg class="cup" viewBox="0 0 200 210" aria-hidden="true">
+      <defs>
+        <linearGradient id="cupG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff"/><stop offset=".7" stop-color="#fff4e6"/><stop offset="1" stop-color="#ecd3b8"/></linearGradient>
+      </defs>
+      <g class="steam" fill="none" stroke="#c9a68b" stroke-width="7" stroke-linecap="round">
+        <path d="M70 62 q-10 -13 0 -26 q10 -13 0 -26"/>
+        <path d="M100 58 q-10 -13 0 -26 q10 -13 0 -26"/>
+        <path d="M130 62 q-10 -13 0 -26 q10 -13 0 -26"/>
+      </g>
+      <path d="M28 82 H172 L156 196 Q154 206 143 206 H57 Q46 206 44 196 Z" fill="url(#cupG)" stroke="#e7cdb1" stroke-width="2"/>
+      <path d="M33 116 H167 L161 156 H39 Z" fill="#e8402a"/>
+      <path d="M40 162 H160 L158.5 172 H41.5 Z" fill="#ffd23f"/>
+      <g class="lid">
+        <path d="M20 74 Q100 60 180 74 L178 88 Q100 78 22 88 Z" fill="#fff" stroke="#e7cdb1" stroke-width="2"/>
+        <path d="M150 68 Q172 54 188 60 L184 76 Q168 72 156 78 Z" fill="#ffd23f"/>
+      </g>
+    </svg>
+    <div class="time" id="time">--:--</div>
+    <div class="sub" id="sub">時間を選んでね</div>
+  </div>
+
+  <div class="presets" id="presets">
+    <button class="preset" data-min="3" type="button"><b>3<small>分</small></b><span>ふつうの麺</span></button>
+    <button class="preset five" data-min="5" type="button"><b>5<small>分</small></b><span>太麺・うどん・そば</span></button>
+  </div>
+  <button class="action" id="cancel" type="button" hidden>キャンセル</button>
+  <button class="action ok" id="ok" type="button" hidden>いただきます 🍜</button>
+
+  <div class="settings">
+    <div class="card" id="notifCard">
+      <div class="ico">🔔</div>
+      <div class="txt"><b id="notifTitle">プッシュ通知</b><span id="notifMsg"></span></div>
+      <button id="notifBtn" type="button" hidden>オンにする</button>
+    </div>
+    <div class="card">
+      <div class="ico">🔊</div>
+      <div class="txt"><b>アラーム音</b><span>画面を閉じても鳴るよう、タイマー中は無音の音声を再生します</span></div>
+      <button class="toggle" id="soundToggle" role="switch" aria-checked="true" aria-label="アラーム音"></button>
+    </div>
+  </div>
+</main>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const KEY = 'cupNoodleTimer.v1';
+  const SOUND_KEY = 'cupNoodleTimer.sound';
+  const R = 136, C = 2 * Math.PI * R;
+  const ring = $('#ring'), dial = $('#dial');
+  ring.style.strokeDasharray = C;
+  ring.style.strokeDashoffset = 0;
+
+  let state = load();          // {end, dur} | null
+  let tickId = null, doneTimer = null, wakeLock = null;
+  let audio = null, audioUrl = null, actx = null, beepTimer = null;
+  let soundOn = (() => { try { return localStorage.getItem(SOUND_KEY) !== '0'; } catch (_) { return true; } })();
+
+  function load(){ try { return JSON.parse(localStorage.getItem(KEY)); } catch (_) { return null; } }
+  function save(){ try { state ? localStorage.setItem(KEY, JSON.stringify(state)) : localStorage.removeItem(KEY); } catch (_) {} }
+  const fmt = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+  // ---------- Service Worker ----------
+  let swReg = null;
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(r => { swReg = r; }).catch(() => {});
+  }
+
+  // ---------- 通知 ----------
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  function renderNotif(){
+    const btn = $('#notifBtn'), msg = $('#notifMsg');
+    btn.hidden = true;
+    if (!('Notification' in window)) {
+      msg.textContent = isIOS && !standalone
+        ? 'iPhoneでは、Safariの共有ボタン →「ホーム画面に追加」から開くと通知が使えます'
+        : 'このブラウザは通知に対応していません';
+      return;
+    }
+    const p = Notification.permission;
+    if (p === 'granted') msg.textContent = 'オン ✓ できあがったら通知します';
+    else if (p === 'denied') msg.textContent = 'ブロック中。端末の設定でこのアプリの通知を許可してください';
+    else { msg.textContent = 'できあがりを通知で受け取れます'; btn.hidden = false; }
+  }
+  async function askNotif(){
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    try { await Notification.requestPermission(); } catch (_) {}
+    renderNotif();
+  }
+  $('#notifBtn').addEventListener('click', askNotif);
+
+  async function notifyDone(){
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const title = '🍜 できあがり！';
+    const opts = { body: (state ? state.dur / 60 : '') + '分経ちました。のびないうちにどうぞ！', icon: 'icon-192.png', badge: 'icon-192.png', tag: 'cup-noodle-timer', renotify: true, requireInteraction: true, vibrate: [300, 150, 300, 150, 600] };
+    try {
+      const reg = swReg || (await navigator.serviceWorker.ready);
+      await reg.showNotification(title, opts);
+    } catch (_) {
+      try { new Notification(title, opts); } catch (__) {}
+    }
+  }
+
+  // ---------- 音 ----------
+  // 「無音（残り時間）＋アラーム」の WAV を作って <audio> で再生。
+  // バックグラウンドや画面ロック中でも音声再生は続くため、時間ぴったりにアラームが鳴る。
+  function makeAlarmWav(silenceSec){
+    const rate = 8000, alarmSec = 20;
+    const n = Math.round((silenceSec + alarmSec) * rate);
+    const buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+    w(36, 'data'); v.setUint32(40, n, true);
+    const data = new Uint8Array(buf, 44);
+    data.fill(128);
+    const start = Math.round(silenceSec * rate);
+    for (let i = start; i < n; i++) {
+      const t = (i - start) / rate, cyc = t % 1.2;           // 1.2秒周期で「ピピピピッ」
+      const k = Math.floor(cyc / 0.18), inBeep = k < 4 && (cyc % 0.18) < 0.12;
+      if (inBeep) {
+        const env = Math.min(1, (cyc % 0.18) * 200, (0.12 - (cyc % 0.18)) * 200);
+        data[i] = 128 + Math.round(100 * env * (Math.sin(2 * Math.PI * 1760 * t) > 0 ? 1 : -1) * 0.6);
+      }
+    }
+    return new Blob([buf], { type: 'audio/wav' });
+  }
+  function startAudio(sec){
+    stopAudio();
+    if (!soundOn) return;
+    try {
+      audioUrl = URL.createObjectURL(makeAlarmWav(sec));
+      audio = new Audio(audioUrl);
+      audio.preload = 'auto';
+      audio.play().catch(() => { audio = null; });
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({ title: 'カップ麺タイマー', artist: (sec / 60).toFixed(0) + '分', artwork: [{ src: 'icon-512.png', sizes: '512x512', type: 'image/png' }] });
+      }
+    } catch (_) { audio = null; }
+  }
+  function stopAudio(){
+    if (audio) { try { audio.pause(); } catch (_) {} audio = null; }
+    if (audioUrl) { URL.revokeObjectURL(audioUrl); audioUrl = null; }
+    if (beepTimer) { clearInterval(beepTimer); beepTimer = null; }
+  }
+  function unlockCtx(){
+    try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (_) {}
+  }
+  // <audio> が鳴っていない時の予備アラーム（Web Audio）
+  function beepFallback(){
+    if (!soundOn || !actx) return;
+    const ring = () => {
+      const t0 = actx.currentTime;
+      for (let k = 0; k < 4; k++) {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'square'; o.frequency.value = 1760;
+        g.gain.setValueAtTime(0, t0 + k * .18); g.gain.linearRampToValueAtTime(.15, t0 + k * .18 + .01);
+        g.gain.setValueAtTime(.15, t0 + k * .18 + .11); g.gain.linearRampToValueAtTime(0, t0 + k * .18 + .12);
+        o.connect(g).connect(actx.destination); o.start(t0 + k * .18); o.stop(t0 + k * .18 + .13);
+      }
+    };
+    ring(); let count = 1;
+    beepTimer = setInterval(() => { if (++count > 15) { clearInterval(beepTimer); beepTimer = null; return; } ring(); }, 1200);
+  }
+
+  // ---------- 画面スリープ防止 ----------
+  async function lockScreen(){
+    try { if ('wakeLock' in navigator && !wakeLock && document.visibilityState === 'visible') { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (_) {}
+  }
+  function unlockScreen(){ try { wakeLock && wakeLock.release(); } catch (_) {} wakeLock = null; }
+
+  // ---------- タイマー ----------
+  function start(min){
+    unlockCtx();
+    const dur = min * 60;
+    state = { end: Date.now() + dur * 1000, dur, notified: false };
+    save();
+    startAudio(dur);
+    lockScreen();
+    if ('Notification' in window && Notification.permission === 'default') askNotif();
+    run();
+  }
+  function run(){
+    clearInterval(tickId); clearTimeout(doneTimer);
+    const left = state.end - Date.now();
+    if (left <= 0) return finish(true);
+    tickId = setInterval(render, 250);
+    doneTimer = setTimeout(() => finish(false), left);
+    render();
+  }
+  function finish(late){
+    clearInterval(tickId); clearTimeout(doneTimer);
+    if (!state) return;
+    const first = !state.notified;
+    state.notified = true; save();
+    if (first) {
+      notifyDone();
+      if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 600]);
+      const audioPlaying = audio && !audio.paused;
+      if (!audioPlaying && !late) beepFallback();
+    }
+    render();
+  }
+  function cancel(){
+    clearInterval(tickId); clearTimeout(doneTimer);
+    stopAudio(); unlockScreen();
+    state = null; save();
+    try { swReg && swReg.getNotifications && swReg.getNotifications({ tag: 'cup-noodle-timer' }).then(ns => ns.forEach(n => n.close())); } catch (_) {}
+    render();
+  }
+
+  function render(){
+    const running = !!state && !state.notified;
+    const done = !!state && state.notified;
+    dial.classList.toggle('running', running);
+    dial.classList.toggle('done', done);
+    $('#presets').hidden = !!state;
+    $('#cancel').hidden = !running;
+    $('#ok').hidden = !done;
+    if (!state) {
+      $('#time').textContent = '0:00';
+      $('#sub').textContent = '時間を選んでね';
+      ring.style.strokeDashoffset = 0;
+      document.title = 'カップ麺タイマー';
+      return;
+    }
+    const left = Math.max(0, (state.end - Date.now()) / 1000);
+    ring.style.strokeDashoffset = C * (1 - left / state.dur);
+    if (done) {
+      $('#time').textContent = 'できた！';
+      $('#sub').textContent = state.dur / 60 + '分経ちました';
+      document.title = '🍜 できあがり！';
+    } else {
+      $('#time').textContent = fmt(left);
+      const endAt = new Date(state.end);
+      $('#sub').textContent = endAt.getHours() + ':' + String(endAt.getMinutes()).padStart(2, '0') + ' にできあがり';
+      document.title = fmt(left) + ' – カップ麺タイマー';
+    }
+  }
+
+  $('#presets').addEventListener('click', e => {
+    const b = e.target.closest('.preset'); if (b) start(+b.dataset.min);
+  });
+  $('#cancel').addEventListener('click', cancel);
+  $('#ok').addEventListener('click', cancel);
+
+  const st = $('#soundToggle');
+  st.setAttribute('aria-checked', soundOn);
+  st.addEventListener('click', () => {
+    soundOn = !soundOn; st.setAttribute('aria-checked', soundOn);
+    try { localStorage.setItem(SOUND_KEY, soundOn ? '1' : '0'); } catch (_) {}
+    if (!soundOn) stopAudio();
+    else if (state && !state.notified) { unlockCtx(); startAudio((state.end - Date.now()) / 1000); }
+  });
+
+  // アプリに戻ってきたら時間を再計算（バックグラウンド中はタイマーが止まることがあるため）
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !state) return;
+    if (!state.notified) { lockScreen(); run(); } else render();
+  });
+
+  renderNotif();
+  if (state) { state.notified ? render() : run(); } else render();
+})();
+</script>
+</body>
+</html>
