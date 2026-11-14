@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="app07">
+<meta name="theme-color" content="#1b1440">
+<title>app07</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+  body{
+    min-height:100vh;min-height:100dvh;color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+    background:
+      radial-gradient(120% 70% at 15% 0%,#ff6aa2 0%,transparent 55%),
+      radial-gradient(110% 70% at 100% 30%,#6b5cff 0%,transparent 60%),
+      radial-gradient(120% 80% at 30% 100%,#00b3c6 0%,transparent 60%),
+      #1b1440;
+    background-attachment:fixed;
+    padding:calc(env(safe-area-inset-top) + 28px) 22px calc(env(safe-area-inset-bottom) + 28px);
+  }
+  header{text-align:center;margin:8px 0 34px;text-shadow:0 1px 12px rgba(0,0,0,.25)}
+  #date{font-size:15px;font-weight:600;opacity:.92}
+  #time{font-size:76px;font-weight:700;line-height:1.05;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+  .grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:26px 14px;
+    max-width:420px;margin:0 auto;
+  }
+  @media (max-width:340px){.grid{grid-template-columns:repeat(3,1fr)}}
+  .app{display:flex;flex-direction:column;align-items:center;text-decoration:none;color:#fff;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  .icon{width:64px;height:64px;border-radius:15px;overflow:hidden;
+    box-shadow:0 6px 16px rgba(0,0,0,.28),inset 0 0 0 .5px rgba(255,255,255,.18);
+    transition:transform .15s ease,filter .15s ease;animation:pop .45s cubic-bezier(.2,1.4,.4,1) both}
+  .icon img{display:block;width:100%;height:100%}
+  .app:active .icon{transform:scale(.88);filter:brightness(.8)}
+  .name{margin-top:7px;font-size:11.5px;font-weight:500;max-width:76px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.45)}
+  .app:nth-child(2) .icon{animation-delay:.04s}.app:nth-child(3) .icon{animation-delay:.08s}
+  .app:nth-child(4) .icon{animation-delay:.12s}.app:nth-child(5) .icon{animation-delay:.16s}
+  .app:nth-child(6) .icon{animation-delay:.2s}.app:nth-child(7) .icon{animation-delay:.24s}
+  .app:nth-child(8) .icon{animation-delay:.28s}.app:nth-child(9) .icon{animation-delay:.32s}
+  .app:nth-child(10) .icon{animation-delay:.36s}.app:nth-child(11) .icon{animation-delay:.4s}
+  .app:nth-child(12) .icon{animation-delay:.44s}
+  @keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+  .dots{display:flex;justify-content:center;gap:7px;margin:40px 0 0}
+  .dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4)}
+  .dots i:first-child{background:#fff}
+  /* 更新（リロード）ボタン */
+  #reload{position:fixed;z-index:10;top:calc(env(safe-area-inset-top) + 10px);right:calc(env(safe-area-inset-right) + 12px);
+    width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.35);padding:0;cursor:pointer;
+    background:rgba(255,255,255,.18);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);color:#fff;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,.25);
+    transition:transform .15s ease,background .15s ease;-webkit-tap-highlight-color:transparent}
+  #reload:active{transform:scale(.88);background:rgba(255,255,255,.3)}
+  #reload svg{width:22px;height:22px}
+  #reload.spin svg{animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<button id="reload" type="button" aria-label="ページを更新">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+</button>
+<header>
+  <div id="date"></div>
+  <div id="time">--:--</div>
+</header>
+
+<nav class="grid" id="grid"></nav>
+
+<div class="dots"><i></i></div>
+
+<script>
+  // アプリ一覧：アプリを追加するときはここに1件足すだけ
+  const apps = [
+    { name: 'ふせチャレ', href: 'phone-down/phone-down.html', icon: 'phone-down/apple-touch-icon.png' },
+  ];
+  document.getElementById('grid').innerHTML = apps.map(a =>
+    `<a class="app" href="${a.href}"><div class="icon"><img src="${a.icon}" alt=""></div><span class="name">${a.name}</span></a>`).join('');
+
+  const days=['日','月','火','水','木','金','土'];
+  function tick(){
+    const d=new Date();
+    document.getElementById('time').textContent=d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+    document.getElementById('date').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日('+days[d.getDay()]+')';
+  }
+  tick(); setInterval(tick,10000);
+
+  // 更新ボタン：Service Worker の更新確認 → キャッシュ削除 → 再読み込み
+  document.getElementById('reload').addEventListener('click',async e=>{
+    e.currentTarget.classList.add('spin');
+    try{
+      if('serviceWorker' in navigator){
+        const rs=await navigator.serviceWorker.getRegistrations();
+        await Promise.race([Promise.all(rs.map(r=>r.update().catch(()=>{}))),new Promise(r=>setTimeout(r,1500))]);
+      }
+      if('caches' in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
+    }catch(_){}
+    location.reload();
+  });
+</script>
+</body>
+</html>
