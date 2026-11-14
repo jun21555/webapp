@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ふせチャレ">
+<meta name="theme-color" content="#14163a">
+<title>ふせチャレ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --bg:#14163a; --card:rgba(255,255,255,.07); --line:rgba(255,255,255,.12);
+    --text:#f3f4ff; --sub:#a9acd6; --accent:#3ad19a; --accent2:#ffd968; --danger:#ff6b81;
+  }
+  *{box-sizing:border-box}
+  html{background:#0d2a2e}
+  html,body{margin:0;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+  body{
+    min-height:100dvh;color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+    background:radial-gradient(120% 60% at 50% 0%,#2a2470 0%,transparent 60%),linear-gradient(#14163a,#0d2a2e);
+    background-attachment:fixed;
+  }
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  /* ヘッダー */
+  .top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;
+    padding:calc(env(safe-area-inset-top) + 6px) calc(env(safe-area-inset-right) + 10px) 8px calc(env(safe-area-inset-left) + 10px);
+    background:rgba(20,22,58,.75);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  .home,.iconbtn{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:rgba(255,255,255,.1);color:#fff;text-decoration:none;flex:none;transition:transform .12s}
+  .home:active,.iconbtn:active{transform:scale(.88)}
+  .home svg,.iconbtn svg{width:22px;height:22px}
+  .top h1{flex:1;margin:0;text-align:center;font-size:18px;font-weight:800;letter-spacing:.04em}
+  main{padding:8px calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 32px) calc(env(safe-area-inset-left) + 16px);
+    max-width:520px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;margin:14px 0}
+  .card h2{margin:0 0 12px;font-size:15px;font-weight:700;color:var(--sub);letter-spacing:.04em}
+  /* 今日 */
+  .today{display:flex;align-items:center;gap:16px}
+  .ring{position:relative;width:132px;height:132px;flex:none}
+  .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+  .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ring b{font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+  .ring small{font-size:11px;color:var(--sub);margin-top:4px}
+  .stats{flex:1;display:grid;gap:10px}
+  .stat{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:6px}
+  .stat:last-child{border:0}
+  .stat span{font-size:12px;color:var(--sub)}
+  .stat b{font-size:17px;font-variant-numeric:tabular-nums}
+  /* モード切替 */
+  .seg{display:flex;background:rgba(255,255,255,.08);border-radius:14px;padding:4px;margin:16px 0 0}
+  .seg button{flex:1;min-height:44px;border-radius:11px;font-size:14px;font-weight:700;color:var(--sub)}
+  .seg button.on{background:rgba(255,255,255,.16);color:#fff}
+  .start{display:block;width:100%;min-height:64px;margin:12px 0 6px;border-radius:20px;font-size:19px;font-weight:800;
+    background:linear-gradient(135deg,#3ad19a,#1fa5c7);color:#06231c;box-shadow:0 10px 28px rgba(58,209,154,.35);transition:transform .12s}
+  .start:active{transform:scale(.97)}
+  .hint{font-size:12.5px;color:var(--sub);line-height:1.6;margin:6px 4px 0}
+  /* 週グラフ */
+  .week{display:flex;align-items:flex-end;gap:8px;height:120px;position:relative}
+  .week .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+  .week .bar{width:100%;max-width:30px;border-radius:8px 8px 4px 4px;background:rgba(255,255,255,.14);min-height:4px}
+  .week .bar.ok{background:linear-gradient(#3ad19a,#1fa5c7)}
+  .week .col span{font-size:11px;color:var(--sub)}
+  .week .col.today span{color:#fff;font-weight:700}
+  .week .goal{position:absolute;left:0;right:0;border-top:1px dashed rgba(255,217,104,.6);pointer-events:none}
+  .week .goal i{position:absolute;right:0;top:-16px;font-size:10px;font-style:normal;color:var(--accent2)}
+  /* 森 */
+  .forest{isolation:isolate;position:relative;height:170px;border-radius:16px;overflow:hidden;
+    background:linear-gradient(#20306e 0%,#2c4b86 45%,#3b7a5a 62%,#2d6447 100%)}
+  .forest .it{position:absolute;transform:translate(-50%,-100%);line-height:1;filter:drop-shadow(0 3px 2px rgba(0,0,0,.3))}
+  .forest .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+    color:rgba(255,255,255,.8);font-size:13px;padding:0 24px;line-height:1.6}
+  .forest-note{font-size:12px;color:var(--sub);margin:8px 2px 0}
+  /* 図鑑 */
+  .dex{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .dex .d{background:rgba(255,255,255,.06);border-radius:14px;padding:8px 2px 6px;text-align:center;position:relative}
+  .dex .d .e{font-size:28px;line-height:1.2}
+  .dex .d.lock .e{filter:grayscale(1) brightness(.25)}
+  .dex .d .n{font-size:9.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dex .d .c{position:absolute;top:3px;right:6px;font-size:10px;color:var(--accent2);font-weight:700}
+  /* 履歴 */
+  .hist{list-style:none;margin:0;padding:0}
+  .hist li{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .hist li:last-child{border:0}
+  .hist .e{font-size:22px;width:30px;text-align:center}
+  .hist .m{flex:1}
+  .hist .m small{display:block;color:var(--sub);font-size:11.5px}
+  .hist .s{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent2)}
+  .muted{color:var(--sub);font-size:13px}
+
+  /* セッション画面（真っ黒で省電力） */
+  .overlay{position:fixed;inset:0;z-index:50;background:#000;color:#8a8db8;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;padding:calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 20px);
+    touch-action:none;-webkit-user-select:none;user-select:none}
+  .overlay[hidden],.modal[hidden]{display:none}
+  .arm .flip{font-size:72px;animation:flip 2.4s ease-in-out infinite;display:inline-block}
+  @keyframes flip{0%,20%{transform:rotateX(0)}50%,70%{transform:rotateX(180deg) translateY(10px)}100%{transform:rotateX(360deg)}}
+  .arm p{color:#d8daf8;font-size:18px;font-weight:700;line-height:1.6;margin:22px 0 6px}
+  .arm small{display:block;font-size:13px;line-height:1.6;color:#8a8db8}
+  .cancel{margin-top:30px;min-height:48px;padding:0 26px;border-radius:24px;border:1px solid #33355c;color:#a9acd6;font-size:15px}
+  .run .moon{font-size:54px;animation:breath 5s ease-in-out infinite}
+  @keyframes breath{0%,100%{opacity:.35;transform:scale(.95)}50%{opacity:.85;transform:scale(1.05)}}
+  .run .clock{font-size:64px;font-weight:200;font-variant-numeric:tabular-nums;color:#b9bce6;margin:14px 0 4px;letter-spacing:1px}
+  .run .score{font-size:20px;color:#ffd968;opacity:.85;font-variant-numeric:tabular-nums}
+  .run .mult{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:10px;background:#2a2550;color:#ffd968;font-size:14px}
+  .run .next{margin-top:18px;font-size:14px;color:#7a7da8}
+  .run .tip{white-space:pre-line;position:absolute;bottom:calc(env(safe-area-inset-bottom) + 24px);left:24px;right:24px;font-size:12.5px;color:#55587e;line-height:1.6}
+  .lift{color:#ff9aa9!important}
+  /* モーダル */
+  .modal{position:fixed;inset:0;z-index:60;background:rgba(5,6,20,.7);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+    display:flex;align-items:flex-end;justify-content:center}
+  .sheet{width:100%;max-width:520px;background:#1d1f4d;border-radius:28px 28px 0 0;
+    padding:22px 20px calc(env(safe-area-inset-bottom) + 20px);animation:up .35s cubic-bezier(.2,1,.3,1);max-height:92dvh;overflow:auto}
+  @keyframes up{from{transform:translateY(100%)}to{transform:none}}
+  .res{text-align:center}
+  .res .big{font-size:96px;line-height:1.1;animation:pop .6s cubic-bezier(.2,1.6,.4,1) both}
+  @keyframes pop{from{transform:scale(.2) rotate(-20deg);opacity:0}to{transform:none;opacity:1}}
+  .res h3{margin:8px 0 4px;font-size:21px}
+  .res .lead{color:var(--sub);font-size:14px;margin:0 0 16px;line-height:1.6}
+  .res .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 16px}
+  .res .grid div{background:rgba(255,255,255,.07);border-radius:16px;padding:10px 4px}
+  .res .grid span{display:block;font-size:11px;color:var(--sub)}
+  .res .grid b{font-size:19px;font-variant-numeric:tabular-nums}
+  .badge{display:inline-block;margin:0 0 14px;padding:6px 14px;border-radius:20px;background:linear-gradient(135deg,#ffd968,#ff9a5a);color:#3a2000;font-weight:800;font-size:14px;animation:pop .6s .3s both}
+  .btn{display:block;width:100%;min-height:52px;border-radius:16px;background:rgba(255,255,255,.12);font-size:16px;font-weight:700}
+  .btn.pri{background:linear-gradient(135deg,#3ad19a,#1fa5c7);color:#06231c}
+  .btn+.btn{margin-top:10px}
+  .set h3{margin:0 0 14px;font-size:18px}
+  .set label{display:block;font-size:13px;color:var(--sub);margin:16px 0 8px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chips button{min-height:44px;min-width:60px;padding:0 14px;border-radius:14px;background:rgba(255,255,255,.08);font-weight:700}
+  .chips button.on{background:var(--accent);color:#06231c}
+  .row{display:flex;align-items:center;justify-content:space-between;min-height:48px}
+  .sw{width:56px;height:34px;border-radius:17px;background:rgba(255,255,255,.18);position:relative;transition:background .2s}
+  .sw::after{content:"";position:absolute;top:3px;left:3px;width:28px;height:28px;border-radius:50%;background:#fff;transition:transform .2s}
+  .sw.on{background:var(--accent)}.sw.on::after{transform:translateX(22px)}
+  .danger{color:var(--danger)!important}
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 24px);transform:translateX(-50%);z-index:80;
+    background:#2e3170;color:#fff;padding:12px 18px;border-radius:16px;font-size:14px;max-width:90%;box-shadow:0 8px 24px rgba(0,0,0,.4);
+    opacity:0;transition:opacity .25s;pointer-events:none;line-height:1.5}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="home" href="../index.html" aria-label="ホームに戻る">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+  </a>
+  <h1>ふせチャレ</h1>
+  <button class="iconbtn" id="setBtn" aria-label="設定">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+  </button>
+</header>
+
+<main>
+  <section class="card">
+    <div class="today">
+      <div class="ring">
+        <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="12"/>
+          <circle id="ringBar" cx="60" cy="60" r="52" fill="none" stroke="url(#rg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" style="transition:stroke-dashoffset .8s"/>
+          <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3ad19a"/><stop offset="1" stop-color="#1fa5c7"/></linearGradient></defs>
+        </svg>
+        <div class="val"><b id="todayMin">0</b><small id="todayGoal">/ 60分</small></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span>今日のスコア</span><b id="todayScore">0</b></div>
+        <div class="stat"><span>連続達成</span><b id="streak">0日</b></div>
+        <div class="stat"><span>最長記録</span><b id="best">-</b></div>
+        <div class="stat"><span>累計スコア</span><b id="total">0</b></div>
+      </div>
+    </div>
+    <div class="seg" role="tablist">
+      <button id="modeFlip" class="on">📱 伏せモード</button>
+      <button id="modeTouch">✋ さわらないモード</button>
+    </div>
+    <button class="start" id="startBtn">スマホを伏せてスタート</button>
+    <p class="hint" id="modeHint"></p>
+  </section>
+
+  <section class="card">
+    <h2>🌲 デトックスの森</h2>
+    <div class="forest" id="forest"></div>
+    <p class="forest-note" id="forestNote"></p>
+  </section>
+
+  <section class="card">
+    <h2>📖 図鑑 <span class="muted" id="dexCount"></span></h2>
+    <div class="dex" id="dex"></div>
+  </section>
+
+  <section class="card">
+    <h2>📊 この1週間</h2>
+    <div class="week" id="week"></div>
+  </section>
+
+  <section class="card">
+    <h2>🕒 最近の記録</h2>
+    <ul class="hist" id="hist"></ul>
+  </section>
+
+  <section class="card">
+    <h2>🎯 スコアのしくみ</h2>
+    <p class="muted" style="margin:0;line-height:1.7">
+      さわらなかった1秒ごとに <b style="color:#ffd968">1pt × 倍率</b>。倍率は10分ごとに +0.5 上がり、最大 ×5（80分〜）。
+      長く続けるほど一気に伸びます。終わったときの時間に応じて、森に植物や動物がやってきます。
+    </p>
+  </section>
+</main>
+
+<!-- セッション画面 -->
+<div class="overlay" id="session" hidden>
+  <div class="arm" id="armView">
+    <div class="flip">📱</div>
+    <p>画面を下にして<br>机に置いてください</p>
+    <small>伏せた瞬間からカウントが始まります。<br>持ち上げると終了です。</small>
+    <button class="cancel" id="cancelArm">やめる</button>
+  </div>
+  <div class="run" id="runView" hidden>
+    <div class="moon">🌙</div>
+    <div class="clock" id="clock">0:00</div>
+    <div class="score"><span id="liveScore">0</span> pt<span class="mult" id="liveMult">×1.0</span></div>
+    <div class="next" id="liveNext"></div>
+    <div class="tip" id="runTip"></div>
+  </div>
+</div>
+
+<!-- 結果 -->
+<div class="modal" id="result" hidden>
+  <div class="sheet res">
+    <div class="big" id="resEmoji">🌱</div>
+    <h3 id="resTitle"></h3>
+    <p class="lead" id="resLead"></p>
+    <div id="resBadge"></div>
+    <div class="grid">
+      <div><span>時間</span><b id="resTime"></b></div>
+      <div><span>スコア</span><b id="resScore"></b></div>
+      <div><span>最高倍率</span><b id="resMult"></b></div>
+    </div>
+    <button class="btn pri" id="resClose">森を見る</button>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div class="modal" id="settings" hidden>
+  <div class="sheet set">
+    <h3>設定</h3>
+    <label>1日の目標</label>
+    <div class="chips" id="goalChips"></div>
+    <div class="row" style="margin-top:14px"><span>節目でチャイムを鳴らす</span><button class="sw" id="soundSw" aria-label="チャイム"></button></div>
+    <p class="muted" style="margin:2px 0 0;line-height:1.6">新しい生きものが来たとき・目標達成時に小さく鳴ります（消音スイッチがオンだと鳴りません）。</p>
+    <label>データ</label>
+    <button class="btn danger" id="resetBtn">記録をすべて消す</button>
+    <button class="btn" id="setClose">閉じる</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== データ ===== */
+const KEY = 'phoneDown.v1';
+const TIERS = [
+  { min: 1,   e: '🌱', n: 'ふたば' },
+  { min: 5,   e: '🍀', n: 'クローバー' },
+  { min: 15,  e: '🌷', n: 'チューリップ' },
+  { min: 25,  e: '🍄', n: 'きのこ' },
+  { min: 30,  e: '🌻', n: 'ひまわり' },
+  { min: 45,  e: '🌳', n: 'おおきな木' },
+  { min: 60,  e: '🌸', n: 'さくら' },
+  { min: 90,  e: '🐿️', n: 'りす' },
+  { min: 120, e: '🦉', n: 'ふくろう' },
+  { min: 180, e: '🦌', n: 'しか' },
+  { min: 240, e: '🦊', n: 'きつね' },
+  { min: 360, e: '🐉', n: '森のぬし' },
+];
+const $ = id => document.getElementById(id);
+let db = load();
+function load() {
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.sessions)) return Object.assign({ goal: 60, sound: true, mode: 'flip' }, d); } catch (_) {}
+  return { sessions: [], goal: 60, sound: true, mode: 'flip', active: null };
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (_) {} }
+
+/* ===== スコア ===== */
+const multAt = sec => Math.min(5, 1 + 0.5 * Math.floor(sec / 600));
+function scoreFor(sec) {
+  let s = 0, t = 0;
+  while (t < sec) { const step = Math.min(600 - (t % 600), sec - t); s += step * multAt(t); t += step; }
+  return Math.floor(s);
+}
+function tierFor(sec) { let r = -1; TIERS.forEach((t, i) => { if (sec >= t.min * 60) r = i; }); return r; }
+
+/* ===== 表示用 ===== */
+const fmtClock = sec => { sec = Math.floor(sec); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`; };
+const fmtDur = sec => { sec = Math.floor(sec); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60);
+  if (h) return `${h}時間${m ? m + '分' : ''}`; if (m) return `${m}分`; return `${sec}秒`; };
+const num = n => n.toLocaleString('ja-JP');
+const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+function daySec(key) { return db.sessions.filter(s => dayKey(s.start) === key).reduce((a, s) => a + s.sec, 0); }
+function toast(msg, ms = 3200) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms); }
+
+function render() {
+  const now = Date.now(), tk = dayKey(now), goal = db.goal * 60;
+  const today = db.sessions.filter(s => dayKey(s.start) === tk);
+  const tSec = today.reduce((a, s) => a + s.sec, 0);
+  $('todayMin').textContent = Math.floor(tSec / 60);
+  $('todayGoal').textContent = `/ ${db.goal}分`;
+  $('ringBar').style.strokeDashoffset = 326.7 * (1 - Math.min(1, tSec / goal));
+  $('todayScore').textContent = num(today.reduce((a, s) => a + s.score, 0));
+  $('total').textContent = num(db.sessions.reduce((a, s) => a + s.score, 0));
+  const best = db.sessions.reduce((a, s) => Math.max(a, s.sec), 0);
+  $('best').textContent = best ? fmtDur(best) : '-';
+  // 連続達成（今日が未達なら昨日から数える）
+  let streak = 0, d = new Date(); d.setHours(12, 0, 0, 0);
+  if (daySec(dayKey(d)) < goal) d.setDate(d.getDate() - 1);
+  while (daySec(dayKey(d)) >= goal) { streak++; d.setDate(d.getDate() - 1); }
+  $('streak').textContent = streak + '日' + (streak >= 3 ? '🔥' : '');
+
+  // モード
+  const flip = db.mode === 'flip';
+  $('modeFlip').classList.toggle('on', flip); $('modeTouch').classList.toggle('on', !flip);
+  $('startBtn').textContent = flip ? 'スマホを伏せてスタート' : 'さわらないチャレンジ開始';
+  $('modeHint').innerHTML = flip
+    ? 'スタートしてからスマホを<b>画面を下にして</b>置くと計測開始。持ち上げたら終了です。画面は点いたままになるので、充電しながらがおすすめ。'
+    : '画面を点けたまま置いておき、<b>画面にさわったら終了</b>。傾きセンサーが使えない端末やPC向けのモードです。';
+
+  // 森
+  const items = db.sessions.filter(s => s.tier >= 0);
+  const f = $('forest'); f.innerHTML = '';
+  if (!items.length) {
+    f.innerHTML = '<div class="empty">まだ何もいません。<br>1分以上スマホから離れると、ここに生きものがやってきます。</div>';
+  } else {
+    const show = items.slice(-48);
+    show.forEach((s, i) => {
+      const r = rnd(s.start);
+      const el = document.createElement('span'); el.className = 'it';
+      const y = 62 + r() * 34;                       // 地面（奥ほど小さく）
+      el.style.left = (6 + r() * 88) + '%'; el.style.top = y + '%';
+      el.style.fontSize = (16 + (y - 62) * 0.55 + Math.min(10, s.tier * 1.2)) + 'px';
+      el.style.zIndex = Math.round(y);
+      el.textContent = TIERS[s.tier].e; f.appendChild(el);
+    });
+    // 空に星（累計時間ぶん）
+    const totalSec = db.sessions.reduce((a, s) => a + s.sec, 0);
+    const stars = Math.min(30, Math.floor(totalSec / 1800));
+    const r = rnd(7);
+    for (let i = 0; i < stars; i++) { const st = document.createElement('span'); st.className = 'it'; st.textContent = '✦';
+      st.style.cssText = `left:${4 + r() * 92}%;top:${8 + r() * 42}%;font-size:${7 + r() * 6}px;color:#fff;opacity:${.4 + r() * .5};filter:none`; f.appendChild(st); }
+  }
+  const totalSec = db.sessions.reduce((a, s) => a + s.sec, 0);
+  $('forestNote').textContent = items.length ? `住人 ${items.length}　・　スマホから離れた時間 合計 ${fmtDur(totalSec)}（30分ごとに夜空の星がひとつ増えます）` : '';
+
+  // 図鑑
+  const cnt = TIERS.map(() => 0); items.forEach(s => cnt[s.tier]++);
+  $('dex').innerHTML = TIERS.map((t, i) => `<div class="d ${cnt[i] ? '' : 'lock'}"><div class="e">${t.e}</div><div class="n">${cnt[i] ? t.n : t.min >= 60 ? t.min / 60 + '時間' : t.min + '分'}</div>${cnt[i] ? `<div class="c">${cnt[i]}</div>` : ''}</div>`).join('');
+  $('dexCount').textContent = `${cnt.filter(Boolean).length} / ${TIERS.length}`;
+
+  // 週
+  const w = $('week'); const days = []; const base = new Date(); base.setHours(12, 0, 0, 0);
+  for (let i = 6; i >= 0; i--) { const x = new Date(base); x.setDate(x.getDate() - i); days.push(x); }
+  const vals = days.map(x => daySec(dayKey(x)));
+  const max = Math.max(goal * 1.2, ...vals);
+  const wd = ['日', '月', '火', '水', '木', '金', '土'];
+  w.innerHTML = days.map((x, i) => `<div class="col ${i === 6 ? 'today' : ''}"><div class="bar ${vals[i] >= goal ? 'ok' : ''}" style="height:${Math.max(3, vals[i] / max * 92)}px" title="${fmtDur(vals[i])}"></div><span>${i === 6 ? '今日' : wd[x.getDay()]}</span></div>`).join('')
+    + `<div class="goal" style="bottom:${goal / max * 92 + 22}px"><i>目標${db.goal}分</i></div>`;
+
+  // 履歴
+  const h = db.sessions.slice(-12).reverse();
+  $('hist').innerHTML = h.length ? h.map(s => { const d = new Date(s.start);
+    return `<li><span class="e">${s.tier >= 0 ? TIERS[s.tier].e : '💤'}</span><span class="m">${fmtDur(s.sec)}<small>${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}〜 ・ ${s.mode === 'touch' ? 'さわらない' : '伏せ'}</small></span><span class="s">${num(s.score)}pt</span></li>`; }).join('')
+    : '<li class="muted">まだ記録がありません</li>';
+}
+function rnd(seed) { let x = (seed % 2147483647) || 1; return () => (x = x * 48271 % 2147483647) / 2147483647; }
+
+/* ===== 音 ===== */
+let actx = null;
+function unlockAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch (_) {} }
+function chime(notes = [880, 1320]) {
+  if (!db.sound || !actx) return;
+  notes.forEach((f, i) => { const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + i * 0.18;
+    o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.2); o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 1.3); });
+}
+
+/* ===== 画面スリープ防止 ===== */
+let wakeLock = null;
+async function lockScreen() { try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); return true; } } catch (_) {} return false; }
+function releaseScreen() { try { wakeLock && wakeLock.release(); } catch (_) {} wakeLock = null; }
+
+/* ===== センサー ===== */
+let beta = null, lastOri = 0, oriListening = false;
+function onOri(e) { if (e.beta == null) return; beta = e.beta; lastOri = Date.now(); if (state === 'arming' || state === 'running') checkPose(); }
+async function enableSensor() {
+  try {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const r = await DeviceOrientationEvent.requestPermission(); if (r !== 'granted') return false;
+    }
+  } catch (_) { return false; }
+  if (!oriListening) { addEventListener('deviceorientation', onOri); oriListening = true; }
+  // 実際に値が来るか確認
+  const t0 = Date.now();
+  while (Date.now() - t0 < 1500) { if (lastOri > t0 - 200 && beta != null) return true; await new Promise(r => setTimeout(r, 100)); }
+  return beta != null && Date.now() - lastOri < 2000;
+}
+const isFaceDown = () => beta != null && Math.abs(beta) > 145;  // 画面が下向き（βが±180付近）
+const isLifted = () => beta != null && Math.abs(beta) < 125;
+
+/* ===== セッション ===== */
+let state = 'idle', sess = null, liftAt = 0, tickTimer = null, lastTierShown = -1, goalChimed = false;
+
+async function start() {
+  unlockAudio();
+  const mode = db.mode;
+  if (mode === 'flip') {
+    const ok = await enableSensor();
+    if (!ok) { db.mode = 'touch'; save(); render(); toast('傾きセンサーが使えないため「さわらないモード」に切り替えました'); return; }
+  }
+  const locked = await lockScreen();
+  $('session').hidden = false;
+  $('runTip').textContent = locked ? '' : '※この端末は画面の自動ロックを止められません。設定 → 画面表示と明るさ → 自動ロック を「なし」にしてください。';
+  if (mode === 'flip') { state = 'arming'; $('armView').hidden = false; $('runView').hidden = true; checkPose(); }
+  else beginRun('touch');
+}
+function beginRun(mode) {
+  state = 'running'; liftAt = 0; lastTierShown = -1;
+  const already = daySec(dayKey(Date.now())); goalChimed = already >= db.goal * 60;
+  sess = { start: Date.now(), mode, already };
+  db.active = { start: sess.start, mode, beat: sess.start }; save();
+  $('armView').hidden = true; $('runView').hidden = false;
+  if (mode === 'touch') $('runTip').textContent = ($('runTip').textContent ? $('runTip').textContent + '\n' : '') + '画面にさわると終了します。';
+  chime([660, 990]);
+  tick(); clearInterval(tickTimer); tickTimer = setInterval(tick, 1000);
+}
+function checkPose() {
+  if (state === 'arming' && isFaceDown()) beginRun('flip');
+  else if (state === 'running' && sess.mode === 'flip') {
+    if (isLifted()) { if (!liftAt) liftAt = Date.now(); else if (Date.now() - liftAt > 1500) finish(liftAt); $('clock').classList.add('lift'); }
+    else if (isFaceDown()) { liftAt = 0; $('clock').classList.remove('lift'); }
+  }
+}
+function tick() {
+  if (state !== 'running') return;
+  const now = Date.now(), sec = (now - sess.start) / 1000;
+  if (sess.mode === 'flip') {
+    checkPose();
+    if (Date.now() - lastOri > 5000) { /* センサー停止＝画面オフなど */ }
+  }
+  $('clock').textContent = fmtClock(sec);
+  $('liveScore').textContent = num(scoreFor(sec));
+  $('liveMult').textContent = '×' + multAt(sec).toFixed(1);
+  const ti = tierFor(sec), nx = TIERS[ti + 1];
+  $('liveNext').textContent = nx ? `あと ${fmtClock(nx.min * 60 - sec)} で ${nx.e} ${nx.n}` : '森のぬしに会えました 🐉';
+  if (ti > lastTierShown) { chime([784, 1047, 1319]); lastTierShown = ti; }
+  if (!goalChimed && sess.already + sec >= db.goal * 60) { goalChimed = true; chime([523, 659, 784, 1047]); }
+  if (db.active && now - db.active.beat > 4000) { db.active.beat = now; save(); }
+}
+function finish(endAt = Date.now(), reason = '') {
+  if (state === 'arming') { cancel(); return; }
+  if (state !== 'running') return;
+  state = 'idle'; clearInterval(tickTimer); releaseScreen();
+  const sec = Math.max(0, Math.floor((endAt - sess.start) / 1000));
+  record(sess.start, sec, sess.mode, reason);
+  $('session').hidden = true; $('clock').classList.remove('lift');
+}
+function record(start, sec, mode, reason) {
+  const prevBest = db.sessions.reduce((a, s) => Math.max(a, s.sec), 0);
+  const tier = tierFor(sec), score = scoreFor(sec);
+  const dexBefore = new Set(db.sessions.map(s => s.tier));
+  db.active = null;
+  if (sec >= 10) db.sessions.push({ start, sec, score, tier, mode });
+  save(); render(); showResult(sec, score, tier, sec > prevBest && sec >= 60, tier >= 0 && !dexBefore.has(tier), reason);
+}
+function cancel() { state = 'idle'; clearInterval(tickTimer); releaseScreen(); $('session').hidden = true; }
+
+function showResult(sec, score, tier, best, newDex, reason) {
+  const t = tier >= 0 ? TIERS[tier] : null;
+  $('resEmoji').textContent = t ? t.e : '💤';
+  $('resTitle').textContent = t ? `${t.n} がやってきた！` : 'おしい…！';
+  const nx = TIERS[tier + 1];
+  $('resLead').innerHTML = (reason ? reason + '<br>' : '') + (t
+    ? (nx ? `次は ${fmtDur(nx.min * 60)} で ${nx.e} ${nx.n} に会えます` : 'すべての生きものに会えました。あなたは森のぬしです。')
+    : '1分以上離れると、森に生きものがやってきます');
+  $('resBadge').innerHTML = (best ? '<span class="badge">🏆 自己ベスト更新！</span> ' : '') + (newDex ? '<span class="badge">📖 図鑑に新登録！</span>' : '');
+  $('resTime').textContent = fmtClock(sec);
+  $('resScore').textContent = num(score);
+  $('resMult').textContent = '×' + multAt(Math.max(0, sec - 1)).toFixed(1);
+  $('result').hidden = false;
+  if (t) chime(best ? [523, 659, 784, 1047, 1319] : [784, 1047]);
+}
+
+/* 画面が隠れた（ロック・アプリ切替）→ その時点で終了 */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { if (state === 'running') { const t = Date.now(); finish(t, '画面が消えた／別のアプリを開いたため終了しました'); } else if (state === 'arming') cancel(); }
+  else if (state === 'running') lockScreen();
+});
+/* さわらないモード：タッチで終了 */
+$('session').addEventListener('pointerdown', e => {
+  if (state === 'running' && sess.mode === 'touch' && Date.now() - sess.start > 2000) finish(Date.now());
+});
+/* 前回、記録中にアプリが閉じられていたら最後の生存確認時刻で記録 */
+if (db.active) { const a = db.active; const sec = Math.floor((a.beat - a.start) / 1000); db.active = null; save();
+  if (sec >= 10) setTimeout(() => record(a.start, sec, a.mode, '前回はアプリが閉じられたため、最後に確認できた時刻までを記録しました'), 300); }
+
+/* ===== UI ===== */
+$('startBtn').onclick = start;
+$('cancelArm').onclick = cancel;
+$('modeFlip').onclick = () => { db.mode = 'flip'; save(); render(); };
+$('modeTouch').onclick = () => { db.mode = 'touch'; save(); render(); };
+$('resClose').onclick = () => { $('result').hidden = true; $('forest').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+$('setBtn').onclick = () => { renderSettings(); $('settings').hidden = false; };
+$('setClose').onclick = () => { $('settings').hidden = true; };
+$('settings').onclick = e => { if (e.target.id === 'settings') $('settings').hidden = true; };
+$('soundSw').onclick = () => { db.sound = !db.sound; save(); renderSettings(); };
+$('resetBtn').onclick = () => { if (confirm('記録・森・図鑑をすべて消します。よろしいですか？')) { db.sessions = []; db.active = null; save(); render(); $('settings').hidden = true; toast('記録を消しました'); } };
+function renderSettings() {
+  $('goalChips').innerHTML = [15, 30, 60, 90, 120, 180].map(m => `<button data-m="${m}" class="${db.goal === m ? 'on' : ''}">${m >= 60 ? m / 60 + '時間' : m + '分'}</button>`).join('');
+  $('goalChips').querySelectorAll('button').forEach(b => b.onclick = () => { db.goal = +b.dataset.m; save(); render(); renderSettings(); });
+  $('soundSw').classList.toggle('on', db.sound);
+}
+render();
+setInterval(() => { if (state === 'idle') render(); }, 60000);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
