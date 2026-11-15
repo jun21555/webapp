@@ -79,7 +79,7 @@
   #tiltTest{height:36px;margin:8px 0 0;border-radius:10px;background:rgba(255,255,255,.08);position:relative;overflow:hidden}
   #tiltTest i{position:absolute;top:4px;bottom:4px;left:50%;width:6px;margin-left:-3px;border-radius:3px;background:#ffd23f;transition:left .05s}
   #tiltTest span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;opacity:.6}
-  .course .del.ren{margin-right:-4px}
+  .course .del{font-size:20px;font-weight:900}
   .chip{display:inline-block;font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;margin-right:6px;vertical-align:2px;background:#2b6cff}
   .chip.ow{background:#ff8a1f}
   .io{display:flex;gap:8px;margin-top:4px}
@@ -328,6 +328,19 @@
   </div>
 </div>
 
+<!-- ================= コースのメニュー ================= -->
+<div id="courseMenu" class="screen dim" hidden>
+  <div class="card">
+    <h3 id="cmName" style="font-size:20px;font-style:normal;font-family:inherit;line-height:1.3"></h3>
+    <p id="cmInfo" style="text-align:center;font-size:13px;opacity:.8;margin:0 0 6px;line-height:1.5"></p>
+    <button class="big ghost" id="cmRefetch"></button>
+    <button class="big ghost" id="cmClear">🧹 保存した建物・道路を消す</button>
+    <button class="big ghost" id="cmRename">✏️ 名前を変更</button>
+    <button class="big ghost" id="cmDelete" style="color:#ff8a7a">🗑 コースを削除</button>
+    <button class="big primary" id="cmClose">閉じる</button>
+  </div>
+</div>
+
 <!-- ================= 片道コースの向き選択 ================= -->
 <div id="dirPick" class="screen dim" hidden>
   <div class="card">
@@ -375,6 +388,48 @@ const store = {
   set(k, v) { try { localStorage.setItem('mapRacer.' + k, JSON.stringify(v)); return true; } catch (e) { return false; } },
   del(k) { try { localStorage.removeItem('mapRacer.' + k); } catch (e) {} }
 };
+/* 建物・道路データは大きいので IndexedDB に保存（localStorage は約5MBまで） */
+const sceneDB = {
+  db: null,
+  open() {
+    if (this.db) return this.db;
+    return this.db = new Promise((res, rej) => {
+      if (!window.indexedDB) return rej(new Error('no idb'));
+      const rq = indexedDB.open('map-racer', 1);
+      rq.onupgradeneeded = () => { const d = rq.result; if (!d.objectStoreNames.contains('scenery')) d.createObjectStore('scenery'); if (!d.objectStoreNames.contains('meta')) d.createObjectStore('meta'); };
+      rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+    });
+  },
+  async tx(stores, mode, fn) {
+    const d = await this.open();
+    return new Promise((res, rej) => { const t = d.transaction(stores, mode); let out; Promise.resolve(fn(t)).then(v => out = v); t.oncomplete = () => res(out); t.onerror = t.onabort = () => rej(t.error); });
+  },
+  req(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  async get(id) {
+    try { return await this.tx(['scenery'], 'readonly', t => this.req(t.objectStore('scenery').get(id))) || null; }
+    catch (e) { return null; }
+  },
+  async set(id, data) {
+    const size = JSON.stringify(data).length;
+    const meta = { saved: Date.now(), size, b: data.b.length, h: data.h.length };
+    await this.tx(['scenery', 'meta'], 'readwrite', t => { t.objectStore('scenery').put(data, id); t.objectStore('meta').put(meta, id); });
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+    return meta;
+  },
+  async del(id) { try { await this.tx(['scenery', 'meta'], 'readwrite', t => { t.objectStore('scenery').delete(id); t.objectStore('meta').delete(id); }); } catch (e) {} },
+  async metas() {
+    try { return await this.tx(['meta'], 'readonly', t => new Promise(res => { const out = {}, st = t.objectStore('meta'); const r = st.openCursor(); r.onsuccess = () => { const c = r.result; if (c) { out[c.key] = c.value; c.continue(); } else res(out); }; r.onerror = () => res(out); })); }
+    catch (e) { return {}; }
+  }
+};
+// 以前のバージョンで localStorage に保存した建物データを移す
+async function loadScenery(id) {
+  let d = await sceneDB.get(id);
+  if (!d) { d = store.get('scn.' + id, null); if (d) { try { await sceneDB.set(id, d); store.del('scn.' + id); } catch (e) {} } }
+  return d;
+}
+const validScen = d => d && Array.isArray(d.b) && Array.isArray(d.h) && Array.isArray(d.g) && Array.isArray(d.w);
+const mb = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1e3)) + 'KB';
 const settings = Object.assign({ ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 const fmt = t => { if (!isFinite(t) || t == null) return '--:--.--'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
@@ -1096,7 +1151,7 @@ function newCPUs(T) {
   return list;
 }
 
-async function playCourse(c, dir = 'fwd') {
+async function playCourse(c, dir = 'fwd', refetch = false) {
   const ow = isOneway(c);
   Snd.init();
   if (settings.ctrl === 'tilt') await enableTilt();
@@ -1113,14 +1168,18 @@ async function playCourse(c, dir = 'fwd') {
       if (ow && dir === 'rev') line = line.slice().reverse();
       proj = makeProj(line[0][0], line[0][1]);
       pts = processLine(line.map(p => proj.fwd(p[0], p[1])), !ow);
-      scen = store.get('scn.' + c.id, null);
+      if (refetch) { await sceneDB.del(c.id); store.del('scn.' + c.id); }
+      else { msg('保存してある建物・道路データを読み込み中…'); scen = await loadScenery(c.id); }
       if (!scen) {
         msg('まわりの建物・道路を読み込み中…<br><small>OpenStreetMap / Overpass API（数秒〜20秒ほど）</small>');
         const skipP = new Promise(res => { $('#loadSkip').onclick = () => { skipScen = true; res(null); }; });
         setTimeout(() => { if (!$('#loading').hidden) show('#loadSkip', true); }, 2500);
         try { scen = await Promise.race([fetchScenery(line, ac.signal), skipP]); }
         catch (e) { if (ac.signal.aborted) return; scen = null; toast('建物データを取得できなかったので、自動生成の街並みで走ります'); }
-        if (scen && !skipScen) { if (!store.set('scn.' + c.id, scen)) { /* 容量不足なら保存しない */ } }
+        if (scen && !skipScen) {
+          try { const m = await sceneDB.set(c.id, scen); toast(`建物 ${m.b.toLocaleString()}件・道路 ${m.h.toLocaleString()}本を保存しました（次回から通信なしで表示）`, 3200); }
+          catch (e) { toast('建物データを保存できませんでした（端末の空き容量を確認してください）'); }
+        }
       }
     }
     if (ac.signal.aborted) return;
@@ -1531,28 +1590,51 @@ function renderCourses() {
     b.querySelector('.cn').innerHTML = isOneway(c) ? '<span class="chip ow">片道</span>' : '<span class="chip">周回</span>';
     b.querySelector('.cn').append(c.name);
     b.querySelector('.cd').textContent = [c.desc, lenTxt(len), bestTxt(c)].filter(Boolean).join(' ・ ');
-    if (!c.id.startsWith('p-')) {
-      const ren = document.createElement('button'); ren.className = 'del ren'; ren.textContent = '✏️'; ren.setAttribute('aria-label', '名前を変更');
-      ren.onclick = e => { e.stopPropagation(); const n = prompt('コース名', c.name); if (n == null || !n.trim()) return; const l = userCourses(); const x = l.find(x => x.id === c.id); if (x) { x.name = n.trim().slice(0, 24); saveUserCourses(l); renderCourses(); } };
-      const del = document.createElement('button'); del.className = 'del'; del.textContent = '🗑'; del.setAttribute('aria-label', '削除');
-      del.onclick = e => { e.stopPropagation(); if (!confirm(`「${c.name}」を削除しますか？`)) return; saveUserCourses(userCourses().filter(x => x.id !== c.id)); store.del('scn.' + c.id); renderCourses(); };
-      b.append(ren, del);
-    }
-    if (c.id.startsWith('p-')) b.insertAdjacentHTML('beforeend', '<span class="go">▶</span>');
+    if (!c.local) {
+      const sc = document.createElement('div'); sc.className = 'cd scn'; sc.dataset.id = c.id; b.querySelector('.ct').appendChild(sc);
+      const mn = document.createElement('button'); mn.className = 'del'; mn.textContent = '⋯'; mn.setAttribute('aria-label', 'コースのメニュー');
+      mn.onclick = e => { e.stopPropagation(); courseMenu(c); };
+      b.append(mn);
+    } else b.insertAdjacentHTML('beforeend', '<span class="go">▶</span>');
     b.onclick = () => isOneway(c) ? pickDir(c) : playCourse(c);
     el.appendChild(b);
     try { drawThumb(cv, c); } catch (e) {}
   }
+  refreshScnBadges();
+}
+let scnMeta = {};
+async function refreshScnBadges() {
+  scnMeta = await sceneDB.metas();
+  for (const el of document.querySelectorAll('.cd.scn')) {
+    const m = scnMeta[el.dataset.id] || (store.get('scn.' + el.dataset.id, null) ? { b: -1 } : null);
+    el.textContent = m ? (m.b >= 0 ? `🏙 建物・道路 保存済み（${mb(m.size)}）` : '🏙 建物・道路 保存済み') : '☁️ 建物・道路は初回に読み込み';
+  }
+}
+/* コースのメニュー（名前変更・建物の取り直し・削除） */
+function courseMenu(c) {
+  const user = !c.id.startsWith('p-'), m = scnMeta[c.id];
+  $('#cmName').textContent = c.name;
+  $('#cmInfo').textContent = m ? `建物 ${m.b.toLocaleString()}件・道路 ${m.h.toLocaleString()}本（${mb(m.size)}）を ${new Date(m.saved).toLocaleDateString('ja-JP')} に保存` : '建物・道路データはまだ保存されていません';
+  $('#cmRename').hidden = $('#cmDelete').hidden = !user;
+  $('#cmClear').hidden = !m;
+  $('#cmRefetch').textContent = m ? '🔄 建物・道路を最新に取り直す' : '⬇️ 建物・道路を読み込んで走る';
+  const close = () => show('#courseMenu', false);
+  $('#cmRename').onclick = () => { close(); const n = prompt('コース名', c.name); if (n == null || !n.trim()) return; const l = userCourses(); const x = l.find(x => x.id === c.id); if (x) { x.name = n.trim().slice(0, 24); saveUserCourses(l); renderCourses(); } };
+  $('#cmRefetch').onclick = () => { close(); if (isOneway(c)) pickDir(c, true); else playCourse(c, 'fwd', true); };
+  $('#cmClear').onclick = async () => { if (!confirm('保存してある建物・道路データを消しますか？（次に走るときにまた読み込みます）')) return; await sceneDB.del(c.id); store.del('scn.' + c.id); close(); renderCourses(); toast('建物・道路データを消しました'); };
+  $('#cmDelete').onclick = async () => { if (!confirm(`「${c.name}」を削除しますか？`)) return; saveUserCourses(userCourses().filter(x => x.id !== c.id)); await sceneDB.del(c.id); store.del('scn.' + c.id); close(); renderCourses(); };
+  $('#cmClose').onclick = close;
+  show('#courseMenu', true);
 }
 /* 片道コース：往路・復路を選ぶ */
-function pickDir(c) {
+function pickDir(c, refetch = false) {
   $('#dpName').textContent = c.name;
   try { drawThumb($('#dpMap'), c, 320); } catch (e) {}
   const f = store.get(bestKey(c, 1, 'fwd'), null), r = store.get(bestKey(c, 1, 'rev'), null);
   $('#dpFwdSub').textContent = '🟢 スタート → 🟡 ゴール' + (f ? '　ベスト ' + fmt(f.time) : '');
   $('#dpRevSub').textContent = '🟡 ゴール → 🟢 スタート' + (r ? '　ベスト ' + fmt(r.time) : '');
-  $('#dpFwd').onclick = () => { show('#dirPick', false); playCourse(c, 'fwd'); };
-  $('#dpRev').onclick = () => { show('#dirPick', false); playCourse(c, 'rev'); };
+  $('#dpFwd').onclick = () => { show('#dirPick', false); playCourse(c, 'fwd', refetch); };
+  $('#dpRev').onclick = () => { show('#dirPick', false); playCourse(c, 'rev', refetch); };
   show('#dirPick', true);
 }
 $('#dpCancel').onclick = () => show('#dirPick', false);
@@ -1560,7 +1642,16 @@ $('#dpCancel').onclick = () => show('#dirPick', false);
 $('#btnExport').onclick = async () => {
   const courses = userCourses();
   if (!courses.length) return toast('書き出す自作コースがありません');
-  const json = JSON.stringify({ app: 'map-racer', version: 1, exported: new Date().toISOString(), courses });
+  const metas = await sceneDB.metas(), withScn = courses.filter(c => metas[c.id]);
+  let out = courses;
+  if (withScn.length) {
+    const total = withScn.reduce((a, c) => a + metas[c.id].size, 0);
+    if (confirm(`建物・道路データ（${withScn.length}コース分・約${mb(total)}）も一緒に書き出しますか？\n含めると、読み込んだ先でも通信なしで街並みが表示されます。`)) {
+      out = [];
+      for (const c of courses) { const sc = metas[c.id] ? await sceneDB.get(c.id) : null; out.push(sc ? Object.assign({}, c, { scenery: sc }) : c); }
+    }
+  }
+  const json = JSON.stringify({ app: 'map-racer', version: 2, exported: new Date().toISOString(), courses: out });
   const name = 'map-racer-courses-' + new Date().toISOString().slice(0, 10) + '.json';
   const file = new File([json], name, { type: 'application/json' });
   try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'マップレーサーのコース' }); return; } } catch (e) { if (e.name === 'AbortError') return; }
@@ -1573,16 +1664,19 @@ $('#importFile').onchange = async e => {
   try {
     const j = JSON.parse(await f.text()); const inc = Array.isArray(j) ? j : j.courses;
     if (!Array.isArray(inc)) throw 0;
-    const list = userCourses(), ids = new Set(list.map(c => c.id)); let n = 0;
+    const list = userCourses(), ids = new Set(list.map(c => c.id)); let n = 0, ns = 0; const scn = [];
     for (const c of inc) {
       if (!c || typeof c.name !== 'string' || !Array.isArray(c.wps) || !Array.isArray(c.line) || c.line.length < 2) continue;
       if (!c.line.every(p => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]))) continue;
-      if (ids.has(c.id)) continue;
+      if (ids.has(c.id)) { if (validScen(c.scenery) && !(await sceneDB.get(c.id))) scn.push([c.id, c.scenery]); continue; }
       const nc = { id: typeof c.id === 'string' && /^u[0-9a-z]+$/.test(c.id) ? c.id : 'u' + (Date.now() + n).toString(36), name: c.name.slice(0, 24), wps: c.wps, line: c.line, len: +c.len || lineLength(c.line), desc: '', type: c.type === 'oneway' ? 'oneway' : 'loop' };
       list.push(nc); ids.add(nc.id); n++;
+      if (validScen(c.scenery)) scn.push([nc.id, c.scenery]);
     }
     if (!saveUserCourses(list)) return toast('保存容量がいっぱいです');
-    renderCourses(); toast(n ? n + '件のコースを読み込みました' : '新しいコースはありませんでした');
+    for (const [id, d] of scn) { try { await sceneDB.set(id, { b: d.b, h: d.h, g: d.g, w: d.w }); ns++; } catch (e) {} }
+    renderCourses();
+    toast(n || ns ? `${n}件のコースを読み込みました${ns ? `（建物・道路データ ${ns}件つき）` : ''}` : '新しいコースはありませんでした');
   } catch (err) { toast('コースファイルを読み込めませんでした'); }
 };
 function seg(id, key, conv = v => v, after) {
