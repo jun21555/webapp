@@ -155,6 +155,11 @@
   #drift{position:absolute;left:0;right:0;top:52%;text-align:center;font:900 22px/1.2 "Arial Black",sans-serif;font-style:italic;opacity:0;transition:opacity .15s}
   #drift.show{opacity:1}
   #drift .pts{display:block;font-size:15px;color:#ffd23f}
+  #jct{top:calc(env(safe-area-inset-top) + 58px);left:50%;transform:translateX(-50%);background:#1d4fb8;border:2px solid #fff;border-radius:8px;
+    padding:4px 14px;text-align:center;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis}
+  #jct b{display:block;font-size:18px;line-height:1.2}
+  #jct small{display:block;font-size:10px;opacity:.9}
+  #jct small:empty{display:none}
   #warn{position:absolute;left:0;right:0;top:22%;text-align:center;font:900 26px/1 sans-serif;color:#ff3b30;text-shadow:0 2px 0 #000}
   #hint{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top) + 64px);text-align:center;font-size:13px;opacity:.85;text-shadow:0 1px 3px #000}
 
@@ -242,6 +247,7 @@
     <div class="row"><label>周回数</label><div class="seg" id="segLaps"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
     <div class="row"><label>最高速度<small id="speedNote"></small></label><div class="seg" id="segSpeed"><button data-v="slow">遅め</button><button data-v="normal">普通</button><button data-v="fast">速め</button></div></div>
     <div class="row"><label>高低差<small>実際の標高から坂を作る。強調するとジェットコースター風</small></label><div class="seg" id="segElev"><button data-v="0">なし</button><button data-v="1">実際</button><button data-v="2">×2</button><button data-v="4">×4</button></div></div>
+    <div class="row"><label>信号機と交差点名<small>OpenStreetMap にある実在の信号機・交差点名を表示</small></label><span class="sw"><input type="checkbox" id="signals"><i></i></span></div>
     <div class="row"><label>ライバル車</label><div class="seg" id="segRiv"><button data-v="none">なし</button><button data-v="normal">ふつう</button><button data-v="hard">つよい</button></div></div>
     <div class="row"><label>画質</label><div class="seg" id="segQ"><button data-v="low">軽い</button><button data-v="high">きれい</button></div></div>
     <div class="row"><label>サウンド</label><span class="sw"><input type="checkbox" id="sound"><i></i></span></div>
@@ -305,6 +311,7 @@
   <canvas id="mini" width="224" height="224"></canvas>
   <div id="hint"></div>
   <div id="warn"></div>
+  <div class="pill" id="jct" hidden><b id="jctName"></b><small id="jctEn"></small></div>
   <div id="msg"></div>
   <div id="drift"><span id="driftTxt">DRIFT</span><span class="pts" id="driftPts"></span></div>
   <svg id="wheel" viewBox="0 0 48 48"><g id="wheelG" fill="none" stroke="#fff" stroke-width="4"><circle cx="24" cy="24" r="19"/><path d="M5 24h38M24 24v19"/><circle cx="24" cy="24" r="4" fill="#fff"/></g></svg>
@@ -432,7 +439,7 @@ async function loadScenery(id) {
 }
 const validScen = d => d && Array.isArray(d.b) && Array.isArray(d.h) && Array.isArray(d.g) && Array.isArray(d.w);
 const mb = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1e3)) + 'KB';
-const settings = Object.assign({ speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
+const settings = Object.assign({ signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 const fmt = t => { if (!isFinite(t) || t == null) return '--:--.--'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
 let toastT;
@@ -719,22 +726,44 @@ const synthElev = (pts, f) => pts.map((p, i) => [p[0], p[1], f(i / pts.length)])
 
 /* Overpass：コース周辺の建物・道路・公園・水辺 */
 const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
-async function fetchScenery(line, signal) {
-  // コースを60mおきに間引いて around フィルタに使う
+// コースを60mおきに間引いて Overpass の around フィルタに使う
+function aroundPoly(line) {
   const pts = []; let acc = 1e9;
   for (let i = 0; i < line.length; i++) {
     if (i > 0) { const a = line[i - 1], b = line[i]; acc += Math.hypot((b[1] - a[1]) * 111320 * Math.cos(a[0] * Math.PI / 180), (b[0] - a[0]) * 110540); }
     if (acc >= 60) { pts.push(line[i]); acc = 0; }
   }
   while (pts.length > 160) { for (let i = pts.length - 2; i > 0; i -= 2) pts.splice(i, 1); }
-  const poly = pts.map(p => p[0].toFixed(5) + ',' + p[1].toFixed(5)).join(',');
-  const q = `[out:json][timeout:25];(way["building"](around:160,${poly});way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|pedestrian)$"](around:220,${poly});way["leisure"~"^(park|garden|pitch)$"](around:250,${poly});way["landuse"~"^(grass|forest|meadow)$"](around:250,${poly});way["natural"~"^(water|wood)$"](around:300,${poly});way["waterway"="riverbank"](around:300,${poly}););out geom qt;`;
+  return pts.map(p => p[0].toFixed(5) + ',' + p[1].toFixed(5)).join(',');
+}
+// 信号機・名前つき交差点のノード
+const SIG_Q = poly => `node["highway"="traffic_signals"](around:45,${poly});node["junction"]["name"](around:45,${poly});node["highway"="crossing"]["crossing"="traffic_signals"]["name"](around:45,${poly});`;
+function parseSignal(e) {
+  const t = e.tags || {}, name = t.name || t['name:ja'] || '';
+  return [+e.lat.toFixed(6), +e.lon.toFixed(6), name, t['name:en'] || t['name:ja-Latn'] || '', t.highway === 'traffic_signals' || t.crossing === 'traffic_signals' ? 1 : 0];
+}
+async function overpassQuery(q, signal) {
   let err;
   for (const ep of OVERPASS) {
-    try {
-      const j = await fetchJSON(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 30000, signal);
-      const r = { b: [], h: [], g: [], w: [] };
+    try { return await fetchJSON(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 30000, signal); }
+    catch (e) { if (signal && signal.aborted) throw e; err = e; }
+  }
+  throw err || new Error('overpass');
+}
+// 以前に保存した建物データに信号機がない場合は信号機だけ取得
+async function fetchSignals(line, signal) {
+  const j = await overpassQuery(`[out:json][timeout:20];(${SIG_Q(aroundPoly(line))});out qt;`, signal);
+  return (j.elements || []).filter(e => e.type === 'node').map(parseSignal);
+}
+async function fetchScenery(line, signal) {
+  const poly = aroundPoly(line);
+  const q = `[out:json][timeout:25];(${SIG_Q(poly)}way["building"](around:160,${poly});way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|pedestrian)$"](around:220,${poly});way["leisure"~"^(park|garden|pitch)$"](around:250,${poly});way["landuse"~"^(grass|forest|meadow)$"](around:250,${poly});way["natural"~"^(water|wood)$"](around:300,${poly});way["waterway"="riverbank"](around:300,${poly}););out geom qt;`;
+  {
+    {
+      const j = await overpassQuery(q, signal);
+      const r = { b: [], h: [], g: [], w: [], s: [] };
       for (const e of j.elements || []) {
+        if (e.type === 'node') { r.s.push(parseSignal(e)); continue; }
         if (e.type !== 'way' || !e.geometry) continue;
         const g = e.geometry.map(p => [+p.lat.toFixed(6), +p.lon.toFixed(6)]), t = e.tags || {};
         if (t.building) {
@@ -745,9 +774,8 @@ async function fetchScenery(line, signal) {
         else r.g.push(g);
       }
       return r;
-    } catch (e) { if (signal && signal.aborted) throw e; err = e; }
+    }
   }
-  throw err || new Error('overpass');
 }
 
 /* =========================================================
@@ -1005,8 +1033,92 @@ function buildWorld(T, scen, proj, HF) {
       leaf.castShadow = trunk.castShadow = true; root.add(leaf, trunk);
     }
   }
-  world = { root, railOff };
+  world = { root, railOff, signals: [], jcts: [] };
+  if (scen && proj && scen.s && scen.s.length && settings.signals) buildSignals(T, scen.s.map(q => [...proj.fwd(q[0], q[1]), q[2], q[3], q[4]]), root, world);
   return world;
+}
+
+/* ---------- 信号機と交差点名 ---------- */
+const SIGMAT = {};
+function signalMats() {
+  if (SIGMAT.on) return SIGMAT;
+  SIGMAT.on = ['#2bff9a', '#ffd23f', '#ff3524'].map(c => new THREE.MeshBasicMaterial({ color: c }));
+  SIGMAT.off = ['#14402e', '#4a3e12', '#4a1612'].map(c => new THREE.MeshBasicMaterial({ color: c }));
+  SIGMAT.box = new THREE.MeshLambertMaterial({ color: '#3a3f47' });
+  SIGMAT.pole = new THREE.MeshLambertMaterial({ color: '#9aa1a8' });
+  SIGMAT.line = new THREE.MeshBasicMaterial({ color: '#f2f2f2' });
+  return SIGMAT;
+}
+function namePlate(name, en) {
+  // 日本の交差点名標識（青地に白文字、下にローマ字）
+  const c = document.createElement('canvas'), g = c.getContext('2d'), fs = 76;
+  g.font = `900 ${fs}px "Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif`; const w1 = g.measureText(name).width;
+  g.font = `700 30px Arial,sans-serif`; const w2 = en ? g.measureText(en).width : 0;
+  const W = Math.ceil(Math.max(w1, w2) + 70), H = en ? 150 : 116; c.width = W; c.height = H;
+  g.fillStyle = '#1d4fb8'; g.fillRect(0, 0, W, H); g.strokeStyle = '#fff'; g.lineWidth = 7; g.strokeRect(9, 9, W - 18, H - 18);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = `900 ${fs}px "Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif`; g.fillText(name, W / 2, en ? 62 : H / 2 + 3);
+  if (en) { g.font = `700 30px Arial,sans-serif`; g.fillText(en, W / 2, 118); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const h = en ? 1.45 : 1.12, m = new THREE.Mesh(new THREE.PlaneGeometry(h * W / H, h), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide }));
+  m.userData.w = h * W / H; return m;
+}
+function buildSignals(T, nodes, root, world) {
+  const M = signalMats(), W = T.W;
+  // 近くのノードをまとめて1つの交差点に
+  const cl = [];
+  for (const [x, z, name, en, sig] of nodes) {
+    let c = cl.find(c => (c.x - x) ** 2 + (c.z - z) ** 2 < 32 * 32);
+    if (!c) cl.push(c = { x, z, n: 0, names: {}, en: '', sig: 0 });
+    c.x = (c.x * c.n + x) / (c.n + 1); c.z = (c.z * c.n + z) / (c.n + 1); c.n++;
+    if (name) c.names[name] = (c.names[name] || 0) + 1; if (en && !c.en) c.en = en; if (sig) c.sig = 1;
+  }
+  let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (const c of cl) {
+    const name = Object.keys(c.names).sort((a, b) => c.names[b] - c.names[a])[0] || '';
+    if (!c.sig && !name) continue;
+    // コースがこの交差点を通る回数分（周回で2回通る所など）
+    const R2 = (W / 2 + 12) ** 2, runs = []; let cur = null;
+    for (let i = 0; i < T.N; i++) {
+      const d = (T.pts[i][0] - c.x) ** 2 + (T.pts[i][1] - c.z) ** 2;
+      if (d < R2) { if (cur && i - cur.last <= 6) { cur.last = i; if (d < cur.d) { cur.d = d; cur.i = i; } } else runs.push(cur = { i, d, last: i }); }
+    }
+    if (T.closed && runs.length > 1 && runs[0].i < 6 && runs[runs.length - 1].last > T.N - 6) { const a = runs.shift(), b = runs[runs.length - 1]; if (a.d < b.d) Object.assign(b, { i: a.i, d: a.d }); }
+    for (const r of runs) {
+      const sAt = T.cum[r.i];
+      if (sAt < 12 || (!T.closed && sAt > T.len - 12)) continue;
+      const a = T.at(sAt), grp = new THREE.Group(); grp.position.set(a.x, a.y, a.z); grp.rotation.y = Math.atan2(a.tx, a.tz); root.add(grp);
+      const px = W / 2 + 5.8; // 左側の歩道あたり（日本は左側通行）
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(.16, .2, 6.4, 8), M.pole); pole.position.set(px, 3.2, 0); pole.castShadow = true; grp.add(pole);
+      const item = { s: sAt, name, en: c.en, lamps: null, phase: rnd() * 16 };
+      if (c.sig) {
+        const armL = px - W * .22; const arm = new THREE.Mesh(new THREE.BoxGeometry(armL, .16, .16), M.pole); arm.position.set(px - armL / 2, 5.9, 0); grp.add(arm);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(1.35, .48, .32), M.box); box.position.set(W * .22, 5.55, 0); box.castShadow = true; grp.add(box);
+        const lampG = new THREE.CircleGeometry(.17, 16); item.lamps = [];
+        [.43, 0, -.43].forEach((lx, k) => { const l = new THREE.Mesh(lampG, M.off[k]); l.rotation.y = Math.PI; l.position.set(W * .22 + lx, 5.55, -.17); grp.add(l); item.lamps.push(l); });
+        // 停止線（左側の車線）
+        const b2 = T.at(sAt - 7), sl = new THREE.Mesh(new THREE.PlaneGeometry(W / 2 - .6, .45), M.line);
+        sl.rotation.set(-Math.PI / 2, 0, Math.atan2(b2.tx, b2.tz)); sl.position.set(b2.x - b2.rx * (W / 4), b2.y + .13, b2.z - b2.rz * (W / 4)); root.add(sl);
+      }
+      if (name) {
+        const pl = namePlate(name, c.en); pl.rotation.y = Math.PI;
+        pl.position.set(c.sig ? Math.max(W * .22 + .7 + pl.userData.w / 2, px - 2 - pl.userData.w / 2) : px - pl.userData.w / 2 + .1, c.sig ? 6.8 : 4.6, -.05); grp.add(pl);
+        world.jcts.push({ s: sAt, name, en: c.en });
+      }
+      if (item.lamps) world.signals.push(item);
+    }
+  }
+  world.jcts.sort((a, b) => a.s - b.s);
+}
+// 信号の色を切り替える（見た目だけ。青8秒→黄2.5秒→赤5.5秒）
+function updateSignals(t) {
+  if (!world || !world.signals.length) return;
+  const M = signalMats();
+  for (const it of world.signals) {
+    const u = (t + it.phase) % 16, st = u < 8 ? 0 : u < 10.5 ? 1 : 2;
+    if (it.st === st) continue; it.st = st;
+    it.lamps.forEach((l, k) => { l.material = k === st ? M.on[k] : M.off[k]; });
+  }
 }
 
 /* ---------- 車モデル ---------- */
@@ -1267,6 +1379,11 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
       pts = processLine(line.map(p => proj.fwd(p[0], p[1])), !ow);
       if (refetch) { await sceneDB.del(c.id); store.del('scn.' + c.id); }
       else { msg('保存してある建物・道路データを読み込み中…'); scen = await loadScenery(c.id); }
+      if (scen && !scen.s && settings.signals) {
+        msg('信号機と交差点名を読み込み中…<br><small>OpenStreetMap / Overpass API</small>');
+        try { scen.s = await fetchSignals(line, ac.signal); await sceneDB.set(c.id, scen); }
+        catch (e) { if (ac.signal.aborted) return; }
+      }
       if (!scen) {
         msg('まわりの建物・道路を読み込み中…<br><small>OpenStreetMap / Overpass API（数秒〜20秒ほど）</small>');
         const skipP = new Promise(res => { $('#loadSkip').onclick = () => { skipScen = true; res(null); }; });
@@ -1274,7 +1391,7 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
         try { scen = await Promise.race([fetchScenery(line, ac.signal), skipP]); }
         catch (e) { if (ac.signal.aborted) return; scen = null; toast('建物データを取得できなかったので、自動生成の街並みで走ります'); }
         if (scen && !skipScen) {
-          try { const m = await sceneDB.set(c.id, scen); toast(`建物 ${m.b.toLocaleString()}件・道路 ${m.h.toLocaleString()}本を保存しました（次回から通信なしで表示）`, 3200); }
+          try { const m = await sceneDB.set(c.id, scen); toast(`建物 ${m.b.toLocaleString()}件・道路 ${m.h.toLocaleString()}本${scen.s && scen.s.length ? `・信号 ${scen.s.filter(q => q[4]).length}基` : ''}を保存しました（次回から通信なしで表示）`, 3200); }
           catch (e) { toast('建物データを保存できませんでした（端末の空き容量を確認してください）'); }
         }
       }
@@ -1303,7 +1420,7 @@ function startRace(course, dir = 'fwd') {
   const p = newPlayer(T), cpus = newCPUs(T);
   const laps = T.closed ? settings.laps : 1;
   race = { course, dir, p, cpus, laps, dist: T.closed ? laps * T.len : T.raceLen, t: 0, state: 'count', count: 3.6, finishOrder: 0, best: store.get(bestKey(course, laps, dir), null), camShake: 0, msgT: 0 };
-  drawMiniBase();
+  drawMiniBase(); jctShown = '\u0000';
   cpus.forEach(c => updateCPU(c, 0, true));
   placeCamera(true);
   show('#loading', false); show('#hud', true); show('#controls', true); show('#pause', false); show('#result', false);
@@ -1508,6 +1625,7 @@ function drawMiniBase() {
   g.beginPath(); T.pts.forEach((p, i) => { const [x, y] = miniTf(p[0], p[1]); i ? g.lineTo(x, y) : g.moveTo(x, y); }); if (T.closed) g.closePath();
   g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 11; g.stroke(); g.strokeStyle = '#fff'; g.lineWidth = 6; g.stroke();
   if (!T.closed) { const gp = T.at(T.finishS), [gx, gy] = miniTf(gp.x, gp.z); g.fillStyle = '#ffd23f'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(gx, gy, 8, 0, 7); g.fill(); g.stroke(); }
+  if (world && world.signals) for (const it of world.signals) { const a = T.at(it.s), [x, y] = miniTf(a.x, a.z); g.fillStyle = '#2bff9a'; g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill(); }
   const sp0 = T.at(T.startS), [sx, sy] = miniTf(sp0.x, sp0.z); g.fillStyle = '#111'; g.fillRect(sx - 5, sy - 5, 10, 10); g.fillStyle = '#fff'; g.fillRect(sx - 5, sy - 5, 5, 5); g.fillRect(sx, sy, 5, 5);
 }
 function drawMini() {
@@ -1522,6 +1640,19 @@ function drawMini() {
 let flashT = null;
 function flash(t, ms = 900, small = false) {
   const m = $('#msg'); m.textContent = t; m.classList.toggle('small', small); m.classList.add('show'); clearTimeout(flashT); flashT = setTimeout(() => m.classList.remove('show'), ms);
+}
+// 近づいている交差点の名前を表示
+let jctShown = '';
+function updateJct() {
+  const p = race.p, list = world && world.jcts; let best = null, bd = 1e9;
+  if (list) for (const j of list) {
+    let d = j.s - p.s; if (T.closed) { if (d < -T.len / 2) d += T.len; if (d > T.len / 2) d -= T.len; }
+    if (d > -12 && d < 160 && d < bd) { bd = d; best = j; }
+  }
+  const key = best ? best.name : '';
+  if (key === jctShown) return; jctShown = key;
+  $('#jct').hidden = !best;
+  if (best) { $('#jctName').textContent = '🚥 ' + best.name; $('#jctEn').textContent = best.en || ''; }
 }
 function updateHUD() {
   const p = race.p, sp = Math.hypot(p.vx, p.vz), kmh = Math.round(sp * 3.6);
@@ -1586,7 +1717,7 @@ function frame(now) {
   Snd.engine(race.state === 'count' ? 1200 + inp.steer * 0 : rpm, inp.gas);
   const sk = p.drifting ? .8 + Math.min(.4, Math.abs(p.slip || 0)) : clamp((Math.abs(p.slip || 0) - .12) * 3, 0, .6) * (sp > 6 ? 1 : 0);
   Snd.skid(p.onRoad ? sk : sk * .3);
-  hudAcc += dt; if (hudAcc > 1 / 20) { hudAcc = 0; updateHUD(); drawMini(); }
+  hudAcc += dt; if (hudAcc > 1 / 20) { hudAcc = 0; updateHUD(); drawMini(); updateSignals(performance.now() / 1000); updateJct(); }
   renderer.render(scene, camera);
 }
 let smokeAcc = 0;
@@ -1781,7 +1912,7 @@ $('#importFile').onchange = async e => {
       if (validScen(c.scenery)) scn.push([nc.id, c.scenery]);
     }
     if (!saveUserCourses(list)) return toast('保存容量がいっぱいです');
-    for (const [id, d] of scn) { try { await sceneDB.set(id, { b: d.b, h: d.h, g: d.g, w: d.w }); ns++; } catch (e) {} }
+    for (const [id, d] of scn) { try { await sceneDB.set(id, Object.assign({ b: d.b, h: d.h, g: d.g, w: d.w }, Array.isArray(d.s) ? { s: d.s.filter(q => Array.isArray(q) && isFinite(q[0]) && isFinite(q[1])).map(q => [+q[0], +q[1], String(q[2] || '').slice(0, 30), String(q[3] || '').slice(0, 40), q[4] ? 1 : 0]) } : {})); ns++; } catch (e) {} }
     renderCourses();
     toast(n || ns ? `${n}件のコースを読み込みました${ns ? `（建物・道路データ ${ns}件つき）` : ''}` : '新しいコースはありませんでした');
   } catch (err) { toast('コースファイルを読み込めませんでした'); }
@@ -1809,6 +1940,7 @@ syncSpeedNote();
 seg('#segQ', 'quality', v => v, applyQuality);
 $('#sens').value = settings.sens; $('#sens').oninput = e => { settings.sens = +e.target.value; saveSettings(); };
 $('#invert').checked = settings.invert; $('#invert').onchange = e => { settings.invert = e.target.checked; saveSettings(); };
+$('#signals').checked = settings.signals; $('#signals').onchange = e => { settings.signals = e.target.checked; saveSettings(); };
 $('#auto').checked = settings.auto; $('#auto').onchange = e => { settings.auto = e.target.checked; saveSettings(); };
 $('#sound').checked = settings.sound; $('#sound').onchange = e => { settings.sound = e.target.checked; saveSettings(); Snd.setOn(settings.sound); };
 syncCtrlUI();
