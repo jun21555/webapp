@@ -248,6 +248,7 @@
     <div class="row"><label>最高速度<small id="speedNote"></small></label><div class="seg" id="segSpeed"><button data-v="slow">遅め</button><button data-v="normal">普通</button><button data-v="fast">速め</button></div></div>
     <div class="row"><label>高低差<small>実際の標高から坂を作る。強調するとジェットコースター風</small></label><div class="seg" id="segElev"><button data-v="0">なし</button><button data-v="1">実際</button><button data-v="2">×2</button><button data-v="4">×4</button></div></div>
     <div class="row"><label>信号機と交差点名<small>OpenStreetMap にある実在の信号機・交差点名を表示</small></label><span class="sw"><input type="checkbox" id="signals"><i></i></span></div>
+    <div class="row"><label>見つからない時は地図から推定<small>信号機は幹線道路との交差点に、交差点名は町名・丁目（国土地理院）や道路名で補う</small></label><span class="sw"><input type="checkbox" id="sigInfer"><i></i></span></div>
     <div class="row"><label>ライバル車</label><div class="seg" id="segRiv"><button data-v="none">なし</button><button data-v="normal">ふつう</button><button data-v="hard">つよい</button></div></div>
     <div class="row"><label>画質</label><div class="seg" id="segQ"><button data-v="low">軽い</button><button data-v="high">きれい</button></div></div>
     <div class="row"><label>サウンド</label><span class="sw"><input type="checkbox" id="sound"><i></i></span></div>
@@ -439,7 +440,7 @@ async function loadScenery(id) {
 }
 const validScen = d => d && Array.isArray(d.b) && Array.isArray(d.h) && Array.isArray(d.g) && Array.isArray(d.w);
 const mb = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1e3)) + 'KB';
-const settings = Object.assign({ signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
+const settings = Object.assign({ sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 const fmt = t => { if (!isFinite(t) || t == null) return '--:--.--'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
 let toastT;
@@ -769,7 +770,7 @@ async function fetchScenery(line, signal) {
         if (t.building) {
           let h = parseFloat(t.height); if (!(h > 0)) { const lv = parseFloat(t['building:levels']); h = lv > 0 ? lv * 3.2 + 1 : 0; }
           r.b.push([g, Math.round(Math.min(h || 0, 250) * 10) / 10]);
-        } else if (t.highway) r.h.push([g, t.highway]);
+        } else if (t.highway) r.h.push([g, t.highway, t.name || '']);
         else if (t.natural === 'water' || t.waterway) r.w.push(g);
         else r.g.push(g);
       }
@@ -936,7 +937,7 @@ function streetGeo(list, G = () => 0) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
 
-function buildWorld(T, scen, proj, HF) {
+function buildWorld(T, scen, proj, HF, jcl) {
   makeTextures();
   disposeWorld();
   const root = new THREE.Group(); scene.add(root);
@@ -1034,7 +1035,7 @@ function buildWorld(T, scen, proj, HF) {
     }
   }
   world = { root, railOff, signals: [], jcts: [] };
-  if (scen && proj && scen.s && scen.s.length && settings.signals) buildSignals(T, scen.s.map(q => [...proj.fwd(q[0], q[1]), q[2], q[3], q[4]]), root, world);
+  if (jcl && jcl.length) buildSignals(T, jcl, root, world);
   return world;
 }
 
@@ -1063,19 +1064,82 @@ function namePlate(name, en) {
   const h = en ? 1.45 : 1.12, m = new THREE.Mesh(new THREE.PlaneGeometry(h * W / H, h), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide }));
   m.userData.w = h * W / H; return m;
 }
-function buildSignals(T, nodes, root, world) {
-  const M = signalMats(), W = T.W;
-  // 近くのノードをまとめて1つの交差点に
+// 近くのノードをまとめて1つの交差点に（nodes: [x, z, name, en, sig, src, road]）
+function clusterJunctions(nodes) {
   const cl = [];
-  for (const [x, z, name, en, sig] of nodes) {
+  for (const [x, z, name, en, sig, src, road] of nodes) {
     let c = cl.find(c => (c.x - x) ** 2 + (c.z - z) ** 2 < 32 * 32);
-    if (!c) cl.push(c = { x, z, n: 0, names: {}, en: '', sig: 0 });
+    if (!c) cl.push(c = { x, z, n: 0, names: {}, en: '', sig: 0, src: src || 'osm', roads: {} });
     c.x = (c.x * c.n + x) / (c.n + 1); c.z = (c.z * c.n + z) / (c.n + 1); c.n++;
     if (name) c.names[name] = (c.names[name] || 0) + 1; if (en && !c.en) c.en = en; if (sig) c.sig = 1;
+    if (src === 'osm') c.src = 'osm';
+    if (road) c.roads[road] = 1;
   }
+  for (const c of cl) { c.name = Object.keys(c.names).sort((a, b) => c.names[b] - c.names[a])[0] || ''; c.nameSrc = c.name ? 'osm' : ''; }
+  return cl;
+}
+/* ---- OpenStreetMap に信号機がないとき：地図データから推定 ---- */
+// 幹線道路（国道・県道クラス）がコースと交わる所に信号があるとみなす
+const MAJOR_RD = new Set(['trunk', 'primary', 'secondary', 'tertiary', 'motorway_link', 'trunk_link', 'primary_link']);
+function inferFromRoads(T, scen, proj) {
+  const W = T.W, out = [], cosLim = Math.cos(35 * Math.PI / 180);
+  for (const [c, type, name] of scen.h) {
+    if (!MAJOR_RD.has(type)) continue;
+    const pc = c.map(q => proj.fwd(q[0], q[1]));
+    for (let i = 0; i < pc.length; i++) {
+      const v = pc[i], d = T.nearest(v[0], v[1], W / 2 + 6); if (d > W / 2 + 4) continue;
+      const t = T.tan[T.nearIdx()];
+      for (const j of [i - 1, i + 1]) {
+        if (j < 0 || j >= pc.length) continue;
+        let dx = pc[j][0] - v[0], dz = pc[j][1] - v[1]; const L = Math.hypot(dx, dz); if (L < 3) continue; dx /= L; dz /= L;
+        if (Math.abs(dx * t[0] + dz * t[1]) < cosLim) { out.push([v[0], v[1], '', '', 1, 'map', name || '']); break; }
+      }
+    }
+  }
+  return out;
+}
+// 建物・道路データもないとき：ルート検索（OSRM）の曲がり角を交差点として使う
+async function inferFromRoute(c, ow, signal) {
+  const key = 'osteps.' + c.id; let pts = store.get(key, null);
+  if (!pts) {
+    const loop = ow ? c.wps : c.wps.concat([c.wps[0]]);
+    const url = 'https://router.project-osrm.org/route/v1/driving/' + loop.map(p => p[1].toFixed(6) + ',' + p[0].toFixed(6)).join(';') + '?overview=false&steps=true&continue_straight=true';
+    const j = await fetchJSON(url, {}, 15000, signal);
+    pts = [];
+    for (const leg of (j.routes && j.routes[0] && j.routes[0].legs) || []) for (const st of leg.steps || []) {
+      const m = st.maneuver || {};
+      if (['turn', 'end of road', 'fork'].includes(m.type) && /left|right/.test(m.modifier || '')) pts.push([+m.location[1].toFixed(6), +m.location[0].toFixed(6), st.name || '']);
+    }
+    store.set(key, pts);
+  }
+  return pts;
+}
+// 名前のない交差点に、国土地理院の住所（町名・丁目）か交わる道路名を付ける
+async function nameJunctions(c, cls, proj, T, signal, msg) {
+  const key = 'jn.' + c.id, cache = store.get(key, {}); let changed = false, budget = Date.now() + 15000, n = 0;
+  for (const cl of cls) {
+    if (cl.name) continue;
+    if (T.nearest(cl.x, cl.z, T.W / 2 + 14) > T.W / 2 + 12) continue; // コースから離れた交差点は不要
+    const [lat, lon] = proj.inv(cl.x, cl.z), k = lat.toFixed(4) + ',' + lon.toFixed(4);
+    let nm = cache[k];
+    if (nm === undefined && Date.now() < budget && n < 40) {
+      n++; if (msg && n === 1) msg('交差点名を地図データから調べています…<br><small>国土地理院 住所検索</small>');
+      try {
+        const j = await fetchJSON(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`, {}, 5000, signal);
+        const v = j && j.results && j.results.lv01Nm; nm = v && v !== '－' && v !== '-' ? String(v).slice(0, 20) : '';
+        cache[k] = nm; changed = true;
+      } catch (e) { if (signal && signal.aborted) throw e; nm = undefined; }
+    }
+    if (nm) { cl.name = nm; cl.nameSrc = 'addr'; }
+    else { const r = Object.keys(cl.roads).filter(Boolean); if (r.length) { cl.name = r[0]; cl.nameSrc = 'road'; } }
+  }
+  if (changed) store.set(key, cache);
+}
+function buildSignals(T, cl, root, world) {
+  const M = signalMats(), W = T.W;
   let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (const c of cl) {
-    const name = Object.keys(c.names).sort((a, b) => c.names[b] - c.names[a])[0] || '';
+    const name = c.name;
     if (!c.sig && !name) continue;
     // コースがこの交差点を通る回数分（周回で2回通る所など）
     const R2 = (W / 2 + 12) ** 2, runs = []; let cur = null;
@@ -1103,7 +1167,7 @@ function buildSignals(T, nodes, root, world) {
       if (name) {
         const pl = namePlate(name, c.en); pl.rotation.y = Math.PI;
         pl.position.set(c.sig ? Math.max(W * .22 + .7 + pl.userData.w / 2, px - 2 - pl.userData.w / 2) : px - pl.userData.w / 2 + .1, c.sig ? 6.8 : 4.6, -.05); grp.add(pl);
-        world.jcts.push({ s: sAt, name, en: c.en });
+        world.jcts.push({ s: sAt, name, en: c.en, guess: c.nameSrc !== 'osm' || c.src !== 'osm' });
       }
       if (item.lamps) world.signals.push(item);
     }
@@ -1403,7 +1467,21 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
     T = buildTrackData(pts, 13, !ow);
     const HF = makeHeightField(elevXZ, settings.elev);
     if (HF) T.setHeights(HF.H);
-    buildWorld(T, scen, scen ? proj : null, HF);
+    // 信号機と交差点名：OpenStreetMap → 無ければ地図データから推定
+    let jcl = null;
+    if (proj && settings.signals) {
+      const nodes = scen && scen.s ? scen.s.map(q => [...proj.fwd(q[0], q[1]), q[2], q[3], q[4], 'osm']) : [];
+      if (!nodes.some(q => q[4]) && settings.sigInfer) {
+        let inf = scen && scen.h ? inferFromRoads(T, scen, proj) : [];
+        if (!inf.length && !c.local) { try { inf = (await inferFromRoute(c, ow, ac.signal)).map(q => [...proj.fwd(q[0], q[1]), '', '', 1, 'map', q[2]]); } catch (e) { if (ac.signal.aborted) return; } }
+        nodes.push(...inf);
+        if (inf.length) T.sigGuess = true;
+      }
+      jcl = clusterJunctions(nodes);
+      if (settings.sigInfer && jcl.some(q => !q.name)) { try { await nameJunctions(c, jcl, proj, T, ac.signal, msg); } catch (e) { if (ac.signal.aborted) return; } }
+    }
+    buildWorld(T, scen, scen ? proj : null, HF, jcl);
+    if (T.sigGuess && world.signals.length) setTimeout(() => toast(`🚥 信号機 ${world.signals.length}基を地図データから推定して表示しています`, 2800), 3400);
     if (HF) { let lo = Infinity, hi = -Infinity; for (const v of T.h) { lo = Math.min(lo, v); hi = Math.max(hi, v); } T.climb = hi - lo; }
     if (T.climb > 1.5) setTimeout(() => toast(`⛰ 高低差 ${Math.round(T.climb)} m${settings.elev > 1 ? `（実際の${settings.elev}倍）` : ''}`, 2500), 600);
     startRace(c, dir);
@@ -1652,7 +1730,7 @@ function updateJct() {
   const key = best ? best.name : '';
   if (key === jctShown) return; jctShown = key;
   $('#jct').hidden = !best;
-  if (best) { $('#jctName').textContent = '🚥 ' + best.name; $('#jctEn').textContent = best.en || ''; }
+  if (best) { $('#jctName').textContent = '🚥 ' + best.name; $('#jctEn').textContent = best.guess ? '地図から推定' : (best.en || ''); }
 }
 function updateHUD() {
   const p = race.p, sp = Math.hypot(p.vx, p.vz), kmh = Math.round(sp * 3.6);
@@ -1941,6 +2019,7 @@ seg('#segQ', 'quality', v => v, applyQuality);
 $('#sens').value = settings.sens; $('#sens').oninput = e => { settings.sens = +e.target.value; saveSettings(); };
 $('#invert').checked = settings.invert; $('#invert').onchange = e => { settings.invert = e.target.checked; saveSettings(); };
 $('#signals').checked = settings.signals; $('#signals').onchange = e => { settings.signals = e.target.checked; saveSettings(); };
+$('#sigInfer').checked = settings.sigInfer; $('#sigInfer').onchange = e => { settings.sigInfer = e.target.checked; saveSettings(); };
 $('#auto').checked = settings.auto; $('#auto').onchange = e => { settings.auto = e.target.checked; saveSettings(); };
 $('#sound').checked = settings.sound; $('#sound').onchange = e => { settings.sound = e.target.checked; saveSettings(); Snd.setOn(settings.sound); };
 syncCtrlUI();
