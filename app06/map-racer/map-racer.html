@@ -240,6 +240,7 @@
     </div>
     <div class="row"><label>オートアクセル<small>オンだとアクセルは自動。ドリフト・ブレーキだけ操作</small></label><span class="sw"><input type="checkbox" id="auto"><i></i></span></div>
     <div class="row"><label>周回数</label><div class="seg" id="segLaps"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
+    <div class="row"><label>高低差<small>実際の標高から坂を作る。強調するとジェットコースター風</small></label><div class="seg" id="segElev"><button data-v="0">なし</button><button data-v="1">実際</button><button data-v="2">×2</button><button data-v="4">×4</button></div></div>
     <div class="row"><label>ライバル車</label><div class="seg" id="segRiv"><button data-v="none">なし</button><button data-v="normal">ふつう</button><button data-v="hard">つよい</button></div></div>
     <div class="row"><label>画質</label><div class="seg" id="segQ"><button data-v="low">軽い</button><button data-v="high">きれい</button></div></div>
     <div class="row"><label>サウンド</label><span class="sw"><input type="checkbox" id="sound"><i></i></span></div>
@@ -430,7 +431,7 @@ async function loadScenery(id) {
 }
 const validScen = d => d && Array.isArray(d.b) && Array.isArray(d.h) && Array.isArray(d.g) && Array.isArray(d.w);
 const mb = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1e3)) + 'KB';
-const settings = Object.assign({ ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
+const settings = Object.assign({ elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 const fmt = t => { if (!isFinite(t) || t == null) return '--:--.--'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
 let toastT;
@@ -569,6 +570,7 @@ function buildTrackData(pts, W, closed = true) {
   const ix = closed ? i => ((i % N) + N) % N : i => clamp(i, 0, N - 1);
   for (let i = 0; i < N; i++) { const b = pts[ix(i + 1)]; seg[i] = (closed || i < N - 1) ? Math.hypot(b[0] - pts[i][0], b[1] - pts[i][1]) : 0; cum[i + 1] = cum[i] + seg[i]; }
   const len = cum[N];
+  const h = new Float64Array(N), grade = new Float64Array(N);
   const tan = [], nrm = [];
   for (let i = 0; i < N; i++) {
     const a = pts[ix(i - 1)], b = pts[ix(i + 1)]; let tx = b[0] - a[0], tz = b[1] - a[1]; const L = Math.hypot(tx, tz) || 1; tx /= L; tz /= L;
@@ -588,14 +590,15 @@ function buildTrackData(pts, W, closed = true) {
   const CELL = 25, grid = new Map();
   const key = (x, z) => Math.floor(x / CELL) + ',' + Math.floor(z / CELL);
   pts.forEach((p, i) => { const k = key(p[0], p[1]); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(i); });
+  let lastNear = -1;
   function nearest(x, z, r, skipI = -1, skipRange = 0) {
     const c0 = Math.floor((x - r) / CELL), c1 = Math.floor((x + r) / CELL), r0 = Math.floor((z - r) / CELL), r1 = Math.floor((z + r) / CELL);
-    let best = Infinity;
+    let best = Infinity; lastNear = -1;
     for (let cx = c0; cx <= c1; cx++) for (let cz = r0; cz <= r1; cz++) {
       const a = grid.get(cx + ',' + cz); if (!a) continue;
       for (const i of a) {
         if (skipI >= 0) { let di = Math.abs(i - skipI); if (closed) di = Math.min(di, N - di); if (di <= skipRange) continue; }
-        const dd = (pts[i][0] - x) ** 2 + (pts[i][1] - z) ** 2; if (dd < best) best = dd;
+        const dd = (pts[i][0] - x) ** 2 + (pts[i][1] - z) ** 2; if (dd < best) { best = dd; lastNear = i; }
       }
     }
     return Math.sqrt(best);
@@ -625,12 +628,24 @@ function buildTrackData(pts, W, closed = true) {
     while (lo < hi) { const m = (lo + hi + 1) >> 1; if (cum[m] <= s) lo = m; else hi = m - 1; }
     const i = lo, j = ix(i + 1), t = seg[i] ? clamp((s - cum[i]) / seg[i], 0, 1) : 0, a = pts[i], b = pts[j];
     const ta = tan[i], tb = tan[j]; let tx = lerp(ta[0], tb[0], t), tz = lerp(ta[1], tb[1], t); const L = Math.hypot(tx, tz) || 1; tx /= L; tz /= L;
-    return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), tx, tz, rx: -tz, rz: tx, i, adv: lerp(adv[i], adv[j], t), curv: curv[i] };
+    return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), y: lerp(h[i], h[j], t), grade: grade[i], tx, tz, rx: -tz, rz: tx, i, adv: lerp(adv[i], adv[j], t), curv: curv[i] };
   }
+  // 高さを設定（道路は急すぎないようならす）
+  function setHeights(fn) {
+    for (let i = 0; i < N; i++) h[i] = fn(pts[i][0], pts[i][1]);
+    for (let it = 0; it < 5; it++) { const c = Float64Array.from(h); for (let i = 0; i < N; i++) { let sum = 0; for (let k = -6; k <= 6; k++) sum += c[ix(i + k)]; h[i] = sum / 13; } }
+    const G = .16;
+    for (let it = 0; it < 3; it++) {
+      for (let i = 0; i < lastSeg + 1; i++) { const j = ix(i + 1), m = G * (seg[i] || 3); h[j] = clamp(h[j], h[i] - m, h[i] + m); }
+      for (let i = lastSeg; i >= 0; i--) { const j = ix(i + 1), m = G * (seg[i] || 3); h[i] = clamp(h[i], h[j] - m, h[j] + m); }
+    }
+    for (let i = 0; i < N; i++) grade[i] = seg[i] ? (h[ix(i + 1)] - h[i]) / seg[i] : (i ? grade[i - 1] : 0);
+  }
+  const yAt = (i, t) => lerp(h[i], h[ix(i + 1)], t);
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const p of pts) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]); }
   const startS = closed ? 0 : RUNUP, finishS = closed ? len : len - RUNOFF;
-  return { pts, N, seg, cum, len, tan, nrm, curv, adv, W, closed, startS, finishS, raceLen: finishS - startS, nearest, locate, at, bbox: { minX, maxX, minZ, maxZ } };
+  return { pts, N, seg, cum, len, tan, nrm, curv, adv, W, closed, startS, finishS, raceLen: finishS - startS, h, grade, setHeights, yAt, nearest, nearIdx: () => lastNear, locate, at, bbox: { minX, maxX, minZ, maxZ } };
 }
 
 /* OSRM：通過ポイントを道路に沿ってつなぐ（loop=true で周回） */
@@ -652,6 +667,50 @@ function straightLine(wps, closed = true) {
 function lineLength(line) {
   let L = 0; for (let i = 1; i < line.length; i++) { const a = line[i - 1], b = line[i]; const kx = 111320 * Math.cos(a[0] * Math.PI / 180); L += Math.hypot((b[1] - a[1]) * kx, (b[0] - a[0]) * 110540); } return L;
 }
+
+/* 標高：Open-Meteo Elevation API（Copernicus DEM, 約90m）でコースに沿って取得 */
+function samplePath(line, step, maxN) {
+  const out = [line[0]]; let acc = 0;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1], b = line[i]; acc += Math.hypot((b[1] - a[1]) * 111320 * Math.cos(a[0] * Math.PI / 180), (b[0] - a[0]) * 110540);
+    if (acc >= step) { out.push(line[i]); acc = 0; }
+  }
+  if (out[out.length - 1] !== line[line.length - 1]) out.push(line[line.length - 1]);
+  while (out.length > maxN) for (let i = out.length - 2; i > 0; i -= 2) out.splice(i, 1);
+  return out;
+}
+async function fetchElevation(line, signal) {
+  const pts = samplePath(line, 30, 500), hs = [];
+  for (let i = 0; i < pts.length; i += 100) {
+    const ch = pts.slice(i, i + 100);
+    const url = 'https://api.open-meteo.com/v1/elevation?latitude=' + ch.map(p => p[0].toFixed(5)).join(',') + '&longitude=' + ch.map(p => p[1].toFixed(5)).join(',');
+    const j = await fetchJSON(url, {}, 15000, signal);
+    if (!j.elevation || j.elevation.length !== ch.length) throw new Error('elev');
+    hs.push(...j.elevation);
+  }
+  return pts.map((p, i) => [+p[0].toFixed(5), +p[1].toFixed(5), Math.round((+hs[i] || 0) * 10) / 10]);
+}
+// 標高サンプル [[x,z,h]] からなめらかな高さ関数を作る（scale 倍に強調）
+function makeHeightField(samples, scale) {
+  if (!samples || samples.length < 2 || !scale) return null;
+  let min = Infinity, max = -Infinity; for (const q of samples) { min = Math.min(min, q[2]); max = Math.max(max, q[2]); }
+  const P = samples.map(([x, z, h]) => [x, z, (h - min) * scale]);
+  const mean = P.reduce((a, q) => a + q[2], 0) / P.length;
+  const CELL = 60, grid = new Map();
+  for (const q of P) { const k = Math.floor(q[0] / CELL) + ',' + Math.floor(q[1] / CELL); let a = grid.get(k); if (!a) grid.set(k, a = []); a.push(q); }
+  function H(x, z) {
+    const gx = Math.floor(x / CELL), gz = Math.floor(z / CELL); let sw = 0, sh = 0, dmin = Infinity;
+    for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) {
+      const a = grid.get((gx + i) + ',' + (gz + j)); if (!a) continue;
+      for (const q of a) { const d2v = (q[0] - x) ** 2 + (q[1] - z) ** 2; if (d2v < dmin) dmin = d2v; if (d2v < 32400) { const w = 1 / (d2v + 900); sw += w; sh += w * q[2]; } }
+    }
+    const v = sw ? sh / sw : mean, far = clamp((Math.sqrt(dmin) - 120) / 300, 0, 1);
+    return lerp(v, mean, far);
+  }
+  return { H, range: (max - min) * scale, realRange: max - min };
+}
+// テストコース用の作り物の起伏
+const synthElev = (pts, f) => pts.map((p, i) => [p[0], p[1], f(i / pts.length)]);
 
 /* Overpass：コース周辺の建物・道路・公園・水辺 */
 const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
@@ -769,7 +828,7 @@ function ribbon(T, off0, off1, y, vScale, filter) {
   if (off0 > off1) [off0, off1] = [off1, off0];
   const pos = [], uv = [], idx = [], N = T.N, rows = T.closed ? N + 1 : N;
   for (let i = 0; i < rows; i++) {
-    const k = i % N, p = T.pts[k], n = T.nrm[k], yy = y + (k / N) * 0.04;
+    const k = i % N, p = T.pts[k], n = T.nrm[k], yy = T.h[k] + y + (k / N) * 0.04;
     pos.push(p[0] + n[0] * off0, yy, p[1] + n[1] * off0, p[0] + n[0] * off1, yy, p[1] + n[1] * off1);
     const v = (i === N ? T.len : T.cum[k]) / vScale; uv.push(0, v, 1, v);
     if (i < rows - 1 && (!filter || (filter(k) && filter((k + 1) % N)))) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
@@ -778,11 +837,11 @@ function ribbon(T, off0, off1, y, vScale, filter) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
   return g;
 }
-function wallRibbon(T, off, h, filter) {
+function wallRibbon(T, off, y0, y1, filter) {
   const pos = [], uv = [], idx = [], N = T.N, rows = T.closed ? N + 1 : N;
   for (let i = 0; i < rows; i++) {
     const k = i % N, p = T.pts[k], n = T.nrm[k], x = p[0] + n[0] * off, z = p[1] + n[1] * off, v = (i === N ? T.len : T.cum[k]) / 4;
-    pos.push(x, 0, z, x, h, z); uv.push(v, 0, v, 1);
+    pos.push(x, T.h[k] + y0, z, x, T.h[k] + y1, z); uv.push(v, 0, v, 1);
     if (i < rows - 1 && filter(k) && filter((k + 1) % N)) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2, a, a + 2, a + 1, a + 1, a + 2, a + 3); }
   }
   const g = new THREE.BufferGeometry();
@@ -791,12 +850,13 @@ function wallRibbon(T, off, h, filter) {
 }
 // 平面ポリゴン（公園・水辺）や建物を1つのジオメトリにまとめる
 function polyArea(c) { let a = 0; for (let i = 0; i < c.length; i++) { const p = c[i], q = c[(i + 1) % c.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; }
-function flatPolys(list, y) {
+function flatPolys(list, y, G = () => 0, flat = false) {
   const pos = [];
   for (const c of list) {
     if (c.length < 3) continue;
     let tris; try { tris = THREE.ShapeUtils.triangulateShape(c.map(p => new THREE.Vector2(p[0], p[1])), []); } catch (e) { continue; }
-    for (const t of tris) for (const k of [t[0], t[2], t[1]]) pos.push(c[k][0], y, c[k][1]);
+    let fy = 0; if (flat) { fy = Infinity; for (const q of c) fy = Math.min(fy, G(q[0], q[1])); }
+    for (const t of tris) for (const k of [t[0], t[2], t[1]]) pos.push(c[k][0], (flat ? fy : G(c[k][0], c[k][1])) + y, c[k][1]);
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
 }
@@ -804,7 +864,8 @@ const BCOLORS = ['#f3efe6', '#e6e1d6', '#d9dde2', '#efe2cf', '#cfd6de', '#e9d8c8
 function buildingGeo(list) {
   const pos = [], col = [], uv = [];
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (const [cIn, hIn] of list) {
+  for (const [cIn, hIn, baseIn] of list) {
+    const base = baseIn || 0, by = base - (baseIn ? 4 : 0);
     let c = cIn.slice(); if (c.length > 2 && d2(c[0], c[c.length - 1]) < .01) c.pop(); if (c.length < 3) continue;
     if (polyArea(c) < 0) c.reverse();
     const area = Math.abs(polyArea(c)); if (area < 8) continue;
@@ -812,13 +873,13 @@ function buildingGeo(list) {
     const color = BCOLORS[Math.floor(rnd() * BCOLORS.length)], dark = color.clone().multiplyScalar(.78);
     let tris; try { tris = THREE.ShapeUtils.triangulateShape(c.map(p => new THREE.Vector2(p[0], p[1])), []); } catch (e) { continue; }
     // 屋根
-    for (const t of tris) for (const k of [t[0], t[2], t[1]]) { pos.push(c[k][0], h, c[k][1]); col.push(dark.r * 1.05, dark.g * 1.05, dark.b * 1.05); uv.push(0, 0); }
+    for (const t of tris) for (const k of [t[0], t[2], t[1]]) { pos.push(c[k][0], base + h, c[k][1]); col.push(dark.r * 1.05, dark.g * 1.05, dark.b * 1.05); uv.push(0, 0); }
     // 壁
     let u = 0;
     for (let i = 0; i < c.length; i++) {
       const a = c[i], b = c[(i + 1) % c.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]); const u0 = u / 12, u1 = (u + L) / 12, v1 = h / 13.6; u += L;
-      const quad = [[a[0], 0, a[1], u0, 0], [b[0], 0, b[1], u1, 0], [b[0], h, b[1], u1, v1], [a[0], 0, a[1], u0, 0], [b[0], h, b[1], u1, v1], [a[0], h, a[1], u0, v1]];
-      for (const q of quad) { pos.push(q[0], q[1], q[2]); uv.push(q[3], q[4]); const s = q[1] > 0 ? 1 : .82; col.push(color.r * s, color.g * s, color.b * s); }
+      const t0 = base + h, quad = [[a[0], by, a[1], u0, 0], [b[0], by, b[1], u1, 0], [b[0], t0, b[1], u1, v1], [a[0], by, a[1], u0, 0], [b[0], t0, b[1], u1, v1], [a[0], t0, a[1], u0, v1]];
+      for (const q of quad) { pos.push(q[0], q[1], q[2]); uv.push(q[3], q[4]); const s = q[1] > by ? 1 : .82; col.push(color.r * s, color.g * s, color.b * s); }
     }
   }
   const g = new THREE.BufferGeometry();
@@ -826,35 +887,49 @@ function buildingGeo(list) {
   g.computeVertexNormals(); return g;
 }
 const HW = { motorway: 16, trunk: 14, primary: 12, secondary: 10, tertiary: 9, unclassified: 7, residential: 7, living_street: 6, service: 4.5, pedestrian: 5 };
-function streetGeo(list) {
+function streetGeo(list, G = () => 0) {
   const pos = [], idx = [];
   for (const [c, type] of list) {
     const w = (HW[type] || 6) / 2;
-    for (let i = 0; i < c.length - 1; i++) {
-      const a = c[i], b = c[i + 1]; let dx = b[0] - a[0], dz = b[1] - a[1]; const L = Math.hypot(dx, dz); if (L < .1) continue; dx /= L; dz /= L;
-      const nx = -dz * w, nz = dx * w, ex = dx * w * .5, ez = dz * w * .5, base = pos.length / 3;
-      pos.push(a[0] + nx - ex, .025, a[1] + nz - ez, a[0] - nx - ex, .025, a[1] - nz - ez, b[0] + nx + ex, .025, b[1] + nz + ez, b[0] - nx + ex, .025, b[1] - nz + ez);
+    // 起伏に沿うよう細かく分割
+    const cc = [c[0]]; for (let i = 1; i < c.length; i++) { const a = c[i - 1], b = c[i], n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 14); for (let k = 1; k <= n; k++) cc.push([lerp(a[0], b[0], k / n), lerp(a[1], b[1], k / n)]); }
+    for (let i = 0; i < cc.length - 1; i++) {
+      const a = cc[i], b = cc[i + 1]; let dx = b[0] - a[0], dz = b[1] - a[1]; const L = Math.hypot(dx, dz); if (L < .1) continue; dx /= L; dz /= L;
+      const nx = -dz * w, nz = dx * w, ex = dx * w * .5, ez = dz * w * .5, base = pos.length / 3, ya = G(a[0], a[1]) + .05, yb = G(b[0], b[1]) + .05;
+      pos.push(a[0] + nx - ex, ya, a[1] + nz - ez, a[0] - nx - ex, ya, a[1] - nz - ez, b[0] + nx + ex, yb, b[1] + nz + ez, b[0] - nx + ex, yb, b[1] - nz + ez);
       idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2);
     }
   }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
 
-function buildWorld(T, scen, proj) {
+function buildWorld(T, scen, proj, HF) {
   makeTextures();
   disposeWorld();
   const root = new THREE.Group(); scene.add(root);
   const W = T.W, b = T.bbox, cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2, size = Math.max(b.maxX - b.minX, b.maxZ - b.minZ) + 1400;
-  // 地面
+  // 地面（高低差ありなら起伏のある地形。コースのすぐ下は少し下げる）
+  // コース近くの地面は道路の高さに合わせ、離れるほど本来の地形へなめらかにつなぐ（土手・切り通し）
+  const G = HF ? (x, z) => {
+    const R0 = W / 2 + 6, R1 = W / 2 + 60, d = T.nearest(x, z, R1), i = T.nearIdx(), h = HF.H(x, z);
+    if (i < 0 || d >= R1) return h;
+    const road = T.h[i] - 1.2 * clamp(1 - (d - W / 2 - 4) / 10, 0, 1);
+    if (d <= R0) return road;
+    const t = (d - R0) / (R1 - R0); return lerp(road, h, t * t * (3 - 2 * t));
+  } : () => 0;
   const gt = TEX.ground.clone(); gt.needsUpdate = true; gt.repeat.set(size / 40, size / 40);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshLambertMaterial({ map: gt }));
-  ground.rotation.x = -Math.PI / 2; ground.position.set(cx, 0, cz); ground.receiveShadow = true; root.add(ground);
+  const segs = HF ? Math.min(220, Math.ceil(size / 14)) : 1;
+  const gg = new THREE.PlaneGeometry(size, size, segs, segs); gg.rotateX(-Math.PI / 2); gg.translate(cx, 0, cz);
+  if (HF) { const pa = gg.attributes.position; for (let i = 0; i < pa.count; i++) pa.setY(i, G(pa.getX(i), pa.getZ(i))); gg.computeVertexNormals(); }
+  const ground = new THREE.Mesh(gg, new THREE.MeshLambertMaterial({ map: gt })); ground.receiveShadow = true; root.add(ground);
   // 路面
   const road = new THREE.Mesh(ribbon(T, -W / 2, W / 2, .06, 12), new THREE.MeshLambertMaterial({ map: TEX.road }));
   road.receiveShadow = true; root.add(road);
   // 路肩（少し明るいアスファルト）
   const shMat = new THREE.MeshLambertMaterial({ color: '#7d7a70' });
-  for (const s of [-1, 1]) { const m = new THREE.Mesh(ribbon(T, s * W / 2, s * (W / 2 + 4.6), .045, 10), shMat); m.material.side = THREE.DoubleSide; m.receiveShadow = true; root.add(m); }
+  for (const s of [-1, 1]) { const m = new THREE.Mesh(ribbon(T, s * W / 2, s * (W / 2 + 5.4), .045, 10), shMat); m.material.side = THREE.DoubleSide; m.receiveShadow = true; root.add(m); }
+  // 道路の側面（高い所を走るときに下が透けないように）
+  if (HF) { const skM = new THREE.MeshLambertMaterial({ color: '#8a8478', side: THREE.DoubleSide }); for (const s of [-1, 1]) root.add(new THREE.Mesh(wallRibbon(T, s * (W / 2 + 5.4), -6, .045, () => true), skM)); }
   // 縁石（カーブ）
   const kerbOn = k => Math.abs(T.curv[k]) > 1 / 70;
   const kMat = new THREE.MeshLambertMaterial({ map: TEX.kerb, side: THREE.DoubleSide });
@@ -865,7 +940,7 @@ function buildWorld(T, scen, proj) {
   for (const s of [-1, 1]) {
     const ok = new Uint8Array(T.N);
     for (let k = 0; k < T.N; k++) { const p = T.pts[k], n = T.nrm[k]; ok[k] = T.nearest(p[0] + n[0] * s * railOff, p[1] + n[1] * s * railOff, W / 2 + 6, k, 14) > W / 2 + 5.5 ? 1 : 0; }
-    const m = new THREE.Mesh(wallRibbon(T, s * railOff, .9, k => ok[k]), rMat); m.castShadow = true; root.add(m);
+    const m = new THREE.Mesh(wallRibbon(T, s * railOff, 0, .9, k => ok[k]), rMat); m.castShadow = true; root.add(m);
   }
   // スタート・ゴールのゲート（片道はゴールにも）
   const postM = new THREE.MeshLambertMaterial({ color: '#333' });
@@ -873,8 +948,8 @@ function buildWorld(T, scen, proj) {
     const s0 = T.at(sAt), ang = Math.atan2(s0.tx, s0.tz);
     const ct = TEX.check.clone(); ct.needsUpdate = true; ct.repeat.set(W / 1.2, 2);
     const line = new THREE.Mesh(new THREE.PlaneGeometry(W, 2.4), new THREE.MeshLambertMaterial({ map: ct }));
-    line.rotation.set(-Math.PI / 2, 0, ang); line.position.set(s0.x, .11, s0.z); root.add(line);
-    const gate = new THREE.Group(); gate.position.set(s0.x, 0, s0.z); gate.rotation.y = ang; root.add(gate);
+    line.rotation.set(-Math.PI / 2, 0, ang); line.position.set(s0.x, s0.y + .14, s0.z); root.add(line);
+    const gate = new THREE.Group(); gate.position.set(s0.x, s0.y, s0.z); gate.rotation.y = ang; root.add(gate);
     for (const sx of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(.6, 7, .6), postM); p.position.set(sx * (W / 2 + 1.5), 3.5, 0); p.castShadow = true; gate.add(p); }
     const bm = new THREE.MeshBasicMaterial({ map: tex });
     const ban = new THREE.Mesh(new THREE.BoxGeometry(W + 3.6, 1.8, .4), [postM, postM, postM, postM, bm, bm]);
@@ -886,18 +961,18 @@ function buildWorld(T, scen, proj) {
     // コースの両端に壁
     for (const sAt of [0, T.len]) {
       const e = T.at(sAt), wall = new THREE.Mesh(new THREE.BoxGeometry(W + 10, 1.2, 1), new THREE.MeshLambertMaterial({ map: TEX.rail }));
-      wall.position.set(e.x, .6, e.z); wall.rotation.y = Math.atan2(e.tx, e.tz); wall.castShadow = true; root.add(wall);
+      wall.position.set(e.x, e.y + .6, e.z); wall.rotation.y = Math.atan2(e.tx, e.tz); wall.castShadow = true; root.add(wall);
     }
   }
   // まわりの景色
   const clearR = W / 2 + 7;
   if (scen && proj) {
     const P = c => c.map(p => proj.fwd(p[0], p[1]));
-    const bl = []; for (const [c, h] of scen.b) { const pc = P(c); if (pc.some(q => T.nearest(q[0], q[1], clearR + 1) < clearR)) continue; let cut = false; for (let i = 0; i < pc.length && !cut; i++) { const q = pc[i], r = pc[(i + 1) % pc.length]; if (T.nearest((q[0] + r[0]) / 2, (q[1] + r[1]) / 2, clearR + 1) < clearR) cut = true; } if (!cut) bl.push([pc, h]); }
+    const bl = []; for (const [c, h] of scen.b) { const pc = P(c); if (pc.some(q => T.nearest(q[0], q[1], clearR + 1) < clearR)) continue; let cut = false; for (let i = 0; i < pc.length && !cut; i++) { const q = pc[i], r = pc[(i + 1) % pc.length]; if (T.nearest((q[0] + r[0]) / 2, (q[1] + r[1]) / 2, clearR + 1) < clearR) cut = true; } if (!cut) bl.push([pc, h, HF ? Math.min(...pc.map(q => G(q[0], q[1]))) : 0]); }
     if (bl.length) { const m = new THREE.Mesh(buildingGeo(bl), new THREE.MeshLambertMaterial({ vertexColors: true, map: TEX.win, side: THREE.DoubleSide })); m.castShadow = true; m.receiveShadow = true; root.add(m); }
-    if (scen.h.length) { const m = new THREE.Mesh(streetGeo(scen.h.map(([c, t]) => [P(c), t])), new THREE.MeshLambertMaterial({ color: '#5d6168', side: THREE.DoubleSide })); m.receiveShadow = true; root.add(m); }
-    if (scen.g.length) { const m = new THREE.Mesh(flatPolys(scen.g.map(P), .012), new THREE.MeshLambertMaterial({ color: '#79a85c', side: THREE.DoubleSide })); m.receiveShadow = true; root.add(m); }
-    if (scen.w.length) root.add(new THREE.Mesh(flatPolys(scen.w.map(P), .018), new THREE.MeshLambertMaterial({ color: '#4f94cf', side: THREE.DoubleSide })));
+    if (scen.h.length) { const m = new THREE.Mesh(streetGeo(scen.h.map(([c, t]) => [P(c), t]), G), new THREE.MeshLambertMaterial({ color: '#5d6168', side: THREE.DoubleSide })); m.receiveShadow = true; root.add(m); }
+    if (scen.g.length) { const m = new THREE.Mesh(flatPolys(scen.g.map(P), .03, G), new THREE.MeshLambertMaterial({ color: '#79a85c', side: THREE.DoubleSide })); m.receiveShadow = true; root.add(m); }
+    if (scen.w.length) root.add(new THREE.Mesh(flatPolys(scen.w.map(P), .04, G, true), new THREE.MeshLambertMaterial({ color: '#4f94cf', side: THREE.DoubleSide })));
   } else {
     // 自動生成の街並みと木
     let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -909,10 +984,10 @@ function buildWorld(T, scen, proj) {
         if (r < .45) {
           const off = W / 2 + 14 + rnd() * 40, x = a.x + a.rx * off * side, z = a.z + a.rz * off * side, w = 8 + rnd() * 14, d = 8 + rnd() * 14;
           const c = [[-w, -d], [w, -d], [w, d], [-w, d]].map(([u, v]) => [x + (a.tx * v + a.rx * u) / 2, z + (a.tz * v + a.rz * u) / 2]);
-          if (c.every(q => T.nearest(q[0], q[1], clearR + 4) > clearR + 3) && T.nearest(x, z, clearR + 4) > clearR + 3) bl.push([c, 6 + rnd() * rnd() * 40]);
+          if (c.every(q => T.nearest(q[0], q[1], clearR + 4) > clearR + 3) && T.nearest(x, z, clearR + 4) > clearR + 3) bl.push([c, 6 + rnd() * rnd() * 40, HF ? Math.min(...c.map(q => G(q[0], q[1]))) : 0]);
         } else if (r < .8) {
           const off = W / 2 + 8 + rnd() * 30, x = a.x + a.rx * off * side, z = a.z + a.rz * off * side;
-          if (T.nearest(x, z, clearR) >= clearR) trees.push([x, z, .8 + rnd() * .7]);
+          if (T.nearest(x, z, clearR) >= clearR) trees.push([x, z, .8 + rnd() * .7, G(x, z)]);
         }
       }
     }
@@ -921,7 +996,7 @@ function buildWorld(T, scen, proj) {
       const leaf = new THREE.InstancedMesh(new THREE.ConeGeometry(2.6, 7, 7), new THREE.MeshLambertMaterial({ color: '#3f8a3a' }), trees.length);
       const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(.35, .45, 2.4, 6), new THREE.MeshLambertMaterial({ color: '#6b4a2b' }), trees.length);
       const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
-      trees.forEach(([x, z, s], i) => { sc.set(s, s, s); m4.compose(new THREE.Vector3(x, 1.2 * s + 3.5 * s, z), q, sc); leaf.setMatrixAt(i, m4); m4.compose(new THREE.Vector3(x, 1.2 * s, z), q, sc); trunk.setMatrixAt(i, m4); });
+      trees.forEach(([x, z, s, gy], i) => { sc.set(s, s, s); m4.compose(new THREE.Vector3(x, gy + 1.2 * s + 3.5 * s, z), q, sc); leaf.setMatrixAt(i, m4); m4.compose(new THREE.Vector3(x, gy + 1.2 * s, z), q, sc); trunk.setMatrixAt(i, m4); });
       leaf.castShadow = trunk.castShadow = true; root.add(leaf, trunk);
     }
   }
@@ -931,7 +1006,7 @@ function buildWorld(T, scen, proj) {
 
 /* ---------- 車モデル ---------- */
 function makeCar(color, num) {
-  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body); g.rotation.order = 'YXZ';
   const paint = new THREE.MeshPhongMaterial({ color, shininess: 80, specular: '#666' });
   const dark = new THREE.MeshLambertMaterial({ color: '#15181d' }), glass = new THREE.MeshPhongMaterial({ color: '#1d2a3a', shininess: 120, specular: '#aaa' });
   const add = (geo, mat, x, y, z, parent = body) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
@@ -988,15 +1063,15 @@ function puff(x, y, z, size, op) {
   const p = FX.smoke[FX.idx = (FX.idx + 1) % FX.smoke.length];
   p.life = 1; p.s.visible = true; p.s.position.set(x, y, z); p.size = size; p.op = op; p.vy = .8 + Math.random() * .6; p.dx = (Math.random() - .5) * 1.2; p.dz = (Math.random() - .5) * 1.2;
 }
-function skidMark(w, x, z, hx, hz) {
+function skidMark(w, x, z, hx, hz, gy = 0) {
   const last = FX.last[w];
   if (last) {
-    const i = FX.skN % FX.skMax, o = i * 12, a = .16, y = .1;
+    const i = FX.skN % FX.skMax, o = i * 12, a = .16, y = gy + .12;
     const nx = -hz * a, nz = hx * a;
-    FX.skPos.set([last[0] + last[2], y, last[1] + last[3], last[0] - last[2], y, last[1] - last[3], x + nx, y, z + nz, x - nx, y, z - nz], o);
+    FX.skPos.set([last[0] + last[2], last[4] + .12, last[1] + last[3], last[0] - last[2], last[4] + .12, last[1] - last[3], x + nx, y, z + nz, x - nx, y, z - nz], o);
     FX.skN++; FX.skid.geometry.attributes.position.needsUpdate = true;
   }
-  FX.last[w] = [x, z, -hz * .16, hx * .16];
+  FX.last[w] = [x, z, -hz * .16, hx * .16, gy];
 }
 function updateFX(dt) {
   for (const p of FX.smoke) {
@@ -1125,6 +1200,11 @@ function readInput(dt) {
   return { steer, gas, brake, drift };
 }
 
+function saveElev(c, elev) {
+  if (!c.id.startsWith('p-')) { const l = userCourses(), x = l.find(x => x.id === c.id); if (x) { x.elev = elev; saveUserCourses(l); c.elev = elev; return; } }
+  store.set('elev.' + c.id, elev);
+}
+
 /* =========================================================
    レース
    ========================================================= */
@@ -1135,7 +1215,7 @@ const GEARS = [0, 11, 20, 29, 38, 46, 60];
 function newPlayer(T) {
   const st = T.at(T.startS - 26), lat = 2.6;
   const car = makeCar('#e8361a', 1); scene.add(car);
-  return { car, x: st.x + st.rx * lat, z: st.z + st.rz * lat, th: Math.atan2(st.tx, st.tz), vx: 0, vz: 0, w: 0, steer: 0,
+  return { car, x: st.x + st.rx * lat, z: st.z + st.rz * lat, y: st.y, vy: st.y, slope: st.grade, vslope: st.grade, th: Math.atan2(st.tx, st.tz), vx: 0, vz: 0, w: 0, steer: 0,
     total: -26, s: T.closed ? T.len - 26 : T.startS - 26, hint: st.i, drifting: false, driftDir: 0, driftT: 0, boost: 0, boostMax: 1, roll: 0, pitch: 0,
     wheelRot: 0, onRoad: true, wrongT: 0, lap: 0, lapStart: 0, bestLap: Infinity, driftScore: 0, top: 0, prevVf: 0, hitCd: 0, finished: false };
 }
@@ -1160,13 +1240,25 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
   const msg = t => $('#loadMsg').innerHTML = t;
   $('#loadCancel').onclick = () => { ac.abort(); show('#loading', false); toTitle(); };
   try {
-    let pts, scen = null, proj = null;
-    if (c.local) { msg('コースを作成中…'); let raw = ow ? sampleSprintPts() : sampleCoursePts(); if (ow && dir === 'rev') raw = raw.slice().reverse(); pts = processLine(raw, !ow); }
+    let pts, scen = null, proj = null, elevXZ = null;
+    if (c.local) {
+      msg('コースを作成中…'); let raw = ow ? sampleSprintPts() : sampleCoursePts();
+      elevXZ = ow ? synthElev(raw, t => 30 * t + 9 * Math.sin(t * 14)) : synthElev(raw, t => 11 * Math.sin(t * Math.PI * 4 + .5) + 6 * Math.sin(t * Math.PI * 6));
+      if (ow && dir === 'rev') raw = raw.slice().reverse(); pts = processLine(raw, !ow);
+    }
     else {
       let line = c.line || store.get('pline.' + c.id, null);
       if (!line) { msg('道路に沿ってルートを計算中…<br><small>OSRM</small>'); line = (await routeOSRM(c.wps, ac.signal, !ow)).line; if (c.id.startsWith('p-')) store.set('pline.' + c.id, line); }
+      // 標高データ（コースごとに保存）
+      let elev = c.elev || store.get('elev.' + c.id, null);
+      if (!elev && settings.elev > 0) {
+        msg('コースの高低差（標高）を取得中…<br><small>Open-Meteo Elevation API</small>');
+        try { elev = await fetchElevation(line, ac.signal); saveElev(c, elev); }
+        catch (e) { if (ac.signal.aborted) return; toast('標高データを取得できなかったので、平らなコースで走ります'); }
+      }
       if (ow && dir === 'rev') line = line.slice().reverse();
       proj = makeProj(line[0][0], line[0][1]);
+      if (elev) elevXZ = elev.map(q => proj.fwd(q[0], q[1]).concat([q[2]]));
       pts = processLine(line.map(p => proj.fwd(p[0], p[1])), !ow);
       if (refetch) { await sceneDB.del(c.id); store.del('scn.' + c.id); }
       else { msg('保存してある建物・道路データを読み込み中…'); scen = await loadScenery(c.id); }
@@ -1187,7 +1279,11 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
     msg('3Dコースを組み立て中…');
     await new Promise(r => setTimeout(r, 30));
     T = buildTrackData(pts, 13, !ow);
-    buildWorld(T, scen, scen ? proj : null);
+    const HF = makeHeightField(elevXZ, settings.elev);
+    if (HF) T.setHeights(HF.H);
+    buildWorld(T, scen, scen ? proj : null, HF);
+    if (HF) { let lo = Infinity, hi = -Infinity; for (const v of T.h) { lo = Math.min(lo, v); hi = Math.max(hi, v); } T.climb = hi - lo; }
+    if (T.climb > 1.5) setTimeout(() => toast(`⛰ 高低差 ${Math.round(T.climb)} m${settings.elev > 1 ? `（実際の${settings.elev}倍）` : ''}`, 2500), 600);
     startRace(c, dir);
   } catch (e) {
     if (ac.signal.aborted) return;
@@ -1227,6 +1323,8 @@ function updatePlayer(p, inp, dt) {
   if (loc.d2 > 40 * 40) { const g = T.locate(p.x, p.z, null); Object.assign(loc, g); }
   p.hint = loc.i;
   const lat = loc.lat, onRoad = Math.abs(lat) < W / 2 + .6; p.onRoad = onRoad;
+  const gr = T.grade[loc.i], slopeF = gr * (fx * loc.tx + fz * loc.tz); // 進行方向の勾配
+  p.y = T.yAt(loc.i, loc.t); p.slope = slopeF;
   const boosting = p.boost > 0;
   const vmax = (onRoad ? 52 : 26) * (boosting ? 1.22 : 1);
 
@@ -1238,6 +1336,7 @@ function updatePlayer(p, inp, dt) {
   a -= .00042 * vf * Math.abs(vf) * 1.2;
   if (!onRoad) a -= vf * 1.1;
   if (boosting) { a += 14; p.boost -= dt; }
+  a -= 9.8 * slopeF / Math.sqrt(1 + slopeF * slopeF); // 上り坂は遅く、下り坂は速く
   if (vf > vmax + 1 && !boosting) a = Math.min(a, -6);
   p.vx += fx * a * dt; p.vz += fz * a * dt;
   vf = p.vx * fx + p.vz * fz; speed = Math.hypot(p.vx, p.vz);
@@ -1347,7 +1446,7 @@ function updateCPU(c, dt, init) {
     c.s = T.closed ? (c.s + c.v * dt) % L : Math.min(c.s + c.v * dt, L - 3); c.total = T.closed ? c.total + c.v * dt : c.s - T.startS;
   }
   const a = T.at(c.s), ah = T.at(c.s + 3);
-  c.x = a.x + a.rx * c.off; c.z = a.z + a.rz * c.off;
+  c.x = a.x + a.rx * c.off; c.z = a.z + a.rz * c.off; c.y = a.y; c.slope = a.grade;
   const th = Math.atan2(ah.tx, ah.tz);
   c.th = init ? th : c.th + wrapAng(th - c.th) * (1 - Math.exp(-dt * 10));
   c.wheelRot += c.v * dt / .37;
@@ -1364,8 +1463,8 @@ function collide(p, c) {
 }
 
 /* ---------- 車の見た目を反映 ---------- */
-function syncCar(car, x, z, th, wheelRot, steer, roll, pitch) {
-  car.position.set(x, 0, z); car.rotation.y = th;
+function syncCar(car, x, y, z, th, wheelRot, steer, roll, pitch, slope) {
+  car.position.set(x, y || 0, z); car.rotation.y = th; car.rotation.x = -Math.atan(slope || 0);
   const { body, wheels } = car.userData;
   body.rotation.z = roll || 0; body.rotation.x = pitch || 0;
   for (const w of wheels) { w.w.rotation.x = wheelRot; if (w.front) w.piv.rotation.y = -steer * .5; }
@@ -1381,15 +1480,16 @@ function placeCamera(snap, dt = 1 / 60) {
   let dx = fx, dz = fz;
   if (sp > 3 && settings.cam !== 2) { const vx = p.vx / sp, vz = p.vz / sp; dx = lerp(fx, vx, .45); dz = lerp(fz, vz, .45); const l = Math.hypot(dx, dz); dx /= l; dz /= l; }
   const portrait = camera.aspect < 1, back = C.d * (portrait && settings.cam !== 2 ? 1.25 : 1);
-  const want = new THREE.Vector3(p.x - dx * back, C.h * (portrait ? 1.15 : 1), p.z - dz * back);
-  const look = new THREE.Vector3(p.x + fx * C.look, C.lh, p.z + fz * C.look);
+  const py = p.vy != null ? p.vy : (p.y || 0), sl = p.vslope || 0;
+  const want = new THREE.Vector3(p.x - dx * back, py - sl * back + C.h * (portrait ? 1.15 : 1), p.z - dz * back);
+  const look = new THREE.Vector3(p.x + fx * C.look, py + sl * C.look + C.lh, p.z + fz * C.look);
   if (snap) { camPos.copy(want); camLook.copy(look); }
   else { const k = settings.cam === 2 ? 1 : 1 - Math.exp(-dt * 7); camPos.lerp(want, k); camLook.lerp(look, settings.cam === 2 ? 1 : 1 - Math.exp(-dt * 12)); }
   camera.position.copy(camPos);
   if (race.camShake > 0) { camera.position.x += (Math.random() - .5) * race.camShake; camera.position.y += (Math.random() - .5) * race.camShake; race.camShake = Math.max(0, race.camShake - dt * 2); }
   camera.lookAt(camLook);
   const baseF = portrait ? 74 : 60; camera.fov = lerp(camera.fov, baseF + sp * .22 + (p.boost > 0 ? 8 : 0), snap ? 1 : 1 - Math.exp(-dt * 3)); camera.updateProjectionMatrix();
-  sun.position.set(p.x + 30, 80, p.z + 22); sun.target.position.set(p.x, 0, p.z);
+  sun.position.set(p.x + 30, py + 80, p.z + 22); sun.target.position.set(p.x, py, p.z);
 }
 
 /* ---------- ミニマップ ---------- */
@@ -1470,8 +1570,9 @@ function frame(now) {
     for (const c of race.cpus) if (!c.finished && c.total >= race.dist) { c.finished = true; c.finishT = race.t; }
   }
   // 見た目
-  syncCar(p.car, p.x, p.z, p.th, p.wheelRot, p.steer, p.roll, p.pitch);
-  for (const c of race.cpus) syncCar(c.car, c.x, c.z, c.th, c.wheelRot, 0, 0, 0);
+  p.vy = lerp(p.vy == null ? p.y || 0 : p.vy, p.y || 0, 1 - Math.exp(-dt * 20)); p.vslope = lerp(p.vslope || 0, p.slope || 0, 1 - Math.exp(-dt * 10));
+  syncCar(p.car, p.x, p.vy, p.z, p.th, p.wheelRot, p.steer, p.roll, p.pitch, p.vslope);
+  for (const c of race.cpus) syncCar(c.car, c.x, c.y, c.z, c.th, c.wheelRot, 0, 0, 0, c.slope);
   effects(p, dt);
   placeCamera(false, dt);
   // サウンド
@@ -1489,21 +1590,21 @@ function effects(p, dt) {
   const fx = Math.sin(p.th), fz = Math.cos(p.th), rx = -fz, rz = fx, sp = Math.hypot(p.vx, p.vz);
   const sliding = p.drifting || (Math.abs(p.slip || 0) > .2 && sp > 8);
   const wheelsPos = [[.88, -1.35], [-.88, -1.35]].map(([u, v]) => [p.x + rx * -u + fx * v, p.z + rz * -u + fz * v]);
-  if (sliding && p.onRoad) { wheelsPos.forEach((w, i) => skidMark(i, w[0], w[1], fx, fz)); }
+  if (sliding && p.onRoad) { wheelsPos.forEach((w, i) => skidMark(i, w[0], w[1], fx, fz, (p.vy || 0) - (p.vslope || 0) * 1.35)); }
   else FX.last = [null, null];
   smokeAcc += dt;
   if ((sliding || (!p.onRoad && sp > 6)) && smokeAcc > .035) {
     smokeAcc = 0; const w = wheelsPos[Math.random() < .5 ? 0 : 1];
-    puff(w[0], .4, w[1], p.onRoad ? 1.6 : 2.2, p.onRoad ? .55 : .5);
+    puff(w[0], (p.vy || 0) + .4, w[1], p.onRoad ? 1.6 : 2.2, p.onRoad ? .55 : .5);
   }
   // ドリフトの火花（色で溜まり具合）
   const t = p.driftT, col = t > 3 ? '#e66bff' : t > 1.8 ? '#ff9f1a' : '#3ad1ff';
   FX.sparks.forEach((s, i) => {
     s.visible = p.drifting && t > .8;
-    if (s.visible) { const w = wheelsPos[i]; s.position.set(w[0] + (Math.random() - .5) * .3, .3, w[1] + (Math.random() - .5) * .3); const k = .9 + Math.random() * .8; s.scale.set(k, k, k); s.material.color.set(col); }
+    if (s.visible) { const w = wheelsPos[i]; s.position.set(w[0] + (Math.random() - .5) * .3, (p.vy || 0) + .3, w[1] + (Math.random() - .5) * .3); const k = .9 + Math.random() * .8; s.scale.set(k, k, k); s.material.color.set(col); }
   });
   FX.flame.visible = p.boost > 0;
-  if (FX.flame.visible) { FX.flame.position.set(p.x - fx * 2.6, .55, p.z - fz * 2.6); const k = 1 + Math.random() * .8; FX.flame.scale.set(k, k, k); }
+  if (FX.flame.visible) { FX.flame.position.set(p.x - fx * 2.6, (p.vy || 0) - (p.vslope || 0) * 2.6 + .55, p.z - fz * 2.6); const k = 1 + Math.random() * .8; FX.flame.scale.set(k, k, k); }
 }
 
 function finishRace() {
@@ -1543,7 +1644,7 @@ $('#pRetry').onclick = () => startRace(race.course, race.dir);
 $('#pQuit').onclick = quitRace;
 $('#pCal').onclick = () => { calibrate(); toast('今の持ち方をまっすぐに設定しました'); };
 $('#pReset').onclick = () => {
-  const p = race.p, a = T.at(p.s); p.x = a.x; p.z = a.z; p.th = Math.atan2(a.tx, a.tz); p.vx = p.vz = 0; p.w = 0; p.drifting = false; togglePause(false); placeCamera(true);
+  const p = race.p, a = T.at(p.s); p.x = a.x; p.z = a.z; p.y = p.vy = a.y; p.slope = p.vslope = a.grade; p.th = Math.atan2(a.tx, a.tz); p.vx = p.vz = 0; p.w = 0; p.drifting = false; togglePause(false); placeCamera(true);
 };
 $('#rRetry').onclick = () => startRace(race.course, race.dir);
 $('#rQuit').onclick = quitRace;
@@ -1670,6 +1771,7 @@ $('#importFile').onchange = async e => {
       if (!c.line.every(p => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]))) continue;
       if (ids.has(c.id)) { if (validScen(c.scenery) && !(await sceneDB.get(c.id))) scn.push([c.id, c.scenery]); continue; }
       const nc = { id: typeof c.id === 'string' && /^u[0-9a-z]+$/.test(c.id) ? c.id : 'u' + (Date.now() + n).toString(36), name: c.name.slice(0, 24), wps: c.wps, line: c.line, len: +c.len || lineLength(c.line), desc: '', type: c.type === 'oneway' ? 'oneway' : 'loop' };
+      if (Array.isArray(c.elev) && c.elev.every(q => Array.isArray(q) && q.length === 3 && q.every(isFinite))) nc.elev = c.elev;
       list.push(nc); ids.add(nc.id); n++;
       if (validScen(c.scenery)) scn.push([nc.id, c.scenery]);
     }
@@ -1695,6 +1797,7 @@ function syncCtrlUI() {
 seg('#segCtrl', 'ctrl', v => v, async v => { syncCtrlUI(); if (v === 'tilt') await enableTilt(); });
 seg('#segLaps', 'laps', v => +v, () => renderCourses());
 seg('#segRiv', 'rivals');
+seg('#segElev', 'elev', v => +v);
 seg('#segQ', 'quality', v => v, applyQuality);
 $('#sens').value = settings.sens; $('#sens').oninput = e => { settings.sens = +e.target.value; saveSettings(); };
 $('#invert').checked = settings.invert; $('#invert').onchange = e => { settings.invert = e.target.checked; saveSettings(); };
