@@ -117,6 +117,12 @@
   .wp.g{background:#ffd23f;color:#111;width:32px;height:32px;line-height:27px;font-size:15px}
   .edOpt .seg button{min-height:36px;font-size:13px}
   .edRow .big.ghost{padding:0 12px}
+  .edPanel.jx .edRoute{display:none}
+  .jxm{display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);position:absolute;left:0;top:0;pointer-events:auto}
+  .jxm i{font-style:normal;font-size:20px;width:34px;height:34px;line-height:30px;text-align:center;border-radius:50%;background:#fff;border:2.5px solid #1d4fb8;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+  .jxm b{margin-top:2px;background:#1d4fb8;color:#fff;border:1.5px solid #fff;border-radius:5px;padding:1px 6px;font-size:12px;white-space:nowrap}
+  .jxm b:empty{display:none}
+  #jxDlg input[type=text]{width:100%;height:50px;border-radius:12px;border:0;padding:0 12px;font-size:16px;background:rgba(255,255,255,.12);margin:4px 0 6px}
   .leaflet-control-attribution{font-size:10px}
 
   /* ローディング */
@@ -276,8 +282,9 @@
   </form>
   <div class="edPanel">
     <p id="edInfo"></p>
-    <div class="edOpt"><span>コースの形</span><div class="seg" id="segType"><button data-v="loop" type="button">🔁 周回</button><button data-v="oneway" type="button">➡️ 片道</button></div></div>
-    <div class="edOpt"><span>道路に沿ってコースを作る</span><span class="sw"><input type="checkbox" id="snap" checked><i></i></span></div>
+    <div class="edOpt"><span>置くもの</span><div class="seg" id="segEdMode"><button data-v="route" type="button">🏁 ルート</button><button data-v="jx" type="button">🚥 交差点・信号</button></div></div>
+    <div class="edOpt edRoute"><span>コースの形</span><div class="seg" id="segType"><button data-v="loop" type="button">🔁 周回</button><button data-v="oneway" type="button">➡️ 片道</button></div></div>
+    <div class="edOpt edRoute"><span>道路に沿ってコースを作る</span><span class="sw"><input type="checkbox" id="snap" checked><i></i></span></div>
     <div class="edBtns">
       <button id="edUndo" type="button">↶ 戻す</button>
       <button id="edClear" type="button">🗑 全消去</button>
@@ -339,6 +346,18 @@
   </div>
 </div>
 
+<!-- ================= 交差点の設定 ================= -->
+<div id="jxDlg" class="screen dim" hidden>
+  <div class="card">
+    <h3 style="font-size:20px;font-style:normal;font-family:inherit">🚥 交差点</h3>
+    <input id="jxName" type="text" maxlength="20" placeholder="交差点名（例：桜田門）空欄でもOK" enterkeyhint="done">
+    <div class="row"><label>信号機を置く</label><span class="sw"><input type="checkbox" id="jxSig" checked><i></i></span></div>
+    <button class="big primary" id="jxOk">OK</button>
+    <button class="big ghost" id="jxDel" style="color:#ff8a7a">🗑 この交差点を消す</button>
+    <button class="big ghost" id="jxCancel">キャンセル</button>
+  </div>
+</div>
+
 <!-- ================= コースのメニュー ================= -->
 <div id="courseMenu" class="screen dim" hidden>
   <div class="card">
@@ -346,6 +365,7 @@
     <p id="cmInfo" style="text-align:center;font-size:13px;opacity:.8;margin:0 0 6px;line-height:1.5"></p>
     <button class="big ghost" id="cmRefetch"></button>
     <button class="big ghost" id="cmClear">🧹 保存した建物・道路を消す</button>
+    <button class="big ghost" id="cmEdit">🗺️ コースを編集（ルート・交差点・信号）</button>
     <button class="big ghost" id="cmRename">✏️ 名前を変更</button>
     <button class="big ghost" id="cmDelete" style="color:#ff8a7a">🗑 コースを削除</button>
     <button class="big primary" id="cmClose">閉じる</button>
@@ -1069,14 +1089,19 @@ function namePlate(name, en) {
 function clusterJunctions(nodes) {
   const cl = [];
   for (const [x, z, name, en, sig, src, road] of nodes) {
-    let c = cl.find(c => (c.x - x) ** 2 + (c.z - z) ** 2 < 32 * 32);
+    let c = cl.find(c => (c.x - x) ** 2 + (c.z - z) ** 2 < 32 * 32 && !(src === 'user' && c.src === 'user'));
     if (!c) cl.push(c = { x, z, n: 0, names: {}, en: '', sig: 0, src: src || 'osm', roads: {}, pts: [] });
     c.x = (c.x * c.n + x) / (c.n + 1); c.z = (c.z * c.n + z) / (c.n + 1); c.n++; if (c.pts.length < 16) c.pts.push([x, z]);
     if (name) c.names[name] = (c.names[name] || 0) + 1; if (en && !c.en) c.en = en; if (sig) c.sig = 1;
-    if (src === 'osm') c.src = 'osm';
+    if (src === 'osm' && c.src !== 'user') c.src = 'osm';
+    if (src === 'user') { c.src = 'user'; c.uSig = sig ? 1 : 0; if (name) c.uName = name; c.x = x; c.z = z; c.ux = x; }
     if (road) c.roads[road] = 1;
   }
-  for (const c of cl) { c.name = Object.keys(c.names).sort((a, b) => c.names[b] - c.names[a])[0] || ''; c.nameSrc = c.name ? 'osm' : ''; }
+  for (const c of cl) {
+    c.name = Object.keys(c.names).sort((a, b) => c.names[b] - c.names[a])[0] || ''; c.nameSrc = c.name ? 'osm' : '';
+    // 自分で設定した交差点は、名前・信号機の有無をそのまま使う
+    if (c.src === 'user') { c.sig = c.uSig; if (c.uName) { c.name = c.uName; c.nameSrc = 'user'; } }
+  }
   return cl;
 }
 // コースがその交差点を通る場所（周回で2回通る所などは複数）。中央分離帯のある広い交差点も拾えるよう少し広めに判定
@@ -1088,7 +1113,8 @@ function junctionRuns(T, c) {
     if (d < R2) { if (cur && i - cur.last <= 6) { cur.last = i; if (d < cur.d) { cur.d = d; cur.i = i; } } else runs.push(cur = { i, d, last: i }); }
   }
   if (T.closed && runs.length > 1 && runs[0].i < 6 && runs[runs.length - 1].last > T.N - 6) { const a = runs.shift(), b = runs[runs.length - 1]; if (a.d < b.d) Object.assign(b, { i: a.i, d: a.d }); }
-  return c.runs = runs.filter(r => { const s = T.cum[r.i]; return !(s < 12 || (!T.closed && s > T.len - 12)); });
+  // スタート直後・ゴール付近は除く（自分で置いた交差点はそのまま）
+  return c.runs = c.src === 'user' ? runs : runs.filter(r => { const s = T.cum[r.i]; return !(s < 12 || (!T.closed && s > T.len - 12)); });
 }
 /* ---- OpenStreetMap に信号機がないとき：地図データから推定 ---- */
 // 幹線道路（国道・県道クラス）がコースと交わる所に信号があるとみなす
@@ -1185,7 +1211,7 @@ function buildSignals(T, cl, root, world) {
         const pl = namePlate(name, c.en); pl.rotation.y = Math.PI;
         pl.position.set(c.sig ? Math.max(W * .22 + .7 + pl.userData.w / 2, px - 2 - pl.userData.w / 2) : px - pl.userData.w / 2 + .1, c.sig ? 6.8 : 4.6, -.05); sg.add(pl);
       }
-      world.jcts.push({ s: sAt, name, en: c.en, sig: c.sig, guess: c.nameSrc !== 'osm' || c.src !== 'osm' });
+      world.jcts.push({ s: sAt, name, en: c.en, sig: c.sig, guess: c.src === 'map' || c.nameSrc === 'addr' || c.nameSrc === 'road' });
       if (item.lamps) world.signals.push(item);
     }
   }
@@ -1491,8 +1517,12 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
       msg('信号機と交差点を探しています…');
       const nodes = scen && scen.s ? scen.s.map(q => [...proj.fwd(q[0], q[1]), q[2], q[3], q[4], 'osm']) : [];
       info.osm = nodes.filter(q => q[4]).length;
+      // 自分で設定した交差点・信号機（いちばん優先）
+      const ujx = (c.jx || []).filter(q => Array.isArray(q) && isFinite(q[0]) && isFinite(q[1]));
+      nodes.push(...ujx.map(q => [...proj.fwd(q[0], q[1]), q[2] || '', '', q[3] ? 1 : 0, 'user']));
+      info.user = ujx.length;
       jcl = clusterJunctions(nodes);
-      info.osmNear = jcl.filter(q => q.sig && junctionRuns(T, q).length).length;
+      info.osmNear = jcl.filter(q => q.sig && junctionRuns(T, q).length).length; // OSM か自分で置いた信号機
       // コース上に OpenStreetMap の信号機が1つもなければ地図データから推定
       if (!info.osmNear && settings.sigInfer) {
         let inf = scen && scen.h ? inferFromRoads(T, scen, proj) : [];
@@ -1507,7 +1537,7 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
       const nS = world.signals.length, nN = world.jcts.filter(j => j.name).length;
       let t;
       if (info.local) t = '🚥 テストコースには実在の信号機はありません（地図から作ったコースで表示されます）';
-      else if (nS || nN) t = `🚥 信号機 ${nS}基・交差点名 ${nN}件${T.sigGuess ? '（地図データから推定）' : '（OpenStreetMap）'}`;
+      else if (nS || nN) t = `🚥 信号機 ${nS}基・交差点名 ${nN}件${info.user ? `（自分で設定した ${info.user}か所を含む）` : T.sigGuess ? '（地図データから推定）' : '（OpenStreetMap）'}`;
       else if (info.err) t = '🚥 信号機のデータを取得できませんでした（通信状態を確認して、コースの「⋯」→「建物・道路を最新に取り直す」を試してください）';
       else t = `🚥 このコース上には信号機が見つかりませんでした${info.osm ? `（近くの信号 ${info.osm}基はコースから離れていました）` : ''}`;
       T.sigText = t; setTimeout(() => toast(t, 4200), 3400);
@@ -1968,6 +1998,9 @@ function courseMenu(c) {
   $('#cmClear').hidden = !m;
   $('#cmRefetch').textContent = m ? '🔄 建物・道路を最新に取り直す' : '⬇️ 建物・道路を読み込んで走る';
   const close = () => show('#courseMenu', false);
+  $('#cmEdit').hidden = !!c.local;
+  $('#cmEdit').textContent = user ? '🗺️ コースを編集（ルート・交差点・信号）' : '🗺️ コピーして編集（交差点・信号を追加）';
+  $('#cmEdit').onclick = () => { close(); editCourse(c); };
   $('#cmRename').onclick = () => { close(); const n = prompt('コース名', c.name); if (n == null || !n.trim()) return; const l = userCourses(); const x = l.find(x => x.id === c.id); if (x) { x.name = n.trim().slice(0, 24); saveUserCourses(l); renderCourses(); } };
   $('#cmRefetch').onclick = () => { close(); if (isOneway(c)) pickDir(c, true); else playCourse(c, 'fwd', true); };
   $('#cmClear').onclick = async () => { if (!confirm('保存してある建物・道路データを消しますか？（次に走るときにまた読み込みます）')) return; await sceneDB.del(c.id); store.del('scn.' + c.id); close(); renderCourses(); toast('建物・道路データを消しました'); };
@@ -2020,6 +2053,7 @@ $('#importFile').onchange = async e => {
       if (ids.has(c.id)) { if (validScen(c.scenery) && !(await sceneDB.get(c.id))) scn.push([c.id, c.scenery]); continue; }
       const nc = { id: typeof c.id === 'string' && /^u[0-9a-z]+$/.test(c.id) ? c.id : 'u' + (Date.now() + n).toString(36), name: c.name.slice(0, 24), wps: c.wps, line: c.line, len: +c.len || lineLength(c.line), desc: '', type: c.type === 'oneway' ? 'oneway' : 'loop' };
       if (Array.isArray(c.elev) && c.elev.every(q => Array.isArray(q) && q.length === 3 && q.every(isFinite))) nc.elev = c.elev;
+      if (Array.isArray(c.jx)) nc.jx = c.jx.filter(q => Array.isArray(q) && isFinite(q[0]) && isFinite(q[1])).slice(0, 60).map(q => [+q[0], +q[1], String(q[2] || '').slice(0, 20), q[3] ? 1 : 0]);
       list.push(nc); ids.add(nc.id); n++;
       if (validScen(c.scenery)) scn.push([nc.id, c.scenery]);
     }
@@ -2070,41 +2104,122 @@ function toTitle() { show('#title', true); show('#editor', false); renderCourses
    コースエディタ（Leaflet）
    ========================================================= */
 let map = null, wps = [], wpMarkers = [], routeLine = null, routeData = null, routeSeq = 0, edType = 'loop';
+let edMode = 'route', jx = [], jxMarkers = [], editing = null, routeDirty = false, edDirty = false;
 const minPts = () => edType === 'oneway' ? 2 : 3;
-function openEditor() {
-  show('#title', false); show('#editor', true);
-  if (!map) {
-    map = L.map('map', { zoomControl: false, attributionControl: true }).setView([35.681, 139.767], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, subdomains: 'abc', attribution: '© OpenStreetMap contributors' }).addTo(map);
-    map.on('click', e => addWp([e.latlng.lat, e.latlng.lng]));
-    // 前回の位置
-    const lastView = store.get('mapView', null); if (lastView) map.setView([lastView[0], lastView[1]], lastView[2]);
-    map.on('moveend', () => { const c = map.getCenter(); store.set('mapView', [c.lat, c.lng, map.getZoom()]); });
-  }
-  setTimeout(() => map.invalidateSize(), 50);
-  updateEditor();
+function initMap() {
+  if (map) return;
+  map = L.map('map', { zoomControl: false, attributionControl: true }).setView([35.681, 139.767], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, subdomains: 'abc', attribution: '© OpenStreetMap contributors' }).addTo(map);
+  map.on('click', e => edMode === 'jx' ? addJx([e.latlng.lat, e.latlng.lng]) : addWp([e.latlng.lat, e.latlng.lng]));
+  // 前回の位置
+  const lastView = store.get('mapView', null); if (lastView) map.setView([lastView[0], lastView[1]], lastView[2]);
+  map.on('moveend', () => { const c = map.getCenter(); store.set('mapView', [c.lat, c.lng, map.getZoom()]); });
 }
-function addWp(ll) { if (wps.length >= 24) { toast('ポイントは24個までです'); return; } wps.push(ll); updateEditor(true); }
+function resetEditor() {
+  wps = []; jx = []; editing = null; routeDirty = false; edDirty = false; routeData = null; routeSeq++;
+  if (routeLine) { routeLine.remove(); routeLine = null; }
+  $('#cname').value = ''; setEdMode('route');
+}
+function openEditor() {
+  show('#title', false); show('#editor', true); initMap();
+  if (editing) resetEditor();
+  setTimeout(() => map.invalidateSize(), 50);
+  updateEditor(); drawJx();
+}
+// 作成済みのコースを編集（プリセットはコピーを作る）
+async function editCourse(c) {
+  show('#title', false); show('#editor', true); initMap(); resetEditor();
+  let line = c.line || store.get('pline.' + c.id, null);
+  edType = isOneway(c) ? 'oneway' : 'loop'; syncType();
+  wps = c.wps.map(p => p.slice()); jx = (c.jx || []).map(q => q.slice());
+  editing = c.id.startsWith('p-') ? { copyOf: c } : { id: c.id };
+  $('#cname').value = editing.copyOf ? c.name + '（編集）' : c.name;
+  setTimeout(() => map.invalidateSize(), 50);
+  if (line) {
+    routeData = { line, len: c.len || lineLength(line), straight: false };
+    routeLine = L.polyline(line, { color: '#ff3b1f', weight: 6, opacity: .85 }).addTo(map);
+    map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
+    updateEditor(false);
+  } else { map.fitBounds(L.latLngBounds(wps), { padding: [30, 30] }); updateEditor(true); }
+  setEdMode('jx'); drawJx();
+}
+function setEdMode(m) {
+  edMode = m; $('#segEdMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
+  document.querySelector('.edPanel').classList.toggle('jx', m === 'jx');
+  $('#edUndo').textContent = '↶ 戻す'; $('#edClear').textContent = '🗑 全消去';
+  refreshInfo();
+}
+$('#segEdMode').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setEdMode(b.dataset.v); });
+function addWp(ll) { if (wps.length >= 24) { toast('ポイントは24個までです'); return; } wps.push(ll); routeDirty = edDirty = true; updateEditor(true); }
 function updateEditor(reroute) {
   wpMarkers.forEach(m => m.remove()); wpMarkers = [];
   wps.forEach((p, i) => {
     const goal = edType === 'oneway' && i === wps.length - 1 && i > 0, big = i === 0 || goal;
     const icon = L.divIcon({ className: '', html: `<div class="wp${i === 0 ? ' s' : goal ? ' g' : ''}">${i === 0 ? '🏁' : goal ? '🏆' : i + 1}</div>`, iconSize: big ? [32, 32] : [28, 28], iconAnchor: big ? [16, 16] : [14, 14] });
     const m = L.marker(p, { icon, draggable: true }).addTo(map);
-    m.on('dragend', () => { const ll = m.getLatLng(); wps[i] = [ll.lat, ll.lng]; updateEditor(true); });
+    m.on('dragend', () => { const ll = m.getLatLng(); wps[i] = [ll.lat, ll.lng]; routeDirty = edDirty = true; updateEditor(true); });
     wpMarkers.push(m);
   });
   if (reroute) buildRoute();
   if (wps.length < minPts()) { routeSeq++; if (routeLine) { routeLine.remove(); routeLine = null; } routeData = null; }
   refreshInfo();
 }
+/* ---- 交差点・信号機を置く ---- */
+// ルート上のいちばん近い点（m単位で計算）
+function nearestOnLine(line, ll) {
+  const pr = makeProj(ll[0], ll[1]); let best = { d: Infinity };
+  for (let i = 0; i < line.length - 1; i++) {
+    const a = pr.fwd(line[i][0], line[i][1]), b = pr.fwd(line[i + 1][0], line[i + 1][1]), dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1;
+    const t = clamp((-a[0] * dx - a[1] * dz) / L2, 0, 1), px = a[0] + dx * t, pz = a[1] + dz * t, d = Math.hypot(px, pz);
+    if (d < best.d) best = { d, ll: pr.inv(px, pz) };
+  }
+  return best;
+}
+function addJx(ll) {
+  if (!routeData) return toast('先に「🏁 ルート」でコースを作ってください');
+  const n = nearestOnLine(routeData.line, ll);
+  if (n.d > 80) return toast('コースの近く（80m以内）をタップしてください');
+  if (jx.length >= 60) return toast('交差点は60個までです');
+  jxDialog(null, [+n.ll[0].toFixed(6), +n.ll[1].toFixed(6)]);
+}
+function jxDialog(idx, ll) {
+  const cur = idx != null ? jx[idx] : null;
+  $('#jxName').value = cur ? cur[2] : ''; $('#jxSig').checked = cur ? !!cur[3] : true; $('#jxDel').hidden = idx == null;
+  show('#jxDlg', true); setTimeout(() => { if (!cur) $('#jxName').focus(); }, 100);
+  const close = () => { show('#jxDlg', false); $('#jxName').blur(); };
+  $('#jxOk').onclick = () => {
+    const name = $('#jxName').value.trim().slice(0, 20), sig = $('#jxSig').checked ? 1 : 0;
+    if (!name && !sig) { toast('交差点名を入れるか、信号機をオンにしてください'); return; }
+    if (cur) { cur[2] = name; cur[3] = sig; } else jx.push([ll[0], ll[1], name, sig]);
+    edDirty = true; close(); drawJx(); refreshInfo();
+  };
+  $('#jxDel').onclick = () => { jx.splice(idx, 1); edDirty = true; close(); drawJx(); refreshInfo(); };
+  $('#jxCancel').onclick = close;
+}
+$('#jxName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#jxOk').click(); } });
+function drawJx() {
+  jxMarkers.forEach(m => m.remove()); jxMarkers = [];
+  if (!map) return;
+  jx.forEach((q, i) => {
+    const d = document.createElement('div'); d.className = 'jxm'; d.innerHTML = `<i>${q[3] ? '🚥' : '📍'}</i><b></b>`; d.querySelector('b').textContent = q[2];
+    const m = L.marker([q[0], q[1]], { icon: L.divIcon({ className: '', html: d, iconSize: [0, 0] }), draggable: true, zIndexOffset: 1000 }).addTo(map);
+    m.on('click', () => jxDialog(i));
+    m.on('dragend', () => { const ll = m.getLatLng(); const n = routeData ? nearestOnLine(routeData.line, [ll.lat, ll.lng]) : null; if (n && n.d < 80) { q[0] = +n.ll[0].toFixed(6); q[1] = +n.ll[1].toFixed(6); } edDirty = true; drawJx(); });
+    jxMarkers.push(m);
+  });
+}
 function refreshInfo(status) {
   const n = wps.length, info = $('#edInfo'), ow = edType === 'oneway', need = minPts(), minLen = ow ? 300 : 400;
-  if (status) info.innerHTML = status;
-  else if (n < need) info.innerHTML = ow
+  const head = editing ? `<b>「${($('#cname').value || '').replace(/[<&>]/g, '')}」を編集中</b><br>` : '';
+  if (status) info.innerHTML = head + status;
+  else if (edMode === 'jx') info.innerHTML = head + (routeData
+    ? `コース上の交差点をタップして<b>交差点名</b>と<b>信号機</b>を設定できます（コースに吸い付きます）。置いた印をタップで変更・削除、ドラッグで移動。<br>設定済み：${jx.length}か所（信号機 ${jx.filter(q => q[3]).length}基）`
+    : '先に「🏁 ルート」でコースを作ってください。');
+  else if (n < need) info.innerHTML = head + (ow
     ? `地図をタップして<b>スタート</b>→（通過ポイント）→<b>ゴール</b>の順に置いてください（あと${need - n}つ以上）。最後に置いたポイントがゴールになります。`
-    : `地図をタップして<b>通過ポイント</b>を置いてください（あと${need - n}つ以上）。最後のポイントから自動でスタートに戻り、周回コースになります。ポイントはドラッグで動かせます。`;
-  else if (routeData) info.innerHTML = `${ow ? '片道' : '周回'}コース 全長 <b>${lenTxt(routeData.len)}</b>（ポイント${n}個）${ow ? '<br>走る前に往路・復路を選べます' : ''}${routeData.len > 8000 ? '<br>⚠ 長いコースは走り切るのに時間がかかります' : ''}${routeData.len < minLen ? '<br>⚠ 短すぎます。ポイントを離してください' : ''}${routeData.straight ? '<br>道路を使わず直線でつないでいます' : ''}`;
+    : `地図をタップして<b>通過ポイント</b>を置いてください（あと${need - n}つ以上）。最後のポイントから自動でスタートに戻り、周回コースになります。ポイントはドラッグで動かせます。`);
+  else if (routeData) info.innerHTML = head + `${ow ? '片道' : '周回'}コース 全長 <b>${lenTxt(routeData.len)}</b>（ポイント${n}個）${ow ? '<br>走る前に往路・復路を選べます' : ''}${routeData.len > 8000 ? '<br>⚠ 長いコースは走り切るのに時間がかかります' : ''}${routeData.len < minLen ? '<br>⚠ 短すぎます。ポイントを離してください' : ''}${routeData.straight ? '<br>道路を使わず直線でつないでいます' : ''}`;
+  else info.innerHTML = head + 'ルートを計算中…';
   const ok = n >= need && routeData && routeData.len >= minLen;
   $('#edSave').disabled = $('#edSaveOnly').disabled = !ok;
 }
@@ -2120,13 +2235,23 @@ async function buildRoute() {
   routeData = { line, len: lineLength(line), straight };
   if (routeLine) routeLine.remove();
   routeLine = L.polyline(line, { color: '#ff3b1f', weight: 6, opacity: .85 }).addTo(map);
+  // ルートが変わったら、離れてしまった交差点を知らせる
+  const far = jx.filter(q => nearestOnLine(line, q).d > 80).length;
+  if (far) toast(`交差点 ${far}か所がコースから離れました（走るときは表示されません）`);
   refreshInfo();
 }
 $('#toEditor').onclick = openEditor;
-$('#edUndo').onclick = () => { wps.pop(); updateEditor(true); };
-$('#edClear').onclick = () => { if (wps.length && !confirm('ポイントを全部消しますか？')) return; wps = []; updateEditor(true); };
-$('#edBack').onclick = () => { toTitle(); };
-$('#snap').onchange = () => updateEditor(true);
+$('#edUndo').onclick = () => {
+  if (edMode === 'jx') { if (jx.length) { jx.pop(); edDirty = true; drawJx(); refreshInfo(); } return; }
+  wps.pop(); routeDirty = edDirty = true; updateEditor(true);
+};
+$('#edClear').onclick = () => {
+  if (edMode === 'jx') { if (jx.length && confirm('置いた交差点を全部消しますか？')) { jx = []; edDirty = true; drawJx(); refreshInfo(); } return; }
+  if (wps.length && !confirm('ポイントを全部消しますか？')) return; wps = []; routeDirty = edDirty = true; updateEditor(true);
+};
+$('#edBack').onclick = () => { if (edDirty && !confirm('変更を保存せずに戻りますか？')) return; resetEditor(); drawJx(); updateEditor(false); toTitle(); };
+$('#snap').onchange = () => { routeDirty = edDirty = true; updateEditor(true); };
+$('#cname').addEventListener('input', () => { edDirty = true; });
 $('#edLoc').onclick = () => {
   if (!navigator.geolocation) return toast('位置情報が使えません');
   toast('現在地を取得中…');
@@ -2142,21 +2267,35 @@ $('#searchForm').onsubmit = async e => {
 };
 function saveCourse() {
   if (!routeData) return null;
-  const name = $('#cname').value.trim() || ('マイコース ' + (userCourses().length + 1));
-  const c = { id: 'u' + Date.now().toString(36), name, wps: wps.slice(), line: routeData.line, len: routeData.len, desc: '', type: edType };
-  const list = userCourses(); list.push(c);
+  const list = userCourses();
+  const name = $('#cname').value.trim() || ('マイコース ' + (list.length + 1));
+  let c;
+  if (editing && editing.id) {
+    c = list.find(x => x.id === editing.id);
+    if (!c) { toast('編集中のコースが見つかりません'); return null; }
+    if (routeDirty) {
+      // ルートが変わったら、古い建物・標高・交差点名のデータを消して次回取り直す
+      Object.assign(c, { wps: wps.slice(), line: routeData.line, len: routeData.len, type: edType }); delete c.elev;
+      sceneDB.del(c.id); for (const k of ['scn.', 'osteps.', 'jn.', 'elev.']) store.del(k + c.id);
+    }
+    c.name = name; c.jx = jx.map(q => q.slice());
+  } else {
+    c = { id: 'u' + Date.now().toString(36), name, wps: wps.slice(), line: routeData.line, len: routeData.len, desc: '', type: edType, jx: jx.map(q => q.slice()) };
+    if (editing && editing.copyOf && !routeDirty && editing.copyOf.elev) c.elev = editing.copyOf.elev;
+    list.push(c);
+  }
   if (!saveUserCourses(list)) { toast('保存容量がいっぱいです。古いコースを削除してください'); return null; }
-  wps = []; $('#cname').value = ''; updateEditor(false);
+  resetEditor(); drawJx(); updateEditor(false);
   return c;
 }
 $('#edSave').onclick = () => { const c = saveCourse(); if (!c) return; if (isOneway(c)) { toTitle(); pickDir(c); } else playCourse(c); };
 $('#edSaveOnly').onclick = () => { const c = saveCourse(); if (!c) return; toTitle(); toast(`「${c.name}」を保存しました`); };
 $('#segType').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || b.dataset.v === edType) return;
-  edType = b.dataset.v; syncType(); updateEditor(true);
+  edType = b.dataset.v; syncType(); routeDirty = edDirty = true; updateEditor(true);
 });
 function syncType() { $('#segType').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === edType)); }
-syncType();
+syncType(); setEdMode('route');
 
 /* 起動 */
 applyQuality();
