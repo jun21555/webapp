@@ -332,6 +332,7 @@
     <h3>PAUSE</h3>
     <button class="big primary" id="pResume">▶ 再開</button>
     <button class="big ghost" id="pRetry">↻ やり直す</button>
+    <p id="pInfo" style="font-size:12px;opacity:.75;text-align:center;margin:10px 0 0;line-height:1.5"></p>
     <button class="big ghost" id="pReset">🚗 コースに戻す</button>
     <button class="big ghost" id="pCal">📱 傾きの中心を合わせる</button>
     <button class="big ghost" id="pQuit">コース選択へ</button>
@@ -1069,14 +1070,25 @@ function clusterJunctions(nodes) {
   const cl = [];
   for (const [x, z, name, en, sig, src, road] of nodes) {
     let c = cl.find(c => (c.x - x) ** 2 + (c.z - z) ** 2 < 32 * 32);
-    if (!c) cl.push(c = { x, z, n: 0, names: {}, en: '', sig: 0, src: src || 'osm', roads: {} });
-    c.x = (c.x * c.n + x) / (c.n + 1); c.z = (c.z * c.n + z) / (c.n + 1); c.n++;
+    if (!c) cl.push(c = { x, z, n: 0, names: {}, en: '', sig: 0, src: src || 'osm', roads: {}, pts: [] });
+    c.x = (c.x * c.n + x) / (c.n + 1); c.z = (c.z * c.n + z) / (c.n + 1); c.n++; if (c.pts.length < 16) c.pts.push([x, z]);
     if (name) c.names[name] = (c.names[name] || 0) + 1; if (en && !c.en) c.en = en; if (sig) c.sig = 1;
     if (src === 'osm') c.src = 'osm';
     if (road) c.roads[road] = 1;
   }
   for (const c of cl) { c.name = Object.keys(c.names).sort((a, b) => c.names[b] - c.names[a])[0] || ''; c.nameSrc = c.name ? 'osm' : ''; }
   return cl;
+}
+// コースがその交差点を通る場所（周回で2回通る所などは複数）。中央分離帯のある広い交差点も拾えるよう少し広めに判定
+function junctionRuns(T, c) {
+  if (c.runs) return c.runs;
+  const R2 = (T.W / 2 + 18) ** 2, runs = []; let cur = null; const P = c.pts && c.pts.length ? c.pts : [[c.x, c.z]];
+  for (let i = 0; i < T.N; i++) {
+    let d = Infinity; for (const q of P) { const v = (T.pts[i][0] - q[0]) ** 2 + (T.pts[i][1] - q[1]) ** 2; if (v < d) d = v; }
+    if (d < R2) { if (cur && i - cur.last <= 6) { cur.last = i; if (d < cur.d) { cur.d = d; cur.i = i; } } else runs.push(cur = { i, d, last: i }); }
+  }
+  if (T.closed && runs.length > 1 && runs[0].i < 6 && runs[runs.length - 1].last > T.N - 6) { const a = runs.shift(), b = runs[runs.length - 1]; if (a.d < b.d) Object.assign(b, { i: a.i, d: a.d }); }
+  return c.runs = runs.filter(r => { const s = T.cum[r.i]; return !(s < 12 || (!T.closed && s > T.len - 12)); });
 }
 /* ---- OpenStreetMap に信号機がないとき：地図データから推定 ---- */
 // 幹線道路（国道・県道クラス）がコースと交わる所に信号があるとみなす
@@ -1116,19 +1128,30 @@ async function inferFromRoute(c, ow, signal) {
 }
 // 名前のない交差点に、国土地理院の住所（町名・丁目）か交わる道路名を付ける
 async function nameJunctions(c, cls, proj, T, signal, msg) {
-  const key = 'jn.' + c.id, cache = store.get(key, {}); let changed = false, budget = Date.now() + 15000, n = 0;
+  const key = 'jn.' + c.id, cache = store.get(key, {}); let changed = false, budget = Date.now() + 20000, n = 0, gsiDown = false, nomiN = 0;
   for (const cl of cls) {
     if (cl.name) continue;
-    if (T.nearest(cl.x, cl.z, T.W / 2 + 14) > T.W / 2 + 12) continue; // コースから離れた交差点は不要
+    if (!junctionRuns(T, cl).length) continue; // コースが通らない交差点は不要
     const [lat, lon] = proj.inv(cl.x, cl.z), k = lat.toFixed(4) + ',' + lon.toFixed(4);
     let nm = cache[k];
     if (nm === undefined && Date.now() < budget && n < 40) {
       n++; if (msg && n === 1) msg('交差点名を地図データから調べています…<br><small>国土地理院 住所検索</small>');
-      try {
-        const j = await fetchJSON(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`, {}, 5000, signal);
-        const v = j && j.results && j.results.lv01Nm; nm = v && v !== '－' && v !== '-' ? String(v).slice(0, 20) : '';
-        cache[k] = nm; changed = true;
-      } catch (e) { if (signal && signal.aborted) throw e; nm = undefined; }
+      if (!gsiDown) {
+        try {
+          const j = await fetchJSON(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`, {}, 5000, signal);
+          const v = j && j.results && j.results.lv01Nm; nm = v && v !== '－' && v !== '-' ? String(v).slice(0, 20) : '';
+        } catch (e) { if (signal && signal.aborted) throw e; gsiDown = true; nm = undefined; }
+      }
+      if (nm === undefined && nomiN < 12) {
+        // 国土地理院につながらない時は Nominatim（1秒に1回まで）
+        nomiN++; if (nomiN > 1) await new Promise(r => setTimeout(r, 1100));
+        try {
+          const j = await fetchJSON(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&accept-language=ja&lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`, {}, 8000, signal);
+          const a = (j && j.address) || {}, q = a.quarter || a.suburb || '', nb = a.neighbourhood || '';
+          nm = (nb && q && !nb.includes(q) ? q + nb : (nb || q || a.road || '')).slice(0, 20);
+        } catch (e) { if (signal && signal.aborted) throw e; nm = undefined; }
+      }
+      if (nm !== undefined) { cache[k] = nm; changed = true; }
     }
     if (nm) { cl.name = nm; cl.nameSrc = 'addr'; }
     else { const r = Object.keys(cl.roads).filter(Boolean); if (r.length) { cl.name = r[0]; cl.nameSrc = 'road'; } }
@@ -1141,34 +1164,28 @@ function buildSignals(T, cl, root, world) {
   for (const c of cl) {
     const name = c.name;
     if (!c.sig && !name) continue;
-    // コースがこの交差点を通る回数分（周回で2回通る所など）
-    const R2 = (W / 2 + 12) ** 2, runs = []; let cur = null;
-    for (let i = 0; i < T.N; i++) {
-      const d = (T.pts[i][0] - c.x) ** 2 + (T.pts[i][1] - c.z) ** 2;
-      if (d < R2) { if (cur && i - cur.last <= 6) { cur.last = i; if (d < cur.d) { cur.d = d; cur.i = i; } } else runs.push(cur = { i, d, last: i }); }
-    }
-    if (T.closed && runs.length > 1 && runs[0].i < 6 && runs[runs.length - 1].last > T.N - 6) { const a = runs.shift(), b = runs[runs.length - 1]; if (a.d < b.d) Object.assign(b, { i: a.i, d: a.d }); }
-    for (const r of runs) {
+    for (const r of junctionRuns(T, c)) {
       const sAt = T.cum[r.i];
-      if (sAt < 12 || (!T.closed && sAt > T.len - 12)) continue;
       const a = T.at(sAt), grp = new THREE.Group(); grp.position.set(a.x, a.y, a.z); grp.rotation.y = Math.atan2(a.tx, a.tz); root.add(grp);
+      const sc = 1.3; // 見やすいよう実物より少し大きめ
+      const sg = new THREE.Group(); sg.scale.set(sc, sc, sc); sg.position.x = (W / 2 + 5.8) * (1 - sc); grp.add(sg);
       const px = W / 2 + 5.8; // 左側の歩道あたり（日本は左側通行）
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(.16, .2, 6.4, 8), M.pole); pole.position.set(px, 3.2, 0); pole.castShadow = true; grp.add(pole);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(.16, .2, 6.4, 8), M.pole); pole.position.set(px, 3.2, 0); pole.castShadow = true; sg.add(pole);
       const item = { s: sAt, name, en: c.en, lamps: null, phase: rnd() * 16 };
       if (c.sig) {
-        const armL = px - W * .22; const arm = new THREE.Mesh(new THREE.BoxGeometry(armL, .16, .16), M.pole); arm.position.set(px - armL / 2, 5.9, 0); grp.add(arm);
-        const box = new THREE.Mesh(new THREE.BoxGeometry(1.35, .48, .32), M.box); box.position.set(W * .22, 5.55, 0); box.castShadow = true; grp.add(box);
+        const armL = px - W * .22; const arm = new THREE.Mesh(new THREE.BoxGeometry(armL, .16, .16), M.pole); arm.position.set(px - armL / 2, 5.9, 0); sg.add(arm);
+        const box = new THREE.Mesh(new THREE.BoxGeometry(1.35, .48, .32), M.box); box.position.set(W * .22, 5.55, 0); box.castShadow = true; sg.add(box);
         const lampG = new THREE.CircleGeometry(.17, 16); item.lamps = [];
-        [.43, 0, -.43].forEach((lx, k) => { const l = new THREE.Mesh(lampG, M.off[k]); l.rotation.y = Math.PI; l.position.set(W * .22 + lx, 5.55, -.17); grp.add(l); item.lamps.push(l); });
+        [.43, 0, -.43].forEach((lx, k) => { const l = new THREE.Mesh(lampG, M.off[k]); l.rotation.y = Math.PI; l.position.set(W * .22 + lx, 5.55, -.17); sg.add(l); item.lamps.push(l); });
         // 停止線（左側の車線）
         const b2 = T.at(sAt - 7), sl = new THREE.Mesh(new THREE.PlaneGeometry(W / 2 - .6, .45), M.line);
         sl.rotation.set(-Math.PI / 2, 0, Math.atan2(b2.tx, b2.tz)); sl.position.set(b2.x - b2.rx * (W / 4), b2.y + .13, b2.z - b2.rz * (W / 4)); root.add(sl);
       }
       if (name) {
         const pl = namePlate(name, c.en); pl.rotation.y = Math.PI;
-        pl.position.set(c.sig ? Math.max(W * .22 + .7 + pl.userData.w / 2, px - 2 - pl.userData.w / 2) : px - pl.userData.w / 2 + .1, c.sig ? 6.8 : 4.6, -.05); grp.add(pl);
-        world.jcts.push({ s: sAt, name, en: c.en, guess: c.nameSrc !== 'osm' || c.src !== 'osm' });
+        pl.position.set(c.sig ? Math.max(W * .22 + .7 + pl.userData.w / 2, px - 2 - pl.userData.w / 2) : px - pl.userData.w / 2 + .1, c.sig ? 6.8 : 4.6, -.05); sg.add(pl);
       }
+      world.jcts.push({ s: sAt, name, en: c.en, sig: c.sig, guess: c.nameSrc !== 'osm' || c.src !== 'osm' });
       if (item.lamps) world.signals.push(item);
     }
   }
@@ -1421,7 +1438,7 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
   const msg = t => $('#loadMsg').innerHTML = t;
   $('#loadCancel').onclick = () => { ac.abort(); show('#loading', false); toTitle(); };
   try {
-    let pts, scen = null, proj = null, elevXZ = null;
+    let pts, scen = null, proj = null, elevXZ = null, sigErr = false;
     if (c.local) {
       msg('コースを作成中…'); let raw = ow ? sampleSprintPts() : sampleCoursePts();
       elevXZ = ow ? synthElev(raw, t => 30 * t + 9 * Math.sin(t * 14)) : synthElev(raw, t => 11 * Math.sin(t * Math.PI * 4 + .5) + 6 * Math.sin(t * Math.PI * 6));
@@ -1443,10 +1460,11 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
       pts = processLine(line.map(p => proj.fwd(p[0], p[1])), !ow);
       if (refetch) { await sceneDB.del(c.id); store.del('scn.' + c.id); }
       else { msg('保存してある建物・道路データを読み込み中…'); scen = await loadScenery(c.id); }
-      if (scen && !scen.s && settings.signals) {
+      if (scen && (!scen.s || (!scen.s.length && Date.now() - (scen.sAt || 0) > 864e5)) && settings.signals) {
+        // 信号データがない（以前の保存データ）か、前回0件だった時は取り直す
         msg('信号機と交差点名を読み込み中…<br><small>OpenStreetMap / Overpass API</small>');
-        try { scen.s = await fetchSignals(line, ac.signal); await sceneDB.set(c.id, scen); }
-        catch (e) { if (ac.signal.aborted) return; }
+        try { scen.s = await fetchSignals(line, ac.signal); scen.sAt = Date.now(); await sceneDB.set(c.id, scen); }
+        catch (e) { if (ac.signal.aborted) return; sigErr = true; }
       }
       if (!scen) {
         msg('まわりの建物・道路を読み込み中…<br><small>OpenStreetMap / Overpass API（数秒〜20秒ほど）</small>');
@@ -1468,20 +1486,32 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
     const HF = makeHeightField(elevXZ, settings.elev);
     if (HF) T.setHeights(HF.H);
     // 信号機と交差点名：OpenStreetMap → 無ければ地図データから推定
-    let jcl = null;
+    let jcl = null; const info = { osm: 0, osmNear: 0, inf: 0, err: sigErr || (!scen && !c.local), local: !!c.local };
     if (proj && settings.signals) {
+      msg('信号機と交差点を探しています…');
       const nodes = scen && scen.s ? scen.s.map(q => [...proj.fwd(q[0], q[1]), q[2], q[3], q[4], 'osm']) : [];
-      if (!nodes.some(q => q[4]) && settings.sigInfer) {
-        let inf = scen && scen.h ? inferFromRoads(T, scen, proj) : [];
-        if (!inf.length && !c.local) { try { inf = (await inferFromRoute(c, ow, ac.signal)).map(q => [...proj.fwd(q[0], q[1]), '', '', 1, 'map', q[2]]); } catch (e) { if (ac.signal.aborted) return; } }
-        nodes.push(...inf);
-        if (inf.length) T.sigGuess = true;
-      }
+      info.osm = nodes.filter(q => q[4]).length;
       jcl = clusterJunctions(nodes);
+      info.osmNear = jcl.filter(q => q.sig && junctionRuns(T, q).length).length;
+      // コース上に OpenStreetMap の信号機が1つもなければ地図データから推定
+      if (!info.osmNear && settings.sigInfer) {
+        let inf = scen && scen.h ? inferFromRoads(T, scen, proj) : [];
+        if (!inf.length && !c.local) { try { inf = (await inferFromRoute(c, ow, ac.signal)).map(q => [...proj.fwd(q[0], q[1]), '', '', 1, 'map', q[2]]); } catch (e) { if (ac.signal.aborted) return; info.err = true; } }
+        if (inf.length) { nodes.push(...inf); jcl = clusterJunctions(nodes); T.sigGuess = true; }
+      }
       if (settings.sigInfer && jcl.some(q => !q.name)) { try { await nameJunctions(c, jcl, proj, T, ac.signal, msg); } catch (e) { if (ac.signal.aborted) return; } }
     }
     buildWorld(T, scen, scen ? proj : null, HF, jcl);
-    if (T.sigGuess && world.signals.length) setTimeout(() => toast(`🚥 信号機 ${world.signals.length}基を地図データから推定して表示しています`, 2800), 3400);
+    // 信号機の表示結果をお知らせ（表示できなかった時は理由も）
+    if (settings.signals) {
+      const nS = world.signals.length, nN = world.jcts.filter(j => j.name).length;
+      let t;
+      if (info.local) t = '🚥 テストコースには実在の信号機はありません（地図から作ったコースで表示されます）';
+      else if (nS || nN) t = `🚥 信号機 ${nS}基・交差点名 ${nN}件${T.sigGuess ? '（地図データから推定）' : '（OpenStreetMap）'}`;
+      else if (info.err) t = '🚥 信号機のデータを取得できませんでした（通信状態を確認して、コースの「⋯」→「建物・道路を最新に取り直す」を試してください）';
+      else t = `🚥 このコース上には信号機が見つかりませんでした${info.osm ? `（近くの信号 ${info.osm}基はコースから離れていました）` : ''}`;
+      T.sigText = t; setTimeout(() => toast(t, 4200), 3400);
+    }
     if (HF) { let lo = Infinity, hi = -Infinity; for (const v of T.h) { lo = Math.min(lo, v); hi = Math.max(hi, v); } T.climb = hi - lo; }
     if (T.climb > 1.5) setTimeout(() => toast(`⛰ 高低差 ${Math.round(T.climb)} m${settings.elev > 1 ? `（実際の${settings.elev}倍）` : ''}`, 2500), 600);
     startRace(c, dir);
@@ -1727,10 +1757,13 @@ function updateJct() {
     let d = j.s - p.s; if (T.closed) { if (d < -T.len / 2) d += T.len; if (d > T.len / 2) d -= T.len; }
     if (d > -12 && d < 160 && d < bd) { bd = d; best = j; }
   }
-  const key = best ? best.name : '';
+  const dist = best ? Math.max(0, Math.round(bd / 10) * 10) : 0, key = best ? best.s + ':' + dist : '';
   if (key === jctShown) return; jctShown = key;
   $('#jct').hidden = !best;
-  if (best) { $('#jctName').textContent = '🚥 ' + best.name; $('#jctEn').textContent = best.guess ? '地図から推定' : (best.en || ''); }
+  if (best) {
+    $('#jctName').textContent = (best.sig ? '🚥 ' : '📍 ') + (best.name || '交差点');
+    $('#jctEn').textContent = [best.en && !best.guess ? best.en : '', dist > 0 ? 'あと ' + dist + ' m' : '', best.guess ? '地図から推定' : ''].filter(Boolean).join('・');
+  }
 }
 function updateHUD() {
   const p = race.p, sp = Math.hypot(p.vx, p.vz), kmh = Math.round(sp * 3.6);
@@ -1845,6 +1878,7 @@ function togglePause(force) {
   if (pause && race.state !== 'paused') { race.prevState = race.state; race.state = 'paused'; show('#pause', true); Snd.mute(); }
   else if (!pause && race.state === 'paused') { race.state = race.prevState; show('#pause', false); last = performance.now(); }
   $('#pCal').hidden = settings.ctrl !== 'tilt';
+  $('#pInfo').textContent = (T && T.sigText) || '';
 }
 function quitRace() {
   if (race) { scene.remove(race.p.car); race.cpus.forEach(c => scene.remove(c.car)); }

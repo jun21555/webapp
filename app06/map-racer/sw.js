@@ -1,5 +1,5 @@
 // マップレーサー Service Worker: アプリ本体とライブラリをキャッシュしてオフラインでも起動できるようにする
-const CACHE = 'map-racer-v7';
+const CACHE = 'map-racer-v8';
 const SHELL = ['map-racer.html', 'manifest.webmanifest', 'favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
   'lib/three.module.min.js', 'lib/leaflet.js', 'lib/leaflet.css'];
 
@@ -14,9 +14,10 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return; // 地図タイルやAPIはキャッシュしない
   e.respondWith(
-    fetch(e.request).then(res => {
+    // GitHub Pages のキャッシュで古い版が使われないよう、毎回サーバーに確認する
+    fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }).then(res => {
       const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copy));
+      if (res.ok) caches.open(CACHE).then(c => c.put(e.request, copy));
       return res;
     }).catch(() => caches.match(e.request, { ignoreSearch: true }))
   );
