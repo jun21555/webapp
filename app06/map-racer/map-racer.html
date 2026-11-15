@@ -34,7 +34,7 @@
   /* ---------- 画面 ---------- */
   .screen{position:fixed;inset:0;z-index:40}
   .dim{background:rgba(6,10,20,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);z-index:90;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
     padding:calc(env(safe-area-inset-top) + 20px) calc(env(safe-area-inset-right) + 20px) calc(env(safe-area-inset-bottom) + 20px) calc(env(safe-area-inset-left) + 20px);
     overflow-y:auto}
 
@@ -79,6 +79,16 @@
   #tiltTest{height:36px;margin:8px 0 0;border-radius:10px;background:rgba(255,255,255,.08);position:relative;overflow:hidden}
   #tiltTest i{position:absolute;top:4px;bottom:4px;left:50%;width:6px;margin-left:-3px;border-radius:3px;background:#ffd23f;transition:left .05s}
   #tiltTest span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;opacity:.6}
+  .course .del.ren{margin-right:-4px}
+  .chip{display:inline-block;font-size:11px;font-weight:800;padding:2px 7px;border-radius:6px;margin-right:6px;vertical-align:2px;background:#2b6cff}
+  .chip.ow{background:#ff8a1f}
+  .io{display:flex;gap:8px;margin-top:4px}
+  .io .big{min-height:48px;font-size:14px}
+  #dirPick .card h3{font-size:22px;font-style:normal;font-family:inherit;line-height:1.3}
+  #dpMap{display:block;width:160px;height:160px;margin:0 auto 6px;border-radius:14px;background:#1b2638}
+  .dpLegend{text-align:center;font-size:12px;opacity:.75;margin:0 0 6px}
+  .big .sub{display:block;font-size:12px;font-weight:600;opacity:.85;margin-top:2px}
+  .big.col{flex-direction:column;gap:0;min-height:64px}
   .credit{font-size:11px;opacity:.5;text-align:center;margin-top:28px;line-height:1.6}
   .help{font-size:13px;opacity:.8;line-height:1.7;margin:0;padding-left:1.2em}
 
@@ -104,6 +114,9 @@
   .edOpt{display:flex;align-items:center;justify-content:space-between;font-size:13px;margin:0 2px 8px}
   .wp{width:28px;height:28px;border-radius:50%;background:#ff5a33;border:2.5px solid #fff;color:#fff;font:800 13px/23px sans-serif;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.4)}
   .wp.s{background:#111;width:32px;height:32px;line-height:27px;font-size:15px}
+  .wp.g{background:#ffd23f;color:#111;width:32px;height:32px;line-height:27px;font-size:15px}
+  .edOpt .seg button{min-height:36px;font-size:13px}
+  .edRow .big.ghost{padding:0 12px}
   .leaflet-control-attribution{font-size:10px}
 
   /* ローディング */
@@ -181,6 +194,8 @@
   }
 
   /* ポーズ・リザルト */
+  #loading{justify-content:center}
+  .dim>.card{margin:auto 0;flex:none}
   .card{width:100%;max-width:380px;background:rgba(20,28,44,.92);border:1.5px solid rgba(255,255,255,.15);border-radius:22px;padding:20px}
   .card h3{margin:0 0 14px;text-align:center;font:900 28px/1 "Arial Black",sans-serif;font-style:italic}
   .card .big{margin-top:10px}
@@ -209,6 +224,11 @@
 
     <h2>コースを選んでスタート</h2>
     <div id="courseList"></div>
+    <div class="io">
+      <button id="btnExport" class="big ghost" type="button">📤 コースを書き出す</button>
+      <button id="btnImport" class="big ghost" type="button">📥 読み込む</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden>
+    </div>
 
     <h2>操作と設定</h2>
     <div class="row"><label>操作方法<small id="ctrlNote">左右ボタンでハンドル</small></label>
@@ -246,7 +266,8 @@
     <button type="submit">検索</button>
   </form>
   <div class="edPanel">
-    <p id="edInfo">地図をタップして<b>通過ポイント</b>を置いてください（3つ以上）。最後のポイントから自動でスタートに戻り、周回コースになります。</p>
+    <p id="edInfo"></p>
+    <div class="edOpt"><span>コースの形</span><div class="seg" id="segType"><button data-v="loop" type="button">🔁 周回</button><button data-v="oneway" type="button">➡️ 片道</button></div></div>
     <div class="edOpt"><span>道路に沿ってコースを作る</span><span class="sw"><input type="checkbox" id="snap" checked><i></i></span></div>
     <div class="edBtns">
       <button id="edUndo" type="button">↶ 戻す</button>
@@ -256,6 +277,7 @@
     </div>
     <div class="edRow">
       <input id="cname" type="text" placeholder="コース名" maxlength="24">
+      <button id="edSaveOnly" class="big ghost" type="button" disabled>保存</button>
       <button id="edSave" class="big primary" type="button" disabled>保存して走る</button>
     </div>
   </div>
@@ -306,6 +328,18 @@
   </div>
 </div>
 
+<!-- ================= 片道コースの向き選択 ================= -->
+<div id="dirPick" class="screen dim" hidden>
+  <div class="card">
+    <h3 id="dpName"></h3>
+    <canvas id="dpMap" width="320" height="320"></canvas>
+    <p class="dpLegend">🟢 スタート地点　🟡 ゴール地点</p>
+    <button class="big primary col" id="dpFwd">▶ 往路を走る<span class="sub" id="dpFwdSub"></span></button>
+    <button class="big primary col" id="dpRev" style="background:linear-gradient(180deg,#3d8bff,#1f5fe0);box-shadow:0 6px 18px rgba(31,95,224,.4)">◀ 復路を走る<span class="sub" id="dpRevSub"></span></button>
+    <button class="big ghost" id="dpCancel">キャンセル</button>
+  </div>
+</div>
+
 <!-- ================= リザルト ================= -->
 <div id="result" class="screen dim" hidden>
   <div class="card">
@@ -314,7 +348,7 @@
     <p class="newrec" id="rNew" hidden>🏆 ベスト記録更新！</p>
     <div class="res">
       <span>タイム</span><b id="rTime"></b>
-      <span>ベストラップ</span><b id="rLap"></b>
+      <span id="rLapL">ベストラップ</span><b id="rLap"></b>
       <span>自己ベスト</span><b id="rBest"></b>
       <span>ドリフトポイント</span><b id="rDrift"></b>
       <span>最高速度</span><b id="rTop"></b>
@@ -359,12 +393,14 @@ async function fetchJSON(url, opt = {}, timeout = 20000, signal) {
    ========================================================= */
 const PRESETS = [
   { id: 'p-sample', name: 'テストサーキット', desc: 'オフラインでも走れる練習コース', local: true },
+  { id: 'p-sprint', name: 'テストスプリント', desc: 'オフラインで走れる片道コース', local: true, type: 'oneway' },
   { id: 'p-kokyo', name: '皇居一周（東京・千代田区）', desc: '内堀通りをぐるっと一周', wps: [[35.6776, 139.7525], [35.6839, 139.7617], [35.6906, 139.7577], [35.6903, 139.7500], [35.6846, 139.7450]] },
   { id: 'p-odaiba', name: 'お台場ベイエリア（東京）', desc: '湾岸のひろい道を周回', wps: [[35.6267, 139.7756], [35.6300, 139.7843], [35.6247, 139.7880], [35.6197, 139.7810]] },
 ];
 const userCourses = () => store.get('courses', []);
 const saveUserCourses = a => store.set('courses', a);
-const bestKey = (c, laps) => 'best.' + c.id + '.' + laps;
+const isOneway = c => c.type === 'oneway';
+const bestKey = (c, laps, dir = 'fwd') => isOneway(c) ? 'best.' + c.id + '.ow.' + dir : 'best.' + c.id + '.' + laps;
 
 /* =========================================================
    地理データ処理
@@ -407,14 +443,60 @@ function smoothClosed(p, r) {
   for (let i = 0; i < n; i++) { let x = 0, z = 0; for (let k = -r; k <= r; k++) { const q = p[(i + k + n) % n]; x += q[0]; z += q[1]; } out[i] = [x / (2 * r + 1), z / (2 * r + 1)]; }
   return out;
 }
-function processLine(raw) {
+function processLine(raw, closed = true) {
   let p = raw.slice();
+  if (!closed) return processOpen(p);
   if (p.length > 2 && d2(p[0], p[p.length - 1]) < 1) p.pop();
   p = resampleClosed(p, 4);
   p = despike(p);
   for (let k = 0; k < 4; k++) p = smoothClosed(p, 3);
   p = resampleClosed(p, 3);
   return p;
+}
+/* ---- 片道コース ---- */
+const RUNUP = 60, RUNOFF = 170; // スタート手前の助走・ゴール後の減速区間(m)
+function resampleOpen(pts, step) {
+  const out = [pts[0].slice()]; let acc = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], L = Math.hypot(dx, dz);
+    if (L < 1e-6) continue;
+    let t = step - acc;
+    while (t <= L) { out.push([a[0] + dx * t / L, a[1] + dz * t / L]); t += step; }
+    acc = L - (t - step);
+  }
+  const e = pts[pts.length - 1]; if (d2(out[out.length - 1], e) > (step * .3) ** 2) out.push(e.slice());
+  return out;
+}
+function despikeOpen(p) {
+  const out = []; let i = 0; const n = p.length;
+  while (i < n) {
+    out.push(p[i]); let cut = -1;
+    for (let j = Math.min(n - 1, i + 70); j >= i + 6; j--) { if (d2(p[i], p[j]) < 16) { cut = j; break; } }
+    i = cut > 0 ? cut + 1 : i + 1;
+  }
+  return out.length > 20 ? out : p;
+}
+function smoothOpen(p, r) {
+  const n = p.length;
+  return p.map((q, i) => {
+    if (i < r || i >= n - r) return q;
+    let x = 0, z = 0; for (let k = -r; k <= r; k++) { x += p[i + k][0]; z += p[i + k][1]; } return [x / (2 * r + 1), z / (2 * r + 1)];
+  });
+}
+function processOpen(raw) {
+  let p = resampleOpen(raw, 4);
+  p = despikeOpen(p);
+  for (let k = 0; k < 4; k++) p = smoothOpen(p, 3);
+  // 両端をまっすぐ延長（助走と減速用）
+  const ext = (a, b, len) => { const dx = a[0] - b[0], dz = a[1] - b[1], L = Math.hypot(dx, dz) || 1; return [a[0] + dx / L * len, a[1] + dz / L * len]; };
+  const k = Math.min(4, p.length - 1);
+  p = [ext(p[0], p[k], RUNUP)].concat(p, [ext(p[p.length - 1], p[p.length - 1 - k], RUNOFF)]);
+  return resampleOpen(p, 3);
+}
+function sampleSprintPts() {
+  const pts = [];
+  for (let i = 0; i <= 300; i++) { const t = i / 300; pts.push([t * 1500 - 750, Math.sin(t * 9) * 70 + Math.sin(t * 23) * 18 + Math.cos(t * 4) * 120]); }
+  return pts;
 }
 function sampleCoursePts() {
   const pts = [], n = 500;
@@ -426,26 +508,27 @@ function sampleCoursePts() {
   return pts;
 }
 
-/* コースの中心線データ */
-function buildTrackData(pts, W) {
+/* コースの中心線データ（closed=false で片道） */
+function buildTrackData(pts, W, closed = true) {
   const N = pts.length, seg = new Float64Array(N), cum = new Float64Array(N + 1);
-  for (let i = 0; i < N; i++) { const b = pts[(i + 1) % N]; seg[i] = Math.hypot(b[0] - pts[i][0], b[1] - pts[i][1]); cum[i + 1] = cum[i] + seg[i]; }
+  const ix = closed ? i => ((i % N) + N) % N : i => clamp(i, 0, N - 1);
+  for (let i = 0; i < N; i++) { const b = pts[ix(i + 1)]; seg[i] = (closed || i < N - 1) ? Math.hypot(b[0] - pts[i][0], b[1] - pts[i][1]) : 0; cum[i + 1] = cum[i] + seg[i]; }
   const len = cum[N];
   const tan = [], nrm = [];
   for (let i = 0; i < N; i++) {
-    const a = pts[(i - 1 + N) % N], b = pts[(i + 1) % N]; let tx = b[0] - a[0], tz = b[1] - a[1]; const L = Math.hypot(tx, tz) || 1; tx /= L; tz /= L;
+    const a = pts[ix(i - 1)], b = pts[ix(i + 1)]; let tx = b[0] - a[0], tz = b[1] - a[1]; const L = Math.hypot(tx, tz) || 1; tx /= L; tz /= L;
     tan.push([tx, tz]); nrm.push([-tz, tx]);
   }
   // 曲率
   let curv = new Float64Array(N);
-  for (let i = 0; i < N; i++) { const t0 = tan[(i - 1 + N) % N], t1 = tan[(i + 1) % N]; const ang = Math.atan2(t0[0] * t1[1] - t0[1] * t1[0], t0[0] * t1[0] + t0[1] * t1[1]); curv[i] = ang / (seg[i] * 2 || 1); }
+  for (let i = 0; i < N; i++) { const t0 = tan[ix(i - 1)], t1 = tan[ix(i + 1)]; const ang = Math.atan2(t0[0] * t1[1] - t0[1] * t1[0], t0[0] * t1[0] + t0[1] * t1[1]); curv[i] = ang / (seg[i] * 2 || 6); }
   const cs = new Float64Array(N);
-  for (let i = 0; i < N; i++) { let s = 0; for (let k = -4; k <= 4; k++) s += curv[(i + k + N) % N]; cs[i] = s / 9; }
+  for (let i = 0; i < N; i++) { let s = 0; for (let k = -4; k <= 4; k++) s += curv[ix(i + k)]; cs[i] = s / 9; }
   curv = cs;
   // CPUの目安速度（コーナー手前で減速）
   const adv = new Float64Array(N);
   for (let i = 0; i < N; i++) adv[i] = Math.min(48, Math.sqrt(9.5 / Math.max(Math.abs(curv[i]), 1e-4)));
-  for (let it = 0; it < 2; it++) for (let i = N - 1; i >= 0; i--) { const j = (i + 1) % N; adv[i] = Math.min(adv[i], Math.sqrt(adv[j] ** 2 + 2 * 11 * seg[i])); }
+  for (let it = 0; it < (closed ? 2 : 1); it++) for (let i = (closed ? N - 1 : N - 2); i >= 0; i--) { const j = ix(i + 1); adv[i] = Math.min(adv[i], Math.sqrt(adv[j] ** 2 + 2 * 11 * seg[i])); }
   // 空間グリッド
   const CELL = 25, grid = new Map();
   const key = (x, z) => Math.floor(x / CELL) + ',' + Math.floor(z / CELL);
@@ -456,55 +539,59 @@ function buildTrackData(pts, W) {
     for (let cx = c0; cx <= c1; cx++) for (let cz = r0; cz <= r1; cz++) {
       const a = grid.get(cx + ',' + cz); if (!a) continue;
       for (const i of a) {
-        if (skipI >= 0) { let di = Math.abs(i - skipI); di = Math.min(di, N - di); if (di <= skipRange) continue; }
+        if (skipI >= 0) { let di = Math.abs(i - skipI); if (closed) di = Math.min(di, N - di); if (di <= skipRange) continue; }
         const dd = (pts[i][0] - x) ** 2 + (pts[i][1] - z) ** 2; if (dd < best) best = dd;
       }
     }
     return Math.sqrt(best);
   }
   // 位置→コース上の位置
+  const lastSeg = closed ? N - 1 : N - 2;
   function locate(x, z, hint, win) {
     let best = { d2: Infinity };
-    const from = hint == null ? 0 : hint - win, to = hint == null ? N - 1 : hint + win;
+    let from = hint == null ? 0 : hint - win, to = hint == null ? lastSeg : hint + win;
+    if (!closed) { from = Math.max(0, from); to = Math.min(lastSeg, to); }
     for (let k = from; k <= to; k++) {
-      const i = ((k % N) + N) % N, a = pts[i], b = pts[(i + 1) % N];
+      const i = ix(k), a = pts[i], b = pts[ix(i + 1)];
       const dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1;
       let t = ((x - a[0]) * dx + (z - a[1]) * dz) / L2; t = clamp(t, 0, 1);
       const px = a[0] + dx * t, pz = a[1] + dz * t, dd = (x - px) ** 2 + (z - pz) ** 2;
       if (dd < best.d2) best = { d2: dd, i, t, px, pz };
     }
-    const L = seg[best.i] || 1, tx = (pts[(best.i + 1) % N][0] - pts[best.i][0]) / L, tz = (pts[(best.i + 1) % N][1] - pts[best.i][1]) / L;
+    const L = seg[best.i] || 1, nb = pts[ix(best.i + 1)], tx = (nb[0] - pts[best.i][0]) / L, tz = (nb[1] - pts[best.i][1]) / L;
     best.lat = (x - best.px) * (-tz) + (z - best.pz) * tx;
     best.s = cum[best.i] + best.t * seg[best.i];
     best.tx = tx; best.tz = tz;
     return best;
   }
   function at(s) {
-    s = ((s % len) + len) % len;
-    let lo = 0, hi = N - 1;
+    s = closed ? ((s % len) + len) % len : clamp(s, 0, len);
+    let lo = 0, hi = lastSeg;
     while (lo < hi) { const m = (lo + hi + 1) >> 1; if (cum[m] <= s) lo = m; else hi = m - 1; }
-    const i = lo, t = seg[i] ? (s - cum[i]) / seg[i] : 0, a = pts[i], b = pts[(i + 1) % N];
-    const ta = tan[i], tb = tan[(i + 1) % N]; let tx = lerp(ta[0], tb[0], t), tz = lerp(ta[1], tb[1], t); const L = Math.hypot(tx, tz) || 1; tx /= L; tz /= L;
-    return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), tx, tz, rx: -tz, rz: tx, i, adv: lerp(adv[i], adv[(i + 1) % N], t), curv: curv[i] };
+    const i = lo, j = ix(i + 1), t = seg[i] ? clamp((s - cum[i]) / seg[i], 0, 1) : 0, a = pts[i], b = pts[j];
+    const ta = tan[i], tb = tan[j]; let tx = lerp(ta[0], tb[0], t), tz = lerp(ta[1], tb[1], t); const L = Math.hypot(tx, tz) || 1; tx /= L; tz /= L;
+    return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), tx, tz, rx: -tz, rz: tx, i, adv: lerp(adv[i], adv[j], t), curv: curv[i] };
   }
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const p of pts) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]); }
-  return { pts, N, seg, cum, len, tan, nrm, curv, adv, W, nearest, locate, at, bbox: { minX, maxX, minZ, maxZ } };
+  const startS = closed ? 0 : RUNUP, finishS = closed ? len : len - RUNOFF;
+  return { pts, N, seg, cum, len, tan, nrm, curv, adv, W, closed, startS, finishS, raceLen: finishS - startS, nearest, locate, at, bbox: { minX, maxX, minZ, maxZ } };
 }
 
-/* OSRM：通過ポイントを道路に沿ってつなぐ（周回） */
-async function routeOSRM(wps, signal) {
-  const loop = wps.concat([wps[0]]);
+/* OSRM：通過ポイントを道路に沿ってつなぐ（loop=true で周回） */
+async function routeOSRM(wps, signal, loop = true) {
+  loop = loop ? wps.concat([wps[0]]) : wps;
   const coords = loop.map(p => p[1].toFixed(6) + ',' + p[0].toFixed(6)).join(';');
   const url = 'https://router.project-osrm.org/route/v1/driving/' + coords + '?overview=full&geometries=geojson&continue_straight=true';
   const j = await fetchJSON(url, {}, 20000, signal);
   if (j.code !== 'Ok' || !j.routes || !j.routes[0]) throw new Error('route');
   return { line: j.routes[0].geometry.coordinates.map(c => [+c[1].toFixed(6), +c[0].toFixed(6)]), dist: j.routes[0].distance };
 }
-function straightLine(wps) {
+function straightLine(wps, closed = true) {
   // 直線でつなぐ（緯度経度のまま細かく区切る）
-  const out = []; const loop = wps.concat([wps[0]]);
+  const out = []; const loop = closed ? wps.concat([wps[0]]) : wps;
   for (let i = 0; i < loop.length - 1; i++) { const a = loop[i], b = loop[i + 1]; for (let k = 0; k < 10; k++) out.push([lerp(a[0], b[0], k / 10), lerp(a[1], b[1], k / 10)]); }
+  if (!closed) out.push(loop[loop.length - 1].slice());
   return out;
 }
 function lineLength(line) {
@@ -603,6 +690,11 @@ function makeTextures() {
     for (let x = 0; x < 64; x++) { g.fillStyle = x % 2 ? '#111' : '#fff'; g.fillRect(x * 8, 0, 8, 8); g.fillStyle = x % 2 ? '#fff' : '#111'; g.fillRect(x * 8, h - 8, 8, 8); }
     g.fillStyle = '#e8361a'; g.fillRect(0, 8, w, h - 16); g.fillStyle = '#fff'; g.font = '900 italic 40px "Arial Black",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('MAP RACER', w / 2, h / 2 + 2);
   });
+  const banner = (txt, col) => canvasTex(512, 64, (g, w, h) => {
+    for (let x = 0; x < 64; x++) { g.fillStyle = x % 2 ? '#111' : '#fff'; g.fillRect(x * 8, 0, 8, 8); g.fillStyle = x % 2 ? '#fff' : '#111'; g.fillRect(x * 8, h - 8, 8, 8); }
+    g.fillStyle = col; g.fillRect(0, 8, w, h - 16); g.fillStyle = '#fff'; g.font = '900 italic 40px "Arial Black",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, h / 2 + 2);
+  });
+  TEX.bannerStart = banner('START', '#1f6fff'); TEX.bannerGoal = banner('GOAL', '#e8361a');
   TEX.smoke = canvasTex(64, 64, (g, w, h) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
   TEX.win = canvasTex(64, 64, (g, w, h) => {
     g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
@@ -620,23 +712,23 @@ function disposeWorld() {
 /* ---------- コース形状メッシュ ---------- */
 function ribbon(T, off0, off1, y, vScale, filter) {
   if (off0 > off1) [off0, off1] = [off1, off0];
-  const pos = [], uv = [], idx = [], N = T.N;
-  for (let i = 0; i <= N; i++) {
+  const pos = [], uv = [], idx = [], N = T.N, rows = T.closed ? N + 1 : N;
+  for (let i = 0; i < rows; i++) {
     const k = i % N, p = T.pts[k], n = T.nrm[k], yy = y + (k / N) * 0.04;
     pos.push(p[0] + n[0] * off0, yy, p[1] + n[1] * off0, p[0] + n[0] * off1, yy, p[1] + n[1] * off1);
     const v = (i === N ? T.len : T.cum[k]) / vScale; uv.push(0, v, 1, v);
-    if (i < N && (!filter || (filter(k) && filter((k + 1) % N)))) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    if (i < rows - 1 && (!filter || (filter(k) && filter((k + 1) % N)))) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
   return g;
 }
 function wallRibbon(T, off, h, filter) {
-  const pos = [], uv = [], idx = [], N = T.N;
-  for (let i = 0; i <= N; i++) {
+  const pos = [], uv = [], idx = [], N = T.N, rows = T.closed ? N + 1 : N;
+  for (let i = 0; i < rows; i++) {
     const k = i % N, p = T.pts[k], n = T.nrm[k], x = p[0] + n[0] * off, z = p[1] + n[1] * off, v = (i === N ? T.len : T.cum[k]) / 4;
     pos.push(x, 0, z, x, h, z); uv.push(v, 0, v, 1);
-    if (i < N && filter(k) && filter((k + 1) % N)) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2, a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    if (i < rows - 1 && filter(k) && filter((k + 1) % N)) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2, a, a + 2, a + 1, a + 1, a + 2, a + 3); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
@@ -720,16 +812,28 @@ function buildWorld(T, scen, proj) {
     for (let k = 0; k < T.N; k++) { const p = T.pts[k], n = T.nrm[k]; ok[k] = T.nearest(p[0] + n[0] * s * railOff, p[1] + n[1] * s * railOff, W / 2 + 6, k, 14) > W / 2 + 5.5 ? 1 : 0; }
     const m = new THREE.Mesh(wallRibbon(T, s * railOff, .9, k => ok[k]), rMat); m.castShadow = true; root.add(m);
   }
-  // スタートライン・ゲート
-  const s0 = T.at(0), ang = Math.atan2(s0.tx, s0.tz);
-  const line = new THREE.Mesh(new THREE.PlaneGeometry(W, 2.4), new THREE.MeshLambertMaterial({ map: TEX.check }));
-  line.material.map = TEX.check.clone(); line.material.map.needsUpdate = true; line.material.map.repeat.set(W / 1.2, 2);
-  line.rotation.set(-Math.PI / 2, 0, ang); line.position.set(s0.x, .11, s0.z); root.add(line);
-  const gate = new THREE.Group(); gate.position.set(s0.x, 0, s0.z); gate.rotation.y = ang; root.add(gate);
+  // スタート・ゴールのゲート（片道はゴールにも）
   const postM = new THREE.MeshLambertMaterial({ color: '#333' });
-  for (const sx of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(.6, 7, .6), postM); p.position.set(sx * (W / 2 + 1.5), 3.5, 0); p.castShadow = true; gate.add(p); }
-  const ban = new THREE.Mesh(new THREE.BoxGeometry(W + 3.6, 1.8, .4), [postM, postM, postM, postM, new THREE.MeshBasicMaterial({ map: TEX.banner }), new THREE.MeshBasicMaterial({ map: TEX.banner })]);
-  ban.position.y = 7.2; gate.add(ban);
+  const addGate = (sAt, tex) => {
+    const s0 = T.at(sAt), ang = Math.atan2(s0.tx, s0.tz);
+    const ct = TEX.check.clone(); ct.needsUpdate = true; ct.repeat.set(W / 1.2, 2);
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(W, 2.4), new THREE.MeshLambertMaterial({ map: ct }));
+    line.rotation.set(-Math.PI / 2, 0, ang); line.position.set(s0.x, .11, s0.z); root.add(line);
+    const gate = new THREE.Group(); gate.position.set(s0.x, 0, s0.z); gate.rotation.y = ang; root.add(gate);
+    for (const sx of [-1, 1]) { const p = new THREE.Mesh(new THREE.BoxGeometry(.6, 7, .6), postM); p.position.set(sx * (W / 2 + 1.5), 3.5, 0); p.castShadow = true; gate.add(p); }
+    const bm = new THREE.MeshBasicMaterial({ map: tex });
+    const ban = new THREE.Mesh(new THREE.BoxGeometry(W + 3.6, 1.8, .4), [postM, postM, postM, postM, bm, bm]);
+    ban.position.y = 7.2; gate.add(ban);
+  };
+  addGate(T.startS, T.closed ? TEX.banner : TEX.bannerStart);
+  if (!T.closed) {
+    addGate(T.finishS, TEX.bannerGoal);
+    // コースの両端に壁
+    for (const sAt of [0, T.len]) {
+      const e = T.at(sAt), wall = new THREE.Mesh(new THREE.BoxGeometry(W + 10, 1.2, 1), new THREE.MeshLambertMaterial({ map: TEX.rail }));
+      wall.position.set(e.x, .6, e.z); wall.rotation.y = Math.atan2(e.tx, e.tz); wall.castShadow = true; root.add(wall);
+    }
+  }
   // まわりの景色
   const clearR = W / 2 + 7;
   if (scen && proj) {
@@ -974,10 +1078,10 @@ const CPU_COLORS = ['#1f6fff', '#ffcc1a', '#25c26a', '#b04dff', '#ff7ac8'];
 const GEARS = [0, 11, 20, 29, 38, 46, 60];
 
 function newPlayer(T) {
-  const st = T.at(-26), lat = 2.6;
+  const st = T.at(T.startS - 26), lat = 2.6;
   const car = makeCar('#e8361a', 1); scene.add(car);
   return { car, x: st.x + st.rx * lat, z: st.z + st.rz * lat, th: Math.atan2(st.tx, st.tz), vx: 0, vz: 0, w: 0, steer: 0,
-    total: -26, s: T.len - 26, hint: st.i, drifting: false, driftDir: 0, driftT: 0, boost: 0, boostMax: 1, roll: 0, pitch: 0,
+    total: -26, s: T.closed ? T.len - 26 : T.startS - 26, hint: st.i, drifting: false, driftDir: 0, driftT: 0, boost: 0, boostMax: 1, roll: 0, pitch: 0,
     wheelRot: 0, onRoad: true, wrongT: 0, lap: 0, lapStart: 0, bestLap: Infinity, driftScore: 0, top: 0, prevVf: 0, hitCd: 0, finished: false };
 }
 function newCPUs(T) {
@@ -987,12 +1091,13 @@ function newCPUs(T) {
   for (let i = 0; i < 3; i++) {
     const car = makeCar(CPU_COLORS[i], i + 2); scene.add(car);
     const skill = (hard ? 1.04 : .9) - i * .03 + Math.random() * .02;
-    list.push({ car, s: ((grid[i][0] % T.len) + T.len) % T.len, total: grid[i][0], v: 0, off: grid[i][1], laneT: grid[i][1], laneTimer: 2 + Math.random() * 3, skill, th: 0, x: 0, z: 0, wheelRot: 0, finished: false, finishT: 0 });
+    list.push({ car, s: T.closed ? ((grid[i][0] % T.len) + T.len) % T.len : T.startS + grid[i][0], total: grid[i][0], v: 0, off: grid[i][1], laneT: grid[i][1], laneTimer: 2 + Math.random() * 3, skill, th: 0, x: 0, z: 0, wheelRot: 0, finished: false, finishT: 0 });
   }
   return list;
 }
 
-async function playCourse(c) {
+async function playCourse(c, dir = 'fwd') {
+  const ow = isOneway(c);
   Snd.init();
   if (settings.ctrl === 'tilt') await enableTilt();
   const ac = new AbortController(); let skipScen = false;
@@ -1001,12 +1106,13 @@ async function playCourse(c) {
   $('#loadCancel').onclick = () => { ac.abort(); show('#loading', false); toTitle(); };
   try {
     let pts, scen = null, proj = null;
-    if (c.local) { msg('コースを作成中…'); pts = processLine(sampleCoursePts()); }
+    if (c.local) { msg('コースを作成中…'); let raw = ow ? sampleSprintPts() : sampleCoursePts(); if (ow && dir === 'rev') raw = raw.slice().reverse(); pts = processLine(raw, !ow); }
     else {
       let line = c.line || store.get('pline.' + c.id, null);
-      if (!line) { msg('道路に沿ってルートを計算中…<br><small>OSRM</small>'); line = (await routeOSRM(c.wps, ac.signal)).line; if (c.id.startsWith('p-')) store.set('pline.' + c.id, line); }
+      if (!line) { msg('道路に沿ってルートを計算中…<br><small>OSRM</small>'); line = (await routeOSRM(c.wps, ac.signal, !ow)).line; if (c.id.startsWith('p-')) store.set('pline.' + c.id, line); }
+      if (ow && dir === 'rev') line = line.slice().reverse();
       proj = makeProj(line[0][0], line[0][1]);
-      pts = processLine(line.map(p => proj.fwd(p[0], p[1])));
+      pts = processLine(line.map(p => proj.fwd(p[0], p[1])), !ow);
       scen = store.get('scn.' + c.id, null);
       if (!scen) {
         msg('まわりの建物・道路を読み込み中…<br><small>OpenStreetMap / Overpass API（数秒〜20秒ほど）</small>');
@@ -1021,9 +1127,9 @@ async function playCourse(c) {
     if (pts.length < 30) throw new Error('short');
     msg('3Dコースを組み立て中…');
     await new Promise(r => setTimeout(r, 30));
-    T = buildTrackData(pts, 13);
+    T = buildTrackData(pts, 13, !ow);
     buildWorld(T, scen, scen ? proj : null);
-    startRace(c);
+    startRace(c, dir);
   } catch (e) {
     if (ac.signal.aborted) return;
     console.error(e); show('#loading', false); toTitle();
@@ -1031,11 +1137,12 @@ async function playCourse(c) {
   }
 }
 
-function startRace(course) {
+function startRace(course, dir = 'fwd') {
   initFX(); resetFX();
   if (race) { scene.remove(race.p.car); race.cpus.forEach(c => scene.remove(c.car)); }
   const p = newPlayer(T), cpus = newCPUs(T);
-  race = { course, p, cpus, laps: settings.laps, t: 0, state: 'count', count: 3.6, finishOrder: 0, best: store.get(bestKey(course, settings.laps), null), camShake: 0, msgT: 0 };
+  const laps = T.closed ? settings.laps : 1;
+  race = { course, dir, p, cpus, laps, dist: T.closed ? laps * T.len : T.raceLen, t: 0, state: 'count', count: 3.6, finishOrder: 0, best: store.get(bestKey(course, laps, dir), null), camShake: 0, msgT: 0 };
   drawMiniBase();
   cpus.forEach(c => updateCPU(c, 0, true));
   placeCamera(true);
@@ -1043,7 +1150,7 @@ function startRace(course) {
   document.body.classList.toggle('tilt', settings.ctrl === 'tilt');
   document.body.classList.toggle('auto', !!settings.auto);
   $('#hPos').hidden = !cpus.length;
-  $('#hBest').textContent = 'BEST ' + fmt(race.best ? race.best.lap : null);
+  $('#hBest').textContent = 'BEST ' + fmt(race.best ? (T.closed ? race.best.lap : race.best.time) : null);
   const portrait = innerHeight > innerWidth;
   $('#hint').textContent = portrait ? '📱 横向きにすると広く見えます' : '';
   setTimeout(() => { if (race) $('#hint').textContent = ''; }, 4000);
@@ -1130,11 +1237,16 @@ function updatePlayer(p, inp, dt) {
     if (vn > 0) { p.vx -= nx * vn * 1.25; p.vz -= nz * vn * 1.25; p.vx *= .985; p.vz *= .985; if (vn > 3 && p.hitCd <= 0) { Snd.thud(vn / 15); race.camShake = Math.min(.6, vn / 20); p.hitCd = .3; if (vn > 6 && navigator.vibrate) navigator.vibrate(30); } }
     if (p.drifting && vn > 5) p.drifting = false;
   }
+  // 片道コースの両端の壁
+  if (!T.closed) for (const [sAt, sg] of [[0, -1], [T.len, 1]]) {
+    const e = T.at(sAt), tx = e.tx * sg, tz = e.tz * sg, along = (p.x - e.x) * tx + (p.z - e.z) * tz;
+    if (along > -2.5) { const o = along + 2.5; p.x -= tx * o; p.z -= tz * o; const vn = p.vx * tx + p.vz * tz; if (vn > 0) { p.vx -= tx * vn * 1.2; p.vz -= tz * vn * 1.2; if (vn > 3 && p.hitCd <= 0) { Snd.thud(vn / 15); p.hitCd = .3; } } }
+  }
   p.hitCd -= dt;
 
   // 周回の進み具合
   const ls = T.locate(p.x, p.z, p.hint, 6);
-  let ds = ls.s - p.s; if (ds < -T.len / 2) ds += T.len; if (ds > T.len / 2) ds -= T.len;
+  let ds = ls.s - p.s; if (T.closed) { if (ds < -T.len / 2) ds += T.len; if (ds > T.len / 2) ds -= T.len; }
   p.s = ls.s; p.total += ds; p.lat = ls.lat;
   // 逆走チェック
   const dot = fx * ls.tx + fz * ls.tz;
@@ -1157,7 +1269,8 @@ function updateCPU(c, dt, init) {
     const gap = c.total - p.total;
     if (gap > 140) target *= .93; else if (gap < -120) target *= 1.07;
     if (race.state !== 'race') target = 0;
-    if (c.finished) target = Math.min(target, 18);
+    if (c.finished) target = T.closed ? Math.min(target, 18) : 0;
+    if (!T.closed && c.s > T.len - 40) target = 0;
     const acc = c.v < target ? 7.5 * (1 - c.v / 60) : -12;
     c.v = Math.max(0, c.v + clamp(target - c.v, -12 * dt, Math.max(0, acc) * dt));
     // 車線変更（前の車を避ける）
@@ -1172,7 +1285,7 @@ function updateCPU(c, dt, init) {
       }
     }
     c.off = lerp(c.off, c.laneT, 1 - Math.exp(-dt * 1.2));
-    c.s = (c.s + c.v * dt) % L; c.total += c.v * dt;
+    c.s = T.closed ? (c.s + c.v * dt) % L : Math.min(c.s + c.v * dt, L - 3); c.total = T.closed ? c.total + c.v * dt : c.s - T.startS;
   }
   const a = T.at(c.s), ah = T.at(c.s + 3);
   c.x = a.x + a.rx * c.off; c.z = a.z + a.rz * c.off;
@@ -1228,9 +1341,10 @@ function drawMiniBase() {
   miniTf = (x, z) => [ox + (x - b.minX) * sc, oz + (z - b.minZ) * sc];
   miniBase = document.createElement('canvas'); miniBase.width = miniBase.height = S; const g = miniBase.getContext('2d');
   g.lineJoin = g.lineCap = 'round';
-  g.beginPath(); T.pts.forEach((p, i) => { const [x, y] = miniTf(p[0], p[1]); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath();
+  g.beginPath(); T.pts.forEach((p, i) => { const [x, y] = miniTf(p[0], p[1]); i ? g.lineTo(x, y) : g.moveTo(x, y); }); if (T.closed) g.closePath();
   g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 11; g.stroke(); g.strokeStyle = '#fff'; g.lineWidth = 6; g.stroke();
-  const [sx, sy] = miniTf(T.pts[0][0], T.pts[0][1]); g.fillStyle = '#111'; g.fillRect(sx - 5, sy - 5, 10, 10); g.fillStyle = '#fff'; g.fillRect(sx - 5, sy - 5, 5, 5); g.fillRect(sx, sy, 5, 5);
+  if (!T.closed) { const gp = T.at(T.finishS), [gx, gy] = miniTf(gp.x, gp.z); g.fillStyle = '#ffd23f'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(gx, gy, 8, 0, 7); g.fill(); g.stroke(); }
+  const sp0 = T.at(T.startS), [sx, sy] = miniTf(sp0.x, sp0.z); g.fillStyle = '#111'; g.fillRect(sx - 5, sy - 5, 10, 10); g.fillStyle = '#fff'; g.fillRect(sx - 5, sy - 5, 5, 5); g.fillRect(sx, sy, 5, 5);
 }
 function drawMini() {
   const S = mini.width; mctx.clearRect(0, 0, S, S); mctx.drawImage(miniBase, 0, 0);
@@ -1249,7 +1363,7 @@ function updateHUD() {
   const p = race.p, sp = Math.hypot(p.vx, p.vz), kmh = Math.round(sp * 3.6);
   $('#spd').textContent = kmh;
   let gear = 1; for (let i = 1; i < GEARS.length - 1; i++) if (sp > GEARS[i]) gear = i + 1; $('#gear').textContent = p.prevVf < -.5 ? 'R' : gear;
-  $('#hLapN').textContent = 'LAP ' + Math.min(race.laps, Math.max(1, p.lap + 1)) + '/' + race.laps;
+  $('#hLapN').textContent = T.closed ? 'LAP ' + Math.min(race.laps, Math.max(1, p.lap + 1)) + '/' + race.laps : 'GOAL まで ' + (lenTxt(Math.max(0, race.dist - Math.max(0, p.total))) || '0 m');
   $('#hTime').textContent = fmt(race.state === 'count' ? 0 : race.t);
   if (race.cpus.length) { const pos = 1 + race.cpus.filter(c => c.total > p.total).length; $('#hPos').innerHTML = pos + '<small>/' + (race.cpus.length + 1) + '</small>'; race.pos = pos; }
   const bb = $('#boostBar i');
@@ -1288,13 +1402,13 @@ function frame(now) {
   }
   // 周回判定
   if (race.state === 'race') {
-    const lapNow = Math.floor(p.total / T.len);
+    const lapNow = T.closed ? Math.floor(p.total / T.len) : (p.total >= T.raceLen ? 1 : 0);
     if (lapNow > p.lap && lapNow >= 1) {
       const lt = race.t - p.lapStart; p.bestLap = Math.min(p.bestLap, lt); p.lapStart = race.t; p.lap = lapNow;
       if (p.lap >= race.laps) finishRace();
       else { flash(p.lap === race.laps - 1 ? 'FINAL LAP' : 'LAP ' + (p.lap + 1), 1200, true); Snd.beep(880, .12); setTimeout(() => Snd.beep(1175, .2), 130); toast('ラップ ' + fmt(lt), 1800); }
     }
-    for (const c of race.cpus) if (!c.finished && c.total >= race.laps * T.len) { c.finished = true; c.finishT = race.t; }
+    for (const c of race.cpus) if (!c.finished && c.total >= race.dist) { c.finished = true; c.finishT = race.t; }
   }
   // 見た目
   syncCar(p.car, p.x, p.z, p.th, p.wheelRot, p.steer, p.roll, p.pitch);
@@ -1338,7 +1452,7 @@ function finishRace() {
   if (p.drifting) p.drifting = false;
   const pos = race.cpus.length ? 1 + race.cpus.filter(c => c.finished).length : 1;
   flash('FINISH!', 1800); Snd.beep(1320, .6, 'triangle', .3);
-  const time = race.t; const key = bestKey(race.course, race.laps);
+  const time = race.t; const key = bestKey(race.course, race.laps, race.dir);
   const prev = store.get(key, null); let isNew = false;
   const rec = { time: Math.min(time, prev ? prev.time : Infinity), lap: Math.min(p.bestLap, prev && prev.lap ? prev.lap : Infinity) };
   if (!prev || time < prev.time) isNew = true;
@@ -1346,7 +1460,7 @@ function finishRace() {
   setTimeout(() => {
     if (!race || race.state !== 'done') return;
     $('#rRank').innerHTML = race.cpus.length ? pos + '<small>位</small>' : '🏁';
-    $('#rTime').textContent = fmt(time); $('#rLap').textContent = fmt(p.bestLap); $('#rBest').textContent = fmt(rec.time);
+    $('#rTime').textContent = fmt(time); $('#rLap').textContent = fmt(p.bestLap); $('#rLap').hidden = $('#rLapL').hidden = !T.closed; $('#rBest').textContent = fmt(rec.time);
     $('#rDrift').textContent = p.driftScore.toLocaleString() + ' pt'; $('#rTop').textContent = Math.round(p.top * 3.6) + ' km/h';
     $('#rNew').hidden = !isNew; show('#result', true); show('#controls', false); Snd.mute();
   }, 1600);
@@ -1366,13 +1480,13 @@ function quitRace() {
 $('#pauseBtn').onclick = () => togglePause(true);
 $('#camBtn').onclick = cycleCam;
 $('#pResume').onclick = () => togglePause(false);
-$('#pRetry').onclick = () => { const c = race.course; startRace(c); };
+$('#pRetry').onclick = () => startRace(race.course, race.dir);
 $('#pQuit').onclick = quitRace;
 $('#pCal').onclick = () => { calibrate(); toast('今の持ち方をまっすぐに設定しました'); };
 $('#pReset').onclick = () => {
   const p = race.p, a = T.at(p.s); p.x = a.x; p.z = a.z; p.th = Math.atan2(a.tx, a.tz); p.vx = p.vz = 0; p.w = 0; p.drifting = false; togglePause(false); placeCamera(true);
 };
-$('#rRetry').onclick = () => startRace(race.course);
+$('#rRetry').onclick = () => startRace(race.course, race.dir);
 $('#rQuit').onclick = quitRace;
 $('#raceHome').addEventListener('click', e => { if (race && race.state !== 'done') { togglePause(true); if (!confirm('レースをやめてホームに戻りますか？')) { e.preventDefault(); } } });
 document.addEventListener('visibilitychange', () => { if (document.hidden && race && race.state !== 'done') togglePause(true); });
@@ -1381,15 +1495,30 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && rac
    タイトル画面
    ========================================================= */
 function lenTxt(m) { return m ? (m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m) + ' m') : ''; }
-function drawThumb(cv, c) {
-  const g = cv.getContext('2d'), S = cv.width = cv.height = 104; g.fillStyle = '#1b2638'; g.fillRect(0, 0, S, S);
-  let pts;
-  if (c.local) pts = sampleCoursePts();
-  else { const line = c.line || store.get('pline.' + c.id, null) || c.wps.concat([c.wps[0]]); const pr = makeProj(line[0][0], line[0][1]); pts = line.map(q => pr.fwd(q[0], q[1])); }
+function coursePts(c) {
+  if (c.local) return isOneway(c) ? sampleSprintPts() : sampleCoursePts();
+  const line = c.line || store.get('pline.' + c.id, null) || (isOneway(c) ? c.wps : c.wps.concat([c.wps[0]]));
+  const pr = makeProj(line[0][0], line[0][1]); return line.map(q => pr.fwd(q[0], q[1]));
+}
+function drawThumb(cv, c, S = 104, rev = false) {
+  const g = cv.getContext('2d'); cv.width = cv.height = S; g.fillStyle = '#1b2638'; g.fillRect(0, 0, S, S);
+  let pts = coursePts(c); if (rev) pts = pts.slice().reverse();
   let a = Infinity, b = -Infinity, cc = Infinity, d = -Infinity; for (const p of pts) { a = Math.min(a, p[0]); b = Math.max(b, p[0]); cc = Math.min(cc, p[1]); d = Math.max(d, p[1]); }
-  const sc = 80 / Math.max(b - a, d - cc, 1), ox = (S - (b - a) * sc) / 2, oy = (S - (d - cc) * sc) / 2;
-  g.beginPath(); pts.forEach((p, i) => { const x = ox + (p[0] - a) * sc, y = oy + (p[1] - cc) * sc; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath();
-  g.lineJoin = 'round'; g.strokeStyle = '#ff6a3d'; g.lineWidth = 6; g.stroke();
+  const sc = S * .74 / Math.max(b - a, d - cc, 1), ox = (S - (b - a) * sc) / 2, oy = (S - (d - cc) * sc) / 2, tf = p => [ox + (p[0] - a) * sc, oy + (p[1] - cc) * sc];
+  g.beginPath(); pts.forEach((p, i) => { const [x, y] = tf(p); i ? g.lineTo(x, y) : g.moveTo(x, y); }); if (!isOneway(c)) g.closePath();
+  g.lineJoin = g.lineCap = 'round'; g.strokeStyle = '#ff6a3d'; g.lineWidth = S / 17; g.stroke();
+  if (isOneway(c)) {
+    const r = S / 15, dot = (p, col) => { const [x, y] = tf(p); g.fillStyle = col; g.strokeStyle = '#fff'; g.lineWidth = S / 50; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.stroke(); };
+    dot(pts[pts.length - 1], '#ffd23f'); dot(pts[0], '#34c759');
+  }
+}
+function bestTxt(c) {
+  if (isOneway(c)) {
+    const f = store.get(bestKey(c, 1, 'fwd'), null), r = store.get(bestKey(c, 1, 'rev'), null);
+    return [f ? '往路 ' + fmt(f.time) : '', r ? '復路 ' + fmt(r.time) : ''].filter(Boolean).join(' / ');
+  }
+  const best = store.get(bestKey(c, settings.laps), null);
+  return best ? `ベスト ${fmt(best.time)}（${settings.laps}周）` : '';
 }
 function renderCourses() {
   const el = $('#courseList'); el.innerHTML = '';
@@ -1397,22 +1526,65 @@ function renderCourses() {
   for (const c of list) {
     const b = document.createElement('div'); b.className = 'course'; b.setAttribute('role', 'button');
     const cv = document.createElement('canvas'); b.appendChild(cv);
-    const best = store.get(bestKey(c, settings.laps), null);
     const len = c.len || (c.local ? null : (store.get('pline.' + c.id, null) ? lineLength(store.get('pline.' + c.id)) : null));
     b.insertAdjacentHTML('beforeend', `<div class="ct"><div class="cn"></div><div class="cd"></div></div>`);
-    b.querySelector('.cn').textContent = c.name;
-    b.querySelector('.cd').textContent = [c.desc, lenTxt(len), best ? `ベスト ${fmt(best.time)}（${settings.laps}周）` : ''].filter(Boolean).join(' ・ ');
+    b.querySelector('.cn').innerHTML = isOneway(c) ? '<span class="chip ow">片道</span>' : '<span class="chip">周回</span>';
+    b.querySelector('.cn').append(c.name);
+    b.querySelector('.cd').textContent = [c.desc, lenTxt(len), bestTxt(c)].filter(Boolean).join(' ・ ');
     if (!c.id.startsWith('p-')) {
+      const ren = document.createElement('button'); ren.className = 'del ren'; ren.textContent = '✏️'; ren.setAttribute('aria-label', '名前を変更');
+      ren.onclick = e => { e.stopPropagation(); const n = prompt('コース名', c.name); if (n == null || !n.trim()) return; const l = userCourses(); const x = l.find(x => x.id === c.id); if (x) { x.name = n.trim().slice(0, 24); saveUserCourses(l); renderCourses(); } };
       const del = document.createElement('button'); del.className = 'del'; del.textContent = '🗑'; del.setAttribute('aria-label', '削除');
       del.onclick = e => { e.stopPropagation(); if (!confirm(`「${c.name}」を削除しますか？`)) return; saveUserCourses(userCourses().filter(x => x.id !== c.id)); store.del('scn.' + c.id); renderCourses(); };
-      b.appendChild(del);
+      b.append(ren, del);
     }
-    b.insertAdjacentHTML('beforeend', '<span class="go">▶</span>');
-    b.onclick = () => playCourse(c);
+    if (c.id.startsWith('p-')) b.insertAdjacentHTML('beforeend', '<span class="go">▶</span>');
+    b.onclick = () => isOneway(c) ? pickDir(c) : playCourse(c);
     el.appendChild(b);
     try { drawThumb(cv, c); } catch (e) {}
   }
 }
+/* 片道コース：往路・復路を選ぶ */
+function pickDir(c) {
+  $('#dpName').textContent = c.name;
+  try { drawThumb($('#dpMap'), c, 320); } catch (e) {}
+  const f = store.get(bestKey(c, 1, 'fwd'), null), r = store.get(bestKey(c, 1, 'rev'), null);
+  $('#dpFwdSub').textContent = '🟢 スタート → 🟡 ゴール' + (f ? '　ベスト ' + fmt(f.time) : '');
+  $('#dpRevSub').textContent = '🟡 ゴール → 🟢 スタート' + (r ? '　ベスト ' + fmt(r.time) : '');
+  $('#dpFwd').onclick = () => { show('#dirPick', false); playCourse(c, 'fwd'); };
+  $('#dpRev').onclick = () => { show('#dirPick', false); playCourse(c, 'rev'); };
+  show('#dirPick', true);
+}
+$('#dpCancel').onclick = () => show('#dirPick', false);
+/* コースの書き出し・読み込み（バックアップ・他の端末へ移す） */
+$('#btnExport').onclick = async () => {
+  const courses = userCourses();
+  if (!courses.length) return toast('書き出す自作コースがありません');
+  const json = JSON.stringify({ app: 'map-racer', version: 1, exported: new Date().toISOString(), courses });
+  const name = 'map-racer-courses-' + new Date().toISOString().slice(0, 10) + '.json';
+  const file = new File([json], name, { type: 'application/json' });
+  try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'マップレーサーのコース' }); return; } } catch (e) { if (e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast(courses.length + '件のコースを書き出しました');
+};
+$('#btnImport').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()); const inc = Array.isArray(j) ? j : j.courses;
+    if (!Array.isArray(inc)) throw 0;
+    const list = userCourses(), ids = new Set(list.map(c => c.id)); let n = 0;
+    for (const c of inc) {
+      if (!c || typeof c.name !== 'string' || !Array.isArray(c.wps) || !Array.isArray(c.line) || c.line.length < 2) continue;
+      if (!c.line.every(p => Array.isArray(p) && isFinite(p[0]) && isFinite(p[1]))) continue;
+      if (ids.has(c.id)) continue;
+      const nc = { id: typeof c.id === 'string' && /^u[0-9a-z]+$/.test(c.id) ? c.id : 'u' + (Date.now() + n).toString(36), name: c.name.slice(0, 24), wps: c.wps, line: c.line, len: +c.len || lineLength(c.line), desc: '', type: c.type === 'oneway' ? 'oneway' : 'loop' };
+      list.push(nc); ids.add(nc.id); n++;
+    }
+    if (!saveUserCourses(list)) return toast('保存容量がいっぱいです');
+    renderCourses(); toast(n ? n + '件のコースを読み込みました' : '新しいコースはありませんでした');
+  } catch (err) { toast('コースファイルを読み込めませんでした'); }
+};
 function seg(id, key, conv = v => v, after) {
   const el = $(id);
   const sync = () => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(settings[key]) === b.dataset.v));
@@ -1447,7 +1619,8 @@ function toTitle() { show('#title', true); show('#editor', false); renderCourses
 /* =========================================================
    コースエディタ（Leaflet）
    ========================================================= */
-let map = null, wps = [], wpMarkers = [], routeLine = null, routeData = null, routeSeq = 0;
+let map = null, wps = [], wpMarkers = [], routeLine = null, routeData = null, routeSeq = 0, edType = 'loop';
+const minPts = () => edType === 'oneway' ? 2 : 3;
 function openEditor() {
   show('#title', false); show('#editor', true);
   if (!map) {
@@ -1465,30 +1638,34 @@ function addWp(ll) { if (wps.length >= 24) { toast('ポイントは24個まで�
 function updateEditor(reroute) {
   wpMarkers.forEach(m => m.remove()); wpMarkers = [];
   wps.forEach((p, i) => {
-    const icon = L.divIcon({ className: '', html: `<div class="wp${i === 0 ? ' s' : ''}">${i === 0 ? '🏁' : i + 1}</div>`, iconSize: i === 0 ? [32, 32] : [28, 28], iconAnchor: i === 0 ? [16, 16] : [14, 14] });
+    const goal = edType === 'oneway' && i === wps.length - 1 && i > 0, big = i === 0 || goal;
+    const icon = L.divIcon({ className: '', html: `<div class="wp${i === 0 ? ' s' : goal ? ' g' : ''}">${i === 0 ? '🏁' : goal ? '🏆' : i + 1}</div>`, iconSize: big ? [32, 32] : [28, 28], iconAnchor: big ? [16, 16] : [14, 14] });
     const m = L.marker(p, { icon, draggable: true }).addTo(map);
     m.on('dragend', () => { const ll = m.getLatLng(); wps[i] = [ll.lat, ll.lng]; updateEditor(true); });
     wpMarkers.push(m);
   });
   if (reroute) buildRoute();
-  if (wps.length < 3) { if (routeLine) { routeLine.remove(); routeLine = null; } routeData = null; }
+  if (wps.length < minPts()) { routeSeq++; if (routeLine) { routeLine.remove(); routeLine = null; } routeData = null; }
   refreshInfo();
 }
 function refreshInfo(status) {
-  const n = wps.length, info = $('#edInfo');
+  const n = wps.length, info = $('#edInfo'), ow = edType === 'oneway', need = minPts(), minLen = ow ? 300 : 400;
   if (status) info.innerHTML = status;
-  else if (n < 3) info.innerHTML = `地図をタップして<b>通過ポイント</b>を置いてください（あと${3 - n}つ以上）。最後のポイントから自動でスタートに戻り、周回コースになります。ポイントはドラッグで動かせます。`;
-  else if (routeData) info.innerHTML = `コース全長 <b>${lenTxt(routeData.len)}</b>（ポイント${n}個）${routeData.len > 8000 ? '<br>⚠ 長いコースは1周に時間がかかります' : ''}${routeData.len < 400 ? '<br>⚠ 短すぎます。ポイントを離してください' : ''}${routeData.straight ? '<br>道路を使わず直線でつないでいます' : ''}`;
-  $('#edSave').disabled = !(n >= 3 && routeData && routeData.len >= 400);
+  else if (n < need) info.innerHTML = ow
+    ? `地図をタップして<b>スタート</b>→（通過ポイント）→<b>ゴール</b>の順に置いてください（あと${need - n}つ以上）。最後に置いたポイントがゴールになります。`
+    : `地図をタップして<b>通過ポイント</b>を置いてください（あと${need - n}つ以上）。最後のポイントから自動でスタートに戻り、周回コースになります。ポイントはドラッグで動かせます。`;
+  else if (routeData) info.innerHTML = `${ow ? '片道' : '周回'}コース 全長 <b>${lenTxt(routeData.len)}</b>（ポイント${n}個）${ow ? '<br>走る前に往路・復路を選べます' : ''}${routeData.len > 8000 ? '<br>⚠ 長いコースは走り切るのに時間がかかります' : ''}${routeData.len < minLen ? '<br>⚠ 短すぎます。ポイントを離してください' : ''}${routeData.straight ? '<br>道路を使わず直線でつないでいます' : ''}`;
+  const ok = n >= need && routeData && routeData.len >= minLen;
+  $('#edSave').disabled = $('#edSaveOnly').disabled = !ok;
 }
 async function buildRoute() {
-  if (wps.length < 3) return;
-  const seq = ++routeSeq; routeData = null; refreshInfo('ルートを計算中…');
+  if (wps.length < minPts()) return;
+  const seq = ++routeSeq, closed = edType !== 'oneway'; routeData = null; refreshInfo('ルートを計算中…');
   let line, straight = false;
   if ($('#snap').checked) {
-    try { line = (await routeOSRM(wps)).line; }
-    catch (e) { if (seq !== routeSeq) return; line = straightLine(wps); straight = true; toast('道路のルート検索に失敗したので直線でつなぎました'); }
-  } else { line = straightLine(wps); straight = true; }
+    try { line = (await routeOSRM(wps, undefined, closed)).line; }
+    catch (e) { if (seq !== routeSeq) return; line = straightLine(wps, closed); straight = true; toast('道路のルート検索に失敗したので直線でつなぎました'); }
+  } else { line = straightLine(wps, closed); straight = true; }
   if (seq !== routeSeq) return;
   routeData = { line, len: lineLength(line), straight };
   if (routeLine) routeLine.remove();
@@ -1513,15 +1690,23 @@ $('#searchForm').onsubmit = async e => {
     map.setView([+r[0].lat, +r[0].lon], 16);
   } catch (err) { toast('検索できませんでした'); }
 };
-$('#edSave').onclick = () => {
-  if (!routeData) return;
+function saveCourse() {
+  if (!routeData) return null;
   const name = $('#cname').value.trim() || ('マイコース ' + (userCourses().length + 1));
-  const c = { id: 'u' + Date.now().toString(36), name, wps: wps.slice(), line: routeData.line, len: routeData.len, desc: '' };
+  const c = { id: 'u' + Date.now().toString(36), name, wps: wps.slice(), line: routeData.line, len: routeData.len, desc: '', type: edType };
   const list = userCourses(); list.push(c);
-  if (!saveUserCourses(list)) { toast('保存容量がいっぱいです。古いコースを削除してください'); }
+  if (!saveUserCourses(list)) { toast('保存容量がいっぱいです。古いコースを削除してください'); return null; }
   wps = []; $('#cname').value = ''; updateEditor(false);
-  playCourse(c);
-};
+  return c;
+}
+$('#edSave').onclick = () => { const c = saveCourse(); if (!c) return; if (isOneway(c)) { toTitle(); pickDir(c); } else playCourse(c); };
+$('#edSaveOnly').onclick = () => { const c = saveCourse(); if (!c) return; toTitle(); toast(`「${c.name}」を保存しました`); };
+$('#segType').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || b.dataset.v === edType) return;
+  edType = b.dataset.v; syncType(); updateEditor(true);
+});
+function syncType() { $('#segType').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === edType)); }
+syncType();
 
 /* 起動 */
 applyQuality();
