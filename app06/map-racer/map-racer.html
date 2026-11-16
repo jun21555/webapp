@@ -231,6 +231,14 @@
   .rank{text-align:center;font:900 64px/1 "Arial Black",sans-serif;font-style:italic;color:#ffd23f;text-shadow:0 3px 0 #9a6a00;margin:4px 0 10px}
   .rank small{font-size:24px}
   .newrec{text-align:center;color:#7dff6a;font-weight:800;margin:0 0 6px}
+  @media (orientation:landscape) and (max-height:520px){
+    #ready .card{max-width:640px;padding:12px 18px}
+    #ready h3{font-size:22px;margin-bottom:4px}
+    #rdName{font-size:16px!important;margin-bottom:4px!important}
+    #rdInfo{font-size:12px!important;line-height:1.45!important}
+    .rdBtns{display:flex;gap:10px}
+    .rdBtns .big{margin-top:6px;min-height:50px}
+  }
   #toast{position:fixed;z-index:200;left:50%;bottom:calc(env(safe-area-inset-bottom) + 24px);transform:translateX(-50%);background:rgba(0,0,0,.85);
     padding:10px 16px;border-radius:12px;font-size:14px;max-width:90vw;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none}
   #toast.show{opacity:1}
@@ -363,6 +371,20 @@
   <div class="cb" id="cbBrake" data-k="B">ブレーキ</div>
   <div class="cb" id="cbDrift" data-k="D"><span class="ic">💨</span>ドリフト</div>
   <div class="cb" id="cbGas" data-k="G"><span class="ic">▲</span>アクセル</div>
+</div>
+
+<!-- ================= レース開始の確認 ================= -->
+<div id="ready" class="screen dim" hidden style="background:rgba(6,10,20,.45)">
+  <div class="card">
+    <h3>READY?</h3>
+    <p id="rdName" style="text-align:center;font-weight:800;font-size:18px;margin:0 0 8px"></p>
+    <ul id="rdInfo" style="list-style:none;padding:0;margin:0 0 8px;font-size:13px;line-height:1.6"></ul>
+    <p id="rdCar" style="font-size:12px;opacity:.75;margin:0 0 4px;line-height:1.5"></p>
+    <div class="rdBtns">
+      <button class="big primary" id="rdGo">▶ レース開始</button>
+      <button class="big ghost" id="rdBack">コース選択に戻る</button>
+    </div>
+  </div>
 </div>
 
 <!-- ================= ポーズ ================= -->
@@ -1715,7 +1737,7 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
   const msg = t => $('#loadMsg').innerHTML = t;
   $('#loadCancel').onclick = () => { ac.abort(); show('#loading', false); toTitle(); };
   try {
-    let pts, scen = null, proj = null, elevXZ = null, sigErr = false;
+    let pts, scen = null, proj = null, elevXZ = null, sigErr = false; const notes = [];
     if (c.local) {
       msg('コースを作成中…'); let raw = ow ? sampleSprintPts() : sampleCoursePts();
       elevXZ = ow ? synthElev(raw, t => 30 * t + 9 * Math.sin(t * 14)) : synthElev(raw, t => 11 * Math.sin(t * Math.PI * 4 + .5) + 6 * Math.sin(t * Math.PI * 6));
@@ -1748,10 +1770,10 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
         const skipP = new Promise(res => { $('#loadSkip').onclick = () => { skipScen = true; res(null); }; });
         setTimeout(() => { if (!$('#loading').hidden) show('#loadSkip', true); }, 2500);
         try { scen = await Promise.race([fetchScenery(line, ac.signal), skipP]); }
-        catch (e) { if (ac.signal.aborted) return; scen = null; toast('建物データを取得できなかったので、自動生成の街並みで走ります'); }
+        catch (e) { if (ac.signal.aborted) return; scen = null; notes.push('⚠ 建物データを取得できなかったので、自動生成の街並みで走ります'); }
         if (scen && !skipScen) {
-          try { const m = await sceneDB.set(c.id, scen); toast(`建物 ${m.b.toLocaleString()}件・道路 ${m.h.toLocaleString()}本${scen.s && scen.s.length ? `・信号 ${scen.s.filter(q => q[4]).length}基` : ''}を保存しました（次回から通信なしで表示）`, 3200); }
-          catch (e) { toast('建物データを保存できませんでした（端末の空き容量を確認してください）'); }
+          try { await sceneDB.set(c.id, scen); notes.push('💾 建物・道路データを保存しました（次回から通信なしで表示）'); }
+          catch (e) { notes.push('⚠ 建物データを保存できませんでした（端末の空き容量を確認してください）'); }
         }
       }
     }
@@ -1777,7 +1799,7 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
       // コース上に OpenStreetMap の信号機が1つもなければ地図データから推定
       if (!info.osmNear && settings.sigInfer) {
         let inf = scen && scen.h ? inferFromRoads(T, scen, proj) : [];
-        if (!inf.length && !c.local) { try { inf = (await inferFromRoute(c, ow, ac.signal)).map(q => [...proj.fwd(q[0], q[1]), '', '', 1, 'map', q[2]]); } catch (e) { if (ac.signal.aborted) return; info.err = true; } }
+        if (!inf.length && !c.local) { try { inf = (await inferFromRoute(c, ow, ac.signal)).map(q => [...proj.fwd(q[0], q[1]), '', '', 1, 'map', q[2]]); } catch (e) { if (ac.signal.aborted) return; } }
         if (inf.length) { nodes.push(...inf); jcl = clusterJunctions(nodes); T.sigGuess = true; }
       }
       if (settings.sigInfer && jcl.some(q => !q.name)) { try { await nameJunctions(c, jcl, proj, T, ac.signal, msg); } catch (e) { if (ac.signal.aborted) return; } }
@@ -1791,11 +1813,17 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
       else if (nS || nN) t = `🚥 信号機 ${nS}基・交差点名 ${nN}件${info.user ? `（自分で設定した ${info.user}か所を含む）` : T.sigGuess ? '（地図データから推定）' : '（OpenStreetMap）'}`;
       else if (info.err) t = '🚥 信号機のデータを取得できませんでした（通信状態を確認して、コースの「⋯」→「建物・道路を最新に取り直す」を試してください）';
       else t = `🚥 このコース上には信号機が見つかりませんでした${info.osm ? `（近くの信号 ${info.osm}基はコースから離れていました）` : ''}`;
-      T.sigText = t; if (t) setTimeout(() => toast(t, 4200), 3400);
+      T.sigText = t;
     }
     if (HF) { let lo = Infinity, hi = -Infinity; for (const v of T.h) { lo = Math.min(lo, v); hi = Math.max(hi, v); } T.climb = hi - lo; }
-    if (T.climb > 1.5) setTimeout(() => toast(`⛰ 高低差 ${Math.round(T.climb)} m${settings.elev > 1 ? `（実際の${settings.elev}倍）` : ''}`, 2500), 600);
-    startRace(c, dir);
+    // 読み込み完了：すぐには始めず、確認画面を出す
+    const lines = [];
+    lines.push(`🏁 ${T.closed ? `周回コース ${lenTxt(T.len)} × ${settings.laps}周` : `片道コース ${lenTxt(T.raceLen)}（${dir === 'rev' ? '復路' : '往路'}）`}`);
+    if (scen) lines.push(`🏙 建物 ${scen.b.length.toLocaleString()}件・道路 ${scen.h.length.toLocaleString()}本（OpenStreetMap）`);
+    else if (!c.local) lines.push('🏙 建物：自動生成の街並み');
+    if (T.sigText) lines.push(T.sigText);
+    lines.push(T.climb > 1.5 ? `⛰ 高低差 ${Math.round(T.climb)} m${settings.elev > 1 ? `（実際の${settings.elev}倍）` : ''}` : settings.elev > 0 && !c.local ? '⛰ 高低差：ほぼ平ら（または標高データなし）' : '⛰ 高低差：なし');
+    startRace(c, dir, { lines: lines.concat(notes) });
   } catch (e) {
     if (ac.signal.aborted) return;
     console.error(e); show('#loading', false); toTitle();
@@ -1803,16 +1831,24 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
   }
 }
 
-function startRace(course, dir = 'fwd') {
+function startRace(course, dir = 'fwd', ready = null) {
   initFX(); resetFX();
   if (race) { scene.remove(race.p.car); race.cpus.forEach(c => scene.remove(c.car)); }
   const p = newPlayer(T), cpus = newCPUs(T);
   const laps = T.closed ? settings.laps : 1;
-  race = { course, dir, p, cpus, laps, dist: T.closed ? laps * T.len : T.raceLen, t: 0, state: 'count', count: 3.6, finishOrder: 0, best: store.get(bestKey(course, laps, dir), null), camShake: 0, msgT: 0 };
+  race = { course, dir, p, cpus, laps, dist: T.closed ? laps * T.len : T.raceLen, t: 0, state: ready ? 'ready' : 'count', count: 3.6, finishOrder: 0, best: store.get(bestKey(course, laps, dir), null), camShake: 0, msgT: 0 };
   drawMiniBase(); jctShown = '\u0000';
   cpus.forEach(c => updateCPU(c, 0, true));
   placeCamera(true);
-  show('#loading', false); show('#hud', true); show('#controls', true); show('#pause', false); show('#result', false);
+  show('#loading', false); show('#pause', false); show('#result', false);
+  show('#hud', !ready); show('#controls', !ready); show('#ready', !!ready);
+  if (ready) {
+    // 確認画面：後ろにスタート地点の様子を映しておく
+    const S = p.spec;
+    $('#rdName').textContent = course.name;
+    $('#rdInfo').innerHTML = ready.lines.map(l => `<li>${l.replace(/[<&>]/g, '')}</li>`).join('');
+    $('#rdCar').textContent = `🚗 ${S.name}（${S.type}）・最高速度 ${({ slow: '遅め', normal: '普通', fast: '速め' })[settings.speed] || '普通'}・ライバル ${({ none: 'なし', normal: 'ふつう', hard: 'つよい' })[settings.rivals]}`;
+  }
   document.body.classList.toggle('tilt', settings.ctrl === 'tilt');
   document.body.classList.toggle('auto', !!settings.auto);
   $('#hPos').hidden = !cpus.length;
@@ -2108,7 +2144,10 @@ function frame(now) {
   requestAnimationFrame(frame);
   if (!race) return;
   let dt = Math.min(.05, (now - last) / 1000); last = now;
-  if (race.state === 'paused') { renderer.render(scene, camera); return; }
+  if (race.state === 'paused' || race.state === 'ready') {
+    if (race.state === 'ready') { syncCar(race.p.car, race.p.x, race.p.vy, race.p.z, race.p.th, 0, 0, 0, 0, race.p.vslope); race.cpus.forEach(c => syncCar(c.car, c.x, c.y, c.z, c.th, 0, 0, 0, 0, c.slope)); }
+    renderer.render(scene, camera); return;
+  }
   const p = race.p;
   const inp = race.state === 'race' ? readInput(dt) : (race.state === 'count' ? Object.assign(readInput(dt), { gas: 0, brake: 0, drift: false }) : { steer: 0, gas: 0, brake: 1, drift: false });
   if (race.state === 'count') {
@@ -2191,7 +2230,7 @@ function finishRace() {
   }, 1600);
 }
 function togglePause(force) {
-  if (!race || race.state === 'done') return;
+  if (!race || race.state === 'done' || race.state === 'ready') return;
   const pause = force != null ? force : race.state !== 'paused';
   if (pause && race.state !== 'paused') { race.prevState = race.state; race.state = 'paused'; show('#pause', true); Snd.mute(); }
   else if (!pause && race.state === 'paused') { race.state = race.prevState; show('#pause', false); last = performance.now(); }
@@ -2200,9 +2239,16 @@ function togglePause(force) {
 }
 function quitRace() {
   if (race) { scene.remove(race.p.car); race.cpus.forEach(c => scene.remove(c.car)); }
-  race = null; Snd.mute(); speedLines(0); show('#hud', false); show('#controls', false); show('#pause', false); show('#result', false);
+  race = null; Snd.mute(); speedLines(0); show('#ready', false); show('#hud', false); show('#controls', false); show('#pause', false); show('#result', false);
   pointers.clear(); refreshTouch(); toTitle();
 }
+$('#rdGo').onclick = async () => {
+  if (!race || race.state !== 'ready') return;
+  Snd.init(); if (settings.ctrl === 'tilt') await enableTilt();
+  show('#ready', false); show('#hud', true); show('#controls', true);
+  race.state = 'count'; race.count = 3.6; calibrate(); last = performance.now();
+};
+$('#rdBack').onclick = () => { show('#ready', false); quitRace(); };
 $('#pauseBtn').onclick = () => togglePause(true);
 $('#camBtn').onclick = cycleCam;
 $('#pResume').onclick = () => togglePause(false);
