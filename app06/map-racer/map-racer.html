@@ -21,6 +21,7 @@
   body{height:100dvh}
   [hidden]{display:none!important}
   button,input{font:inherit;color:inherit}
+  #lines{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50}
   #cv{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 
   /* ---------- 共通：上部の丸ボタン ---------- */
@@ -237,6 +238,7 @@
 </head>
 <body class="auto">
 <canvas id="cv"></canvas>
+<canvas id="lines"></canvas>
 
 <!-- ================= タイトル ================= -->
 <section id="title" class="screen">
@@ -280,6 +282,8 @@
     <div class="row"><label>オートアクセル<small>オンだとアクセルは自動。ドリフト・ブレーキだけ操作</small></label><span class="sw"><input type="checkbox" id="auto"><i></i></span></div>
     <div class="row"><label>周回数</label><div class="seg" id="segLaps"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
     <div class="row"><label>最高速度<small id="speedNote"></small></label><div class="seg" id="segSpeed"><button data-v="slow">遅め</button><button data-v="normal">普通</button><button data-v="fast">速め</button></div></div>
+    <div class="row"><label>スピード感<small>カメラ・スピード線・振動・風の音の強さ。酔いやすい人は「ひかえめ」に</small></label><div class="seg" id="segFeel"><button data-v="low">ひかえめ</button><button data-v="normal">ふつう</button><button data-v="high">強め</button></div></div>
+    <div class="row"><label>道幅<small>狭いほど速く感じるが、運転は難しくなる</small></label><div class="seg" id="segRoadW"><button data-v="wide">広い</button><button data-v="normal">ふつう</button><button data-v="narrow">狭い</button></div></div>
     <div class="row"><label>高低差<small>実際の標高から坂を作る。強調するとジェットコースター風</small></label><div class="seg" id="segElev"><button data-v="0">なし</button><button data-v="1">実際</button><button data-v="2">×2</button><button data-v="4">×4</button></div></div>
     <div class="row"><label>信号機と交差点名<small>OpenStreetMap にある実在の信号機・交差点名を表示</small></label><span class="sw"><input type="checkbox" id="signals"><i></i></span></div>
     <div class="row"><label>見つからない時は地図から推定<small>信号機は幹線道路との交差点に、交差点名は町名・丁目（国土地理院）や道路名で補う</small></label><span class="sw"><input type="checkbox" id="sigInfer"><i></i></span></div>
@@ -489,7 +493,7 @@ async function loadScenery(id) {
 }
 const validScen = d => d && Array.isArray(d.b) && Array.isArray(d.h) && Array.isArray(d.g) && Array.isArray(d.w);
 const mb = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1e3)) + 'KB';
-const settings = Object.assign({ car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
+const settings = Object.assign({ feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 const fmt = t => { if (!isFinite(t) || t == null) return '--:--.--'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
 let toastT;
@@ -517,6 +521,12 @@ const isOneway = c => c.type === 'oneway';
 // 最高速度の3段階（速めが最初のバージョンと同じ速さ）
 const SPEEDS = { slow: .55, normal: .75, fast: 1 };
 const spk = () => SPEEDS[settings.speed] || .75;
+// 道幅（m）と路肩の幅。スピード感の強さ
+const ROADW = { wide: 13, normal: 10, narrow: 8 };
+const roadW = () => ROADW[settings.roadW] || 10;
+const shoulderW = W => W >= 13 ? 5 : 3.4;
+const FEEL = { low: .45, normal: 1, high: 1.6 };
+const feel = () => FEEL[settings.feel] ?? 1;
 // ベスト記録は速度ごとに別々（速めは以前の記録をそのまま使う）
 const bestKey = (c, laps, dir = 'fwd') => (isOneway(c) ? 'best.' + c.id + '.ow.' + dir : 'best.' + c.id + '.' + laps) + (settings.speed === 'fast' ? '' : '.' + settings.speed);
 
@@ -1010,21 +1020,24 @@ function buildWorld(T, scen, proj, HF, jcl) {
   road.receiveShadow = true; root.add(road);
   // 路肩（少し明るいアスファルト）
   const shMat = new THREE.MeshLambertMaterial({ color: '#7d7a70' });
-  for (const s of [-1, 1]) { const m = new THREE.Mesh(ribbon(T, s * W / 2, s * (W / 2 + 5.4), .045, 10), shMat); m.material.side = THREE.DoubleSide; m.receiveShadow = true; root.add(m); }
+  const SH = T.SH || 5;
+  for (const s of [-1, 1]) { const m = new THREE.Mesh(ribbon(T, s * W / 2, s * (W / 2 + SH + .4), .045, 10), shMat); m.material.side = THREE.DoubleSide; m.receiveShadow = true; root.add(m); }
   // 道路の側面（高い所を走るときに下が透けないように）
-  if (HF) { const skM = new THREE.MeshLambertMaterial({ color: '#8a8478', side: THREE.DoubleSide }); for (const s of [-1, 1]) root.add(new THREE.Mesh(wallRibbon(T, s * (W / 2 + 5.4), -6, .045, () => true), skM)); }
+  if (HF) { const skM = new THREE.MeshLambertMaterial({ color: '#8a8478', side: THREE.DoubleSide }); for (const s of [-1, 1]) root.add(new THREE.Mesh(wallRibbon(T, s * (W / 2 + SH + .4), -6, .045, () => true), skM)); }
   // 縁石（カーブ）
   const kerbOn = k => Math.abs(T.curv[k]) > 1 / 70;
   const kMat = new THREE.MeshLambertMaterial({ map: TEX.kerb, side: THREE.DoubleSide });
   for (const s of [-1, 1]) root.add(new THREE.Mesh(ribbon(T, s * W / 2, s * (W / 2 + 1.3), .075, 4, kerbOn), kMat));
   // ガードレール（他の区間と重なる所は付けない）
-  const railOff = W / 2 + 5;
+  const railOff = W / 2 + SH;
   const rMat = new THREE.MeshLambertMaterial({ map: TEX.rail, side: THREE.DoubleSide });
+  const railOk = {};
   for (const s of [-1, 1]) {
-    const ok = new Uint8Array(T.N);
-    for (let k = 0; k < T.N; k++) { const p = T.pts[k], n = T.nrm[k]; ok[k] = T.nearest(p[0] + n[0] * s * railOff, p[1] + n[1] * s * railOff, W / 2 + 6, k, 14) > W / 2 + 5.5 ? 1 : 0; }
+    const ok = railOk[s] = new Uint8Array(T.N);
+    for (let k = 0; k < T.N; k++) { const p = T.pts[k], n = T.nrm[k]; ok[k] = T.nearest(p[0] + n[0] * s * (railOff + 1.5), p[1] + n[1] * s * (railOff + 1.5), railOff + 2, k, 14) > railOff + .5 ? 1 : 0; }
     const m = new THREE.Mesh(wallRibbon(T, s * railOff, 0, .9, k => ok[k]), rMat); m.castShadow = true; root.add(m);
   }
+  buildRoadside(T, root, railOk, railOff);
   // スタート・ゴールのゲート（片道はゴールにも）
   const postM = new THREE.MeshLambertMaterial({ color: '#333' });
   const addGate = (sAt, tex) => {
@@ -1048,7 +1061,7 @@ function buildWorld(T, scen, proj, HF, jcl) {
     }
   }
   // まわりの景色
-  const clearR = W / 2 + 7;
+  const clearR = railOff + 2.6;
   if (scen && proj) {
     const P = c => c.map(p => proj.fwd(p[0], p[1]));
     const bl = []; for (const [c, h] of scen.b) { const pc = P(c); if (pc.some(q => T.nearest(q[0], q[1], clearR + 1) < clearR)) continue; let cut = false; for (let i = 0; i < pc.length && !cut; i++) { const q = pc[i], r = pc[(i + 1) % pc.length]; if (T.nearest((q[0] + r[0]) / 2, (q[1] + r[1]) / 2, clearR + 1) < clearR) cut = true; } if (!cut) bl.push([pc, h, HF ? Math.min(...pc.map(q => G(q[0], q[1]))) : 0]); }
@@ -1086,6 +1099,63 @@ function buildWorld(T, scen, proj, HF, jcl) {
   world = { root, railOff, signals: [], jcts: [] };
   if (jcl && jcl.length) buildSignals(T, jcl, root, world);
   return world;
+}
+
+/* ---------- 道路脇の物（反射ポール・街灯・電柱と電線・植え込み） ----------
+   すぐ横を流れていく物があるとスピード感が出る。インスタンス描画で軽く */
+function buildRoadside(T, root, railOk, railOff) {
+  const W = T.W, dummy = new THREE.Object3D(), list = {};
+  const put = (key, k, side, off, lx, ly, lz, rx = 0, sc = null) => {
+    const p = T.pts[k], n = T.nrm[k], t = T.tan[k];
+    dummy.position.set(p[0] + n[0] * side * off, T.h[k], p[1] + n[1] * side * off);
+    dummy.rotation.set(0, Math.atan2(t[0], t[1]), 0); dummy.scale.set(1, 1, 1);
+    dummy.translateX(lx * side); dummy.translateY(ly); dummy.translateZ(lz); dummy.rotateX(rx); if (sc) dummy.scale.copy(sc);
+    dummy.updateMatrix(); (list[key] = list[key] || []).push(dummy.matrix.clone());
+  };
+  const near = (s0, d) => { let x = s0 - T.startS; if (T.closed) { x = ((x % T.len) + T.len) % T.len; x = Math.min(x, T.len - x); } return Math.abs(x) < d || (!T.closed && Math.abs(s0 - T.finishS) < d); };
+  const okAt = (k, side) => railOk[side][k] && railOk[side][(k + 1) % T.N] && Math.abs(T.curv[k]) < 1 / 18;
+  const step = T.len / T.N; let lastWire = { '-1': null, '1': null }; const wires = [];
+  for (let k = 0; k < T.N; k++) {
+    const s0 = T.cum[k]; if (near(s0, 10)) { lastWire = { '-1': null, '1': null }; continue; }
+    const i8 = Math.floor(s0 / 8), i12 = Math.floor(s0 / 12), i36 = Math.floor(s0 / 36), i30 = Math.floor(s0 / 30);
+    const first = (n) => Math.floor((s0 - step) / n) !== Math.floor(s0 / n);
+    for (const side of [-1, 1]) {
+      if (!okAt(k, side)) { if (side === -1) lastWire['-1'] = null; continue; }
+      // 反射ポール（白い柱＋オレンジの反射板）12mおき
+      if (first(12)) { put('post', k, side, railOff - .25, 0, .55, 0); put('refl', k, side, railOff - .25, .07, .95, 0); }
+      // 街灯：右側に36mおき（道路側へアームを出す）
+      if (side === 1 && first(36)) { put('lpole', k, side, railOff + .9, 0, 4.2, 0); put('larm', k, side, railOff + .9, -1.3, 8.3, 0); put('lhead', k, side, railOff + .9, -2.5, 8.15, 0); }
+      // 電柱：左側に30mおき、電線でつなぐ
+      if (side === -1 && first(30)) {
+        put('upole', k, side, railOff + 1.6, 0, 5.5, 0); put('uarm', k, side, railOff + 1.6, 0, 10.2, 0); put('utrans', k, side, railOff + 1.6, .35, 8.2, 0);
+        const p = T.pts[k], n = T.nrm[k], t = T.tan[k], off = railOff + 1.6, bx = p[0] - n[0] * off, bz = p[1] - n[1] * off, y = T.h[k] + 10.25;
+        const tops = [-.75, 0, .75].map(o => [bx - n[0] * o, y, bz - n[1] * o]);
+        const lw = lastWire['-1']; if (lw && Math.hypot(lw[1][0] - tops[1][0], lw[1][2] - tops[1][2]) < 45) for (let j = 0; j < 3; j++) wires.push(lw[j], tops[j]);
+        lastWire['-1'] = tops;
+      }
+      // 植え込み：右側の路肩外に8mおき
+      if (side === 1 && first(8) && !first(36)) put('hedge', k, side, railOff + 1.3, 0, .45, 0);
+    }
+  }
+  const mats = {
+    white: new THREE.MeshLambertMaterial({ color: '#f2f2f2' }), refl: new THREE.MeshBasicMaterial({ color: '#ff8a1a' }), grey: new THREE.MeshLambertMaterial({ color: '#9ca3ab' }),
+    lamp: new THREE.MeshBasicMaterial({ color: '#fff6d8' }), conc: new THREE.MeshLambertMaterial({ color: '#b9b4a8' }), dark: new THREE.MeshLambertMaterial({ color: '#3d4148' }), hedge: new THREE.MeshLambertMaterial({ color: '#3f7f3a' })
+  };
+  const geos = {
+    post: [new THREE.CylinderGeometry(.06, .06, 1.1, 6), mats.white], refl: [new THREE.BoxGeometry(.04, .14, .1), mats.refl],
+    lpole: [new THREE.CylinderGeometry(.09, .13, 8.4, 8), mats.grey], larm: [new THREE.BoxGeometry(2.6, .1, .1), mats.grey], lhead: [new THREE.BoxGeometry(.7, .12, .3), mats.lamp],
+    upole: [new THREE.CylinderGeometry(.14, .19, 11, 8), mats.conc], uarm: [new THREE.BoxGeometry(1.8, .12, .12), mats.dark], utrans: [new THREE.CylinderGeometry(.22, .22, .7, 8), mats.dark],
+    hedge: [new THREE.BoxGeometry(1.1, .9, 6.4), mats.hedge]
+  };
+  for (const key in list) {
+    const [g, m] = geos[key], arr = list[key], im = new THREE.InstancedMesh(g, m, arr.length);
+    arr.forEach((mx, i) => im.setMatrixAt(i, mx)); im.castShadow = key !== 'refl' && key !== 'lhead'; im.receiveShadow = key === 'hedge'; root.add(im);
+  }
+  if (wires.length) {
+    const pos = new Float32Array(wires.length * 3); wires.forEach((q, i) => pos.set(q, i * 3));
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    root.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#2a2d33' })));
+  }
 }
 
 /* ---------- 信号機と交差点名 ---------- */
@@ -1222,8 +1292,8 @@ function buildSignals(T, cl, root, world) {
       const sAt = T.cum[r.i];
       const a = T.at(sAt), grp = new THREE.Group(); grp.position.set(a.x, a.y, a.z); grp.rotation.y = Math.atan2(a.tx, a.tz); root.add(grp);
       const sc = 1.3; // 見やすいよう実物より少し大きめ
-      const sg = new THREE.Group(); sg.scale.set(sc, sc, sc); sg.position.x = (W / 2 + 5.8) * (1 - sc); grp.add(sg);
-      const px = W / 2 + 5.8; // 左側の歩道あたり（日本は左側通行）
+      const px = W / 2 + (T.SH || 5) + .8; // 左側の歩道あたり（日本は左側通行）
+      const sg = new THREE.Group(); sg.scale.set(sc, sc, sc); sg.position.x = px * (1 - sc); grp.add(sg);
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(.16, .2, 6.4, 8), M.pole); pole.position.set(px, 3.2, 0); pole.castShadow = true; sg.add(pole);
       const item = { s: sAt, name, en: c.en, lamps: null, phase: rnd() * 16 };
       if (c.sig) {
@@ -1498,11 +1568,18 @@ const Snd = {
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1300; bp.Q.value = 4;
     const sg = ctx.createGain(); sg.gain.value = 0; ns.connect(bp); bp.connect(sg); sg.connect(this.master); ns.start();
     this.sg = sg; this.bp = bp; this.noise = buf;
+    // 風切り音（速度の2乗で大きくなる）
+    const wn = ctx.createBufferSource(); wn.buffer = buf; wn.loop = true; wn.playbackRate.value = .7;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 500;
+    const lp2 = ctx.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 2400;
+    const wg = ctx.createGain(); wg.gain.value = 0; wn.connect(hp); hp.connect(lp2); lp2.connect(wg); wg.connect(this.master); wn.start();
+    this.wg = wg; this.wlp = lp2;
   },
   setOn(on) { if (this.master) this.master.gain.value = on ? .55 : 0; },
   engine(rpm, load) { if (!this.ctx) return; const t = this.ctx.currentTime, f = 38 + rpm * .028; this.o1.frequency.setTargetAtTime(f, t, .03); this.o2.frequency.setTargetAtTime(f * .5, t, .03); this.lp.frequency.setTargetAtTime(400 + rpm * .25 + load * 600, t, .05); this.eg.gain.setTargetAtTime(.07 + load * .08, t, .05); },
+  wind(f) { if (!this.ctx || !this.wg) return; const t = this.ctx.currentTime; this.wg.gain.setTargetAtTime(Math.min(.32, f * f * .2), t, .1); this.wlp.frequency.setTargetAtTime(1600 + f * 2400, t, .1); },
   skid(v) { if (!this.ctx) return; const t = this.ctx.currentTime; this.sg.gain.setTargetAtTime(v * .22, t, .04); this.bp.frequency.setTargetAtTime(1100 + v * 500, t, .05); },
-  mute() { if (!this.ctx) return; const t = this.ctx.currentTime; this.eg.gain.setTargetAtTime(0, t, .05); this.sg.gain.setTargetAtTime(0, t, .05); },
+  mute() { if (!this.ctx) return; const t = this.ctx.currentTime; this.eg.gain.setTargetAtTime(0, t, .05); this.sg.gain.setTargetAtTime(0, t, .05); if (this.wg) this.wg.gain.setTargetAtTime(0, t, .05); },
   beep(f, dur = .15, type = 'square', vol = .25) { if (!this.ctx) return; const o = this.ctx.createOscillator(), g = this.ctx.createGain(), t = this.ctx.currentTime; o.type = type; o.frequency.value = f; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur); o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur); },
   thud(v) { if (!this.ctx) return; const s = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain(), t = this.ctx.currentTime; s.buffer = this.noise; f.type = 'lowpass'; f.frequency.value = 380; g.gain.setValueAtTime(clamp(v, .05, .6), t); g.gain.exponentialRampToValueAtTime(.001, t + .25); s.connect(f); f.connect(g); g.connect(this.master); s.start(t); s.stop(t + .3); },
   whoosh() { if (!this.ctx) return; const s = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain(), t = this.ctx.currentTime; s.buffer = this.noise; f.type = 'bandpass'; f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(3000, t + .5); g.gain.setValueAtTime(.35, t); g.gain.exponentialRampToValueAtTime(.001, t + .6); s.connect(f); f.connect(g); g.connect(this.master); s.start(t); s.stop(t + .7); }
@@ -1682,7 +1759,7 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
     if (pts.length < 30) throw new Error('short');
     msg('3Dコースを組み立て中…');
     await new Promise(r => setTimeout(r, 30));
-    T = buildTrackData(pts, 13, !ow);
+    T = buildTrackData(pts, roadW(), !ow); T.SH = shoulderW(T.W);
     const HF = makeHeightField(elevXZ, settings.elev);
     if (HF) T.setHeights(HF.H);
     // 信号機と交差点名：OpenStreetMap → 無ければ地図データから推定
@@ -1913,17 +1990,52 @@ function placeCamera(snap, dt = 1 / 60) {
   const fx = Math.sin(p.th), fz = Math.cos(p.th), sp = Math.hypot(p.vx, p.vz);
   let dx = fx, dz = fz;
   if (sp > 3 && settings.cam !== 2) { const vx = p.vx / sp, vz = p.vz / sp; dx = lerp(fx, vx, .45); dz = lerp(fz, vz, .45); const l = Math.hypot(dx, dz); dx /= l; dz /= l; }
-  const portrait = camera.aspect < 1, back = C.d * (portrait && settings.cam !== 2 ? 1.25 : 1);
-  const py = p.vy != null ? p.vy : (p.y || 0), sl = p.vslope || 0;
-  const want = new THREE.Vector3(p.x - dx * back, py - sl * back + C.h * (portrait ? 1.15 : 1), p.z - dz * back);
+  // スピード感の演出：速いほどカメラを低く近く、画角を広く。加速・ブースト時は少し遅れて付いてくる
+  const I = feel(), top = 52 * spk() * ((p.spec && p.spec.stats.top) || 1), f = clamp(sp / top, 0, 1.25), hood = settings.cam === 2;
+  p.accSm = lerp(p.accSm || 0, clamp(((p.prevVf || 0) - (p.lastVfCam ?? (p.prevVf || 0))) / dt, -25, 25), 1 - Math.exp(-dt * 4)); p.lastVfCam = p.prevVf || 0;
+  const pull = hood ? 0 : clamp(p.accSm * .05 + (p.boost > 0 ? 1.2 : 0), -.8, 2) * I;
+  const portrait = camera.aspect < 1, back = hood ? C.d : C.d * (portrait ? 1.25 : 1) * (1 - .2 * f * I) + pull;
+  const py = p.vy != null ? p.vy : (p.y || 0), sl = p.vslope || 0, camH = hood ? C.h : C.h * (portrait ? 1.15 : 1) * (1 - .24 * f * I);
+  const want = new THREE.Vector3(p.x - dx * back, py - sl * back + camH, p.z - dz * back);
   const look = new THREE.Vector3(p.x + fx * C.look, py + sl * C.look + C.lh, p.z + fz * C.look);
   if (snap) { camPos.copy(want); camLook.copy(look); }
   else { const k = settings.cam === 2 ? 1 : 1 - Math.exp(-dt * 7); camPos.lerp(want, k); camLook.lerp(look, settings.cam === 2 ? 1 : 1 - Math.exp(-dt * 12)); }
   camera.position.copy(camPos);
   if (race.camShake > 0) { camera.position.x += (Math.random() - .5) * race.camShake; camera.position.y += (Math.random() - .5) * race.camShake; race.camShake = Math.max(0, race.camShake - dt * 2); }
+  // 高速での細かい振動（路面外ではもっと揺れる）
+  const vib = (Math.max(0, f - .45) * .05 + (!p.onRoad && sp > 5 ? .05 : 0) + (p.boost > 0 ? .02 : 0)) * I;
+  if (vib > 0 && race.state !== 'paused') { const t = performance.now() / 1000; camera.position.y += Math.sin(t * 61) * vib + (Math.random() - .5) * vib; camera.position.x += Math.sin(t * 47) * vib * .6; }
   camera.lookAt(camLook);
-  const baseF = portrait ? 74 : 60; camera.fov = lerp(camera.fov, baseF + sp * .22 + (p.boost > 0 ? 8 : 0), snap ? 1 : 1 - Math.exp(-dt * 3)); camera.updateProjectionMatrix();
+  const baseF = portrait ? 72 : 58; camera.fov = lerp(camera.fov, baseF + (6 + 16 * I) * Math.min(f, 1.1) + (p.boost > 0 ? 10 * I : 0), snap ? 1 : 1 - Math.exp(-dt * 3)); camera.updateProjectionMatrix();
+  race.feelF = f;
   sun.position.set(p.x + 30, py + 80, p.z + 22); sun.target.position.set(p.x, py, p.z);
+}
+
+/* ---------- スピード線（画面の端を流れる線） ---------- */
+const SL = { cv: $('#lines'), lines: [], on: false };
+SL.g = SL.cv.getContext('2d');
+function speedLines(dt) {
+  const cv = SL.cv, g = SL.g, w = innerWidth, h = innerHeight;
+  const I = feel(), f = race ? race.feelF || 0 : 0, boost = race && race.p.boost > 0;
+  const amt = race && race.state !== 'paused' && race.state !== 'count' ? clamp((f - .45) * 1.6, 0, 1) * I + (boost ? .7 * I : 0) : 0;
+  if (amt <= .01 && !SL.on) return;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  g.clearRect(0, 0, w, h); SL.on = amt > .01;
+  if (!SL.on) { SL.lines.length = 0; return; }
+  const cx = w / 2, cy = h * .45, R0 = Math.hypot(w, h) / 2;
+  const want = Math.round(14 + 46 * Math.min(amt, 1.6));
+  while (SL.lines.length < want) SL.lines.push({ a: Math.random() * Math.PI * 2, r: R0 * (.35 + Math.random() * .35), v: 1.2 + Math.random() * 1.4, l: .08 + Math.random() * .16 });
+  if (SL.lines.length > want) SL.lines.length = want;
+  g.lineCap = 'round';
+  for (const L of SL.lines) {
+    L.r += L.v * R0 * dt * (1 + amt);
+    if (L.r > R0 * 1.15) { L.a = Math.random() * Math.PI * 2; L.r = R0 * (.35 + Math.random() * .2); }
+    const r2 = L.r + L.l * R0 * (1 + amt), ca = Math.cos(L.a), sa = Math.sin(L.a), edge = clamp((L.r / R0 - .35) * 2.2, 0, 1);
+    g.strokeStyle = `rgba(255,255,255,${(.1 + .28 * Math.min(amt, 1)) * edge})`; g.lineWidth = 1.5 + 1.5 * Math.min(amt, 1);
+    g.beginPath(); g.moveTo(cx + ca * L.r, cy + sa * L.r * .7); g.lineTo(cx + ca * r2, cy + sa * r2 * .7); g.stroke();
+  }
+  // ブースト中は周りを少し暗く（集中線の効果）
+  if (boost || amt > .6) { const gr = g.createRadialGradient(cx, cy, R0 * .45, cx, cy, R0 * 1.05); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(0,0,0,${.28 * Math.min(1, amt)})`); g.fillStyle = gr; g.fillRect(0, 0, w, h); }
 }
 
 /* ---------- ミニマップ ---------- */
@@ -2026,12 +2138,14 @@ function frame(now) {
   for (const c of race.cpus) syncCar(c.car, c.x, c.y, c.z, c.th, c.wheelRot, 0, 0, 0, c.slope);
   effects(p, dt);
   placeCamera(false, dt);
+  speedLines(dt);
   // サウンド
   const sp = Math.hypot(p.vx, p.vz), spg = sp / spk(); let g = 0; for (let i = 1; i < GEARS.length; i++) if (spg >= GEARS[i - 1]) g = i;
   const lo = GEARS[g - 1] || 0, hi = GEARS[g] || 60, rpm = 1500 + 5500 * clamp((spg - lo) / (hi - lo), 0, 1);
   Snd.engine(race.state === 'count' ? 1200 + inp.steer * 0 : rpm, inp.gas);
   const sk = p.drifting ? .8 + Math.min(.4, Math.abs(p.slip || 0)) : clamp((Math.abs(p.slip || 0) - .12) * 3, 0, .6) * (sp > 6 ? 1 : 0);
   Snd.skid(p.onRoad ? sk : sk * .3);
+  Snd.wind((race.feelF || 0) * (.6 + .4 * feel()) * (p.boost > 0 ? 1.2 : 1));
   hudAcc += dt; if (hudAcc > 1 / 20) { hudAcc = 0; updateHUD(); drawMini(); updateSignals(performance.now() / 1000); updateJct(); }
   renderer.render(scene, camera);
 }
@@ -2086,7 +2200,7 @@ function togglePause(force) {
 }
 function quitRace() {
   if (race) { scene.remove(race.p.car); race.cpus.forEach(c => scene.remove(c.car)); }
-  race = null; Snd.mute(); show('#hud', false); show('#controls', false); show('#pause', false); show('#result', false);
+  race = null; Snd.mute(); speedLines(0); show('#hud', false); show('#controls', false); show('#pause', false); show('#result', false);
   pointers.clear(); refreshTouch(); toTitle();
 }
 $('#pauseBtn').onclick = () => togglePause(true);
@@ -2254,6 +2368,8 @@ seg('#segCtrl', 'ctrl', v => v, async v => { syncCtrlUI(); if (v === 'tilt') awa
 seg('#segLaps', 'laps', v => +v, () => renderCourses());
 seg('#segRiv', 'rivals');
 seg('#segElev', 'elev', v => +v);
+seg('#segFeel', 'feel');
+seg('#segRoadW', 'roadW');
 const syncSpeedNote = () => { $('#speedNote').textContent = `最高 約${Math.round(52 * spk() * 3.6 / 5) * 5} km/h（ライバル車も同じ割合）`; };
 seg('#segSpeed', 'speed', v => v, () => { syncSpeedNote(); renderCourses(); });
 syncSpeedNote();
