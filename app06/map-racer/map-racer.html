@@ -133,11 +133,17 @@
   .wp.g{background:#ffd23f;color:#111;width:32px;height:32px;line-height:27px;font-size:15px}
   .edOpt .seg button{min-height:36px;font-size:13px}
   .edRow .big.ghost{padding:0 12px}
-  .edPanel.jx .edRoute{display:none}
+  .edPanel.jx .edRoute,.edPanel.shop .edRoute{display:none}
+  #segEdMode button{padding:0 8px}
   .jxm{display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);position:absolute;left:0;top:0;pointer-events:auto}
   .jxm i{font-style:normal;font-size:20px;width:34px;height:34px;line-height:30px;text-align:center;border-radius:50%;background:#fff;border:2.5px solid #1d4fb8;box-shadow:0 2px 6px rgba(0,0,0,.4)}
   .jxm b{margin-top:2px;background:#1d4fb8;color:#fff;border:1.5px solid #fff;border-radius:5px;padding:1px 6px;font-size:12px;white-space:nowrap}
   .jxm b:empty{display:none}
+  #shopDlg input[type=text]{width:100%;height:50px;border-radius:12px;border:0;padding:0 12px;font-size:16px;background:rgba(255,255,255,.12);margin:8px 0 2px}
+  #shopColors{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  #shopColors button{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.25);padding:0;cursor:pointer}
+  #shopColors button.on{border-color:#fff;box-shadow:0 0 0 2px #ff5a33}
+  .jxm.shop i{border-color:#ff8a1a}
   #jxDlg input[type=text]{width:100%;height:50px;border-radius:12px;border:0;padding:0 12px;font-size:16px;background:rgba(255,255,255,.12);margin:4px 0 6px}
   .leaflet-control-attribution{font-size:10px}
 
@@ -322,7 +328,7 @@
   </form>
   <div class="edPanel">
     <p id="edInfo"></p>
-    <div class="edOpt"><span>置くもの</span><div class="seg" id="segEdMode"><button data-v="route" type="button">🏁 ルート</button><button data-v="jx" type="button">🚥 交差点・信号</button></div></div>
+    <div class="edOpt"><span>置くもの</span><div class="seg" id="segEdMode"><button data-v="route" type="button">🏁 ルート</button><button data-v="jx" type="button">🚥 交差点</button><button data-v="shop" type="button">🏪 お店</button></div></div>
     <div class="edOpt edRoute"><span>コースの形</span><div class="seg" id="segType"><button data-v="loop" type="button">🔁 周回</button><button data-v="oneway" type="button">➡️ 片道</button></div></div>
     <div class="edOpt edRoute"><span>道路に沿ってコースを作る</span><span class="sw"><input type="checkbox" id="snap" checked><i></i></span></div>
     <div class="edBtns">
@@ -397,6 +403,19 @@
     <button class="big ghost" id="pReset">🚗 コースに戻す</button>
     <button class="big ghost" id="pCal">📱 傾きの中心を合わせる</button>
     <button class="big ghost" id="pQuit">コース選択へ</button>
+  </div>
+</div>
+
+<!-- ================= お店の設定 ================= -->
+<div id="shopDlg" class="screen dim" hidden>
+  <div class="card">
+    <h3 style="font-size:20px;font-style:normal;font-family:inherit">🏪 お店</h3>
+    <div class="row"><label>種類</label><div class="seg" id="shopType"><button data-v="cvs" type="button">🏪 コンビニ</button><button data-v="super" type="button">🛒 スーパー</button></div></div>
+    <input id="shopName" type="text" maxlength="14" placeholder="店名（空欄なら「コンビニ」「スーパー」）" enterkeyhint="done">
+    <div class="row"><label>看板の色</label><div id="shopColors"></div></div>
+    <button class="big primary" id="shopOk">OK</button>
+    <button class="big ghost" id="shopDel" style="color:#ff8a7a">🗑 このお店を消す</button>
+    <button class="big ghost" id="shopCancel">キャンセル</button>
   </div>
 </div>
 
@@ -1018,7 +1037,7 @@ function streetGeo(list, G = () => 0) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
 
-function buildWorld(T, scen, proj, HF, jcl) {
+function buildWorld(T, scen, proj, HF, jcl, shopsXZ = []) {
   makeTextures();
   disposeWorld();
   const root = new THREE.Group(); scene.add(root);
@@ -1059,7 +1078,9 @@ function buildWorld(T, scen, proj, HF, jcl) {
     for (let k = 0; k < T.N; k++) { const p = T.pts[k], n = T.nrm[k]; ok[k] = T.nearest(p[0] + n[0] * s * (railOff + 1.5), p[1] + n[1] * s * (railOff + 1.5), railOff + 2, k, 14) > railOff + .5 ? 1 : 0; }
     const m = new THREE.Mesh(wallRibbon(T, s * railOff, 0, .9, k => ok[k]), rMat); m.castShadow = true; root.add(m);
   }
-  buildRoadside(T, root, railOk, railOff);
+  const shopPl = placeShops(T, shopsXZ, railOff);
+  buildRoadside(T, root, railOk, railOff, shopPl);
+  shopPl.forEach(pl => buildShop(root, pl));
   // スタート・ゴールのゲート（片道はゴールにも）
   const postM = new THREE.MeshLambertMaterial({ color: '#333' });
   const addGate = (sAt, tex) => {
@@ -1086,7 +1107,7 @@ function buildWorld(T, scen, proj, HF, jcl) {
   const clearR = railOff + 2.6;
   if (scen && proj) {
     const P = c => c.map(p => proj.fwd(p[0], p[1]));
-    const bl = []; for (const [c, h] of scen.b) { const pc = P(c); if (pc.some(q => T.nearest(q[0], q[1], clearR + 1) < clearR)) continue; let cut = false; for (let i = 0; i < pc.length && !cut; i++) { const q = pc[i], r = pc[(i + 1) % pc.length]; if (T.nearest((q[0] + r[0]) / 2, (q[1] + r[1]) / 2, clearR + 1) < clearR) cut = true; } if (!cut) bl.push([pc, h, HF ? Math.min(...pc.map(q => G(q[0], q[1]))) : 0]); }
+    const bl = []; for (const [c, h] of scen.b) { const pc = P(c); if (pc.some(q => T.nearest(q[0], q[1], clearR + 1) < clearR)) continue; let cut = false; for (let i = 0; i < pc.length && !cut; i++) { const q = pc[i], r = pc[(i + 1) % pc.length]; if (T.nearest((q[0] + r[0]) / 2, (q[1] + r[1]) / 2, clearR + 1) < clearR) cut = true; } if (!cut && !hitsShop(pc, shopPl)) bl.push([pc, h, HF ? Math.min(...pc.map(q => G(q[0], q[1]))) : 0]); }
     if (bl.length) { const m = new THREE.Mesh(buildingGeo(bl), new THREE.MeshLambertMaterial({ vertexColors: true, map: TEX.win, side: THREE.DoubleSide })); m.castShadow = true; m.receiveShadow = true; root.add(m); }
     if (scen.h.length) { const m = new THREE.Mesh(streetGeo(scen.h.map(([c, t]) => [P(c), t]), G), new THREE.MeshLambertMaterial({ color: '#5d6168', side: THREE.DoubleSide })); m.receiveShadow = true; root.add(m); }
     if (scen.g.length) { const m = new THREE.Mesh(flatPolys(scen.g.map(P), .03, G), new THREE.MeshLambertMaterial({ color: '#79a85c', side: THREE.DoubleSide })); m.receiveShadow = true; root.add(m); }
@@ -1102,7 +1123,7 @@ function buildWorld(T, scen, proj, HF, jcl) {
         if (r < .45) {
           const off = W / 2 + 14 + rnd() * 40, x = a.x + a.rx * off * side, z = a.z + a.rz * off * side, w = 8 + rnd() * 14, d = 8 + rnd() * 14;
           const c = [[-w, -d], [w, -d], [w, d], [-w, d]].map(([u, v]) => [x + (a.tx * v + a.rx * u) / 2, z + (a.tz * v + a.rz * u) / 2]);
-          if (c.every(q => T.nearest(q[0], q[1], clearR + 4) > clearR + 3) && T.nearest(x, z, clearR + 4) > clearR + 3) bl.push([c, 6 + rnd() * rnd() * 40, HF ? Math.min(...c.map(q => G(q[0], q[1]))) : 0]);
+          if (c.every(q => T.nearest(q[0], q[1], clearR + 4) > clearR + 3) && T.nearest(x, z, clearR + 4) > clearR + 3 && !hitsShop(c, shopPl)) bl.push([c, 6 + rnd() * rnd() * 40, HF ? Math.min(...c.map(q => G(q[0], q[1]))) : 0]);
         } else if (r < .8) {
           const off = W / 2 + 8 + rnd() * 30, x = a.x + a.rx * off * side, z = a.z + a.rz * off * side;
           if (T.nearest(x, z, clearR) >= clearR) trees.push([x, z, .8 + rnd() * .7, G(x, z)]);
@@ -1118,14 +1139,14 @@ function buildWorld(T, scen, proj, HF, jcl) {
       leaf.castShadow = trunk.castShadow = true; root.add(leaf, trunk);
     }
   }
-  world = { root, railOff, signals: [], jcts: [] };
+  world = { root, railOff, signals: [], jcts: shopPl.map(pl => ({ s: pl.s, name: pl.name, icon: pl.type === 'super' ? '🛒' : '🏪' })), shops: shopPl };
   if (jcl && jcl.length) buildSignals(T, jcl, root, world);
   return world;
 }
 
 /* ---------- 道路脇の物（反射ポール・街灯・電柱と電線・植え込み） ----------
    すぐ横を流れていく物があるとスピード感が出る。インスタンス描画で軽く */
-function buildRoadside(T, root, railOk, railOff) {
+function buildRoadside(T, root, railOk, railOff, shopPl = []) {
   const W = T.W, dummy = new THREE.Object3D(), list = {};
   const put = (key, k, side, off, lx, ly, lz, rx = 0, sc = null) => {
     const p = T.pts[k], n = T.nrm[k], t = T.tan[k];
@@ -1142,6 +1163,7 @@ function buildRoadside(T, root, railOk, railOff) {
     const i8 = Math.floor(s0 / 8), i12 = Math.floor(s0 / 12), i36 = Math.floor(s0 / 36), i30 = Math.floor(s0 / 30);
     const first = (n) => Math.floor((s0 - step) / n) !== Math.floor(s0 / n);
     for (const side of [-1, 1]) {
+      if (shopPl.some(pl => pl.side === side && pl.nearS(s0))) { if (side === -1) lastWire['-1'] = null; continue; }
       if (!okAt(k, side)) { if (side === -1) lastWire['-1'] = null; continue; }
       // 反射ポール（白い柱＋オレンジの反射板）12mおき
       if (first(12)) { put('post', k, side, railOff - .25, 0, .55, 0); put('refl', k, side, railOff - .25, .07, .95, 0); }
@@ -1177,6 +1199,89 @@ function buildRoadside(T, root, railOk, railOff) {
     const pos = new Float32Array(wires.length * 3); wires.forEach((q, i) => pos.set(q, i * 3));
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     root.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#2a2d33' })));
+  }
+}
+
+/* ---------- お店（コンビニ・スーパー） ---------- */
+const SHOP_DIM = { cvs: { w: 14, d: 10, h: 4.6, lot: 9 }, super: { w: 34, d: 24, h: 7.5, lot: 16 } };
+function placeShops(T, list, railOff) {
+  const out = [];
+  for (const sh of list || []) {
+    const loc = T.locate(sh.x, sh.z, null); if (Math.sqrt(loc.d2) > 120) continue;
+    const type = sh.type === 'super' ? 'super' : 'cvs', D = SHOP_DIM[type], side = loc.lat >= 0 ? 1 : -1, a = T.at(loc.s);
+    const nx = a.rx * side, nz = a.rz * side, off = railOff + 1.2 + D.lot + D.d / 2;
+    const near0 = railOff + .8, far0 = off + D.d / 2 + 2, mid = (near0 + far0) / 2, hd = (far0 - near0) / 2, hw = D.w / 2 + 3;
+    const rcx = a.x + nx * mid, rcz = a.z + nz * mid;
+    // 同じ側の近くに置いたお店とは重ならないようにする
+    if (out.some(o => o.side === side && Math.abs(o.s - loc.s) < (o.w + D.w) / 2 + 2)) continue;
+    out.push({
+      type, name: sh.name || SHOP_LABEL[type], color: sh.color || SHOP_COLORS[0], side, s: loc.s, w: D.w, D,
+      x: a.x + nx * off, z: a.z + nz * off, y: a.y, rot: Math.atan2(-nx, -nz),
+      inRect: (x, z) => { const dx = x - rcx, dz = z - rcz, u = dx * a.tx + dz * a.tz, v = dx * nx + dz * nz; return Math.abs(u) < hw && Math.abs(v) < hd; },
+      // 敷地内の点（敷地より大きい建物と重なっていないか調べる用）
+      samples: [-1, -.5, 0, .5, 1].flatMap(u => [-1, -.5, 0, .5, 1].map(v => [rcx + a.tx * u * hw * .95 + nx * v * hd * .95, rcz + a.tz * u * hw * .95 + nz * v * hd * .95])),
+      nearS: s0 => { let d = s0 - loc.s; if (T.closed) { if (d > T.len / 2) d -= T.len; if (d < -T.len / 2) d += T.len; } return Math.abs(d) < hw + 2; }
+    });
+  }
+  return out;
+}
+function pointInPoly(x, z, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a[1] > z) !== (b[1] > z) && x < (b[0] - a[0]) * (z - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside; }
+  return inside;
+}
+const hitsShop = (pc, shopPl) => shopPl.some(pl => pc.some(q => pl.inRect(q[0], q[1])) || pl.samples.some(q => pointInPoly(q[0], q[1], pc)));
+function signTex(text, bg, fg = '#fff', W = 512, H = 128, font = 900) {
+  return canvasTex(W, H, (g) => {
+    g.fillStyle = bg; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(0, 0, W, H * .12);
+    g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+    let fs = H * .62; g.font = `${font} ${fs}px "Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif`;
+    while (g.measureText(text).width > W * .9 && fs > 10) { fs -= 2; g.font = `${font} ${fs}px "Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif`; }
+    g.fillText(text, W / 2, H / 2 + 3);
+  });
+}
+let lotTex = null;
+function buildShop(root, pl) {
+  const { w, d, h, lot } = pl.D, g = new THREE.Group(); g.position.set(pl.x, pl.y, pl.z); g.rotation.y = pl.rot; root.add(g);
+  const M = c => new THREE.MeshLambertMaterial({ color: c });
+  const add = (geo, mat, x, y, z, cast = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; m.receiveShadow = true; g.add(m); return m; };
+  const box = (a, b, c) => new THREE.BoxGeometry(a, b, c);
+  const accent = M(pl.color), wall = M(pl.type === 'super' ? '#ece6da' : '#f4f2ec'), dark = M('#3a3f47'), white = M('#ffffff');
+  const glass = new THREE.MeshBasicMaterial({ color: '#dff1ff' }), signM = new THREE.MeshBasicMaterial({ map: signTex(pl.name, pl.color) });
+  // 土台（起伏があっても浮かないように）と駐車場
+  add(box(w + 4, 3, d + lot + 3), M('#8d8f93'), 0, -1.5 + .02, lot / 2 + .4, false);
+  if (!lotTex) lotTex = canvasTex(256, 128, (c, W, H) => { c.fillStyle = '#5f636b'; c.fillRect(0, 0, W, H); c.strokeStyle = '#f2f2f2'; c.lineWidth = 5; for (let x = 0; x <= W; x += 32) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H * .55); c.stroke(); } });
+  const lt = lotTex.clone(); lt.needsUpdate = true; lt.repeat.set((w + 4) / 20, 1);
+  const lotM = new THREE.Mesh(new THREE.PlaneGeometry(w + 4, lot + 1.2), new THREE.MeshLambertMaterial({ map: lt })); lotM.rotation.x = -Math.PI / 2; lotM.rotation.z = Math.PI; lotM.position.set(0, .05, d / 2 + (lot + 1.2) / 2); lotM.receiveShadow = true; g.add(lotM);
+  // 建物
+  add(box(w, h, d), wall, 0, h / 2, 0);
+  add(box(w + .3, .35, d + .3), dark, 0, h + .17, 0);
+  // 正面のガラス（明るい店内）とサッシ
+  const gw = w - 2, gh = pl.type === 'super' ? 3.2 : 2.7;
+  add(box(gw, gh, .1), glass, 0, .2 + gh / 2, d / 2 + .02, false);
+  for (let x = -gw / 2; x <= gw / 2 + .01; x += pl.type === 'super' ? 2.4 : 1.6) add(box(.08, gh, .14), dark, x, .2 + gh / 2, d / 2 + .04, false);
+  // 看板帯（店名）
+  const bandH = pl.type === 'super' ? 1.8 : 1.1;
+  add(box(w + .2, bandH, .35), accent, 0, h - bandH / 2 - .15, d / 2 + .1);
+  const signW = pl.type === 'super' ? Math.min(w * .6, 16) : w * .78;
+  const sp = new THREE.Mesh(new THREE.PlaneGeometry(signW, bandH * .82), signM); sp.position.set(0, h - bandH / 2 - .15, d / 2 + .29); g.add(sp);
+  add(box(w + .2, .14, .4), white, 0, h - bandH - .25, d / 2 + .12, false);
+  // 道路側のポール看板（両面）
+  const ph = pl.type === 'super' ? 8 : 6.5, px = w / 2 + 1, pz = d / 2 + lot - .5;
+  add(new THREE.CylinderGeometry(.14, .16, ph, 8), M('#9ca3ab'), px, ph / 2, pz);
+  const pb = add(box(pl.type === 'super' ? 4.2 : 2.4, pl.type === 'super' ? 2 : 2.4, .35), accent, px, ph + .9, pz);
+  for (const sgn of [1, -1]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(pl.type === 'super' ? 3.8 : 2.1, pl.type === 'super' ? 1.4 : 1.2), new THREE.MeshBasicMaterial({ map: signTex(pl.type === 'super' ? pl.name : pl.name.slice(0, 6), pl.color) })); m.position.set(px, ph + .9, pz + sgn * .19); if (sgn < 0) m.rotation.y = Math.PI; g.add(m); }
+  if (pl.type === 'super') {
+    // 入口のひさし・屋上の室外機・カート置き場
+    add(box(8, .3, 3.2), accent, 0, 3.7, d / 2 + 1.6);
+    for (let i = 0; i < 4; i++) add(box(2.2, 1.4, 1.6), M('#c9ccd1'), -w / 2 + 5 + i * 3.4, h + 1, -d / 4);
+    add(box(4, 2.2, 1.6), M('#c9ccd1'), w / 2 - 6, h + 1.1, d / 4 - 2);
+    add(box(5, 2.4, 1.6), dark, -w / 2 + 4, 1.2, d / 2 + 3);
+  } else {
+    // 入口の自動ドア上のひさし・ゴミ箱・のぼり
+    add(box(3.4, .2, 1.4), accent, gw / 2 - 2.2, 3, d / 2 + .7);
+    add(box(1.6, 1, .7), M('#5b6470'), -w / 2 + 1.5, .5, d / 2 + .5);
+    for (let i = 0; i < 3; i++) { add(new THREE.CylinderGeometry(.03, .03, 3, 6), M('#ddd'), -w / 2 + 3 + i * 1.2, 1.5, d / 2 + lot - 1.4); add(box(.5, 1.6, .02), accent, -w / 2 + 3.27 + i * 1.2, 2.1, d / 2 + lot - 1.4, false); }
   }
 }
 
@@ -1804,10 +1909,11 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
       }
       if (settings.sigInfer && jcl.some(q => !q.name)) { try { await nameJunctions(c, jcl, proj, T, ac.signal, msg); } catch (e) { if (ac.signal.aborted) return; } }
     }
-    buildWorld(T, scen, scen ? proj : null, HF, jcl);
+    const shopsXZ = proj && Array.isArray(c.shops) ? c.shops.map(q => ({ x: proj.fwd(q[0], q[1])[0], z: proj.fwd(q[0], q[1])[1], type: q[2], name: q[3], color: q[4] })) : [];
+    buildWorld(T, scen, scen ? proj : null, HF, jcl, shopsXZ);
     // 信号機の表示結果をお知らせ（表示できなかった時は理由も）
     if (settings.signals) {
-      const nS = world.signals.length, nN = world.jcts.filter(j => j.name).length;
+      const nS = world.signals.length, nN = world.jcts.filter(j => j.name && !j.icon).length;
       let t;
       if (info.local) t = store.get('localSigNote', false) ? '' : (store.set('localSigNote', true), '🚥 テストコースには実在の信号機はありません（地図から作ったコースで表示されます）');
       else if (nS || nN) t = `🚥 信号機 ${nS}基・交差点名 ${nN}件${info.user ? `（自分で設定した ${info.user}か所を含む）` : T.sigGuess ? '（地図データから推定）' : '（OpenStreetMap）'}`;
@@ -1822,6 +1928,7 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
     if (scen) lines.push(`🏙 建物 ${scen.b.length.toLocaleString()}件・道路 ${scen.h.length.toLocaleString()}本（OpenStreetMap）`);
     else if (!c.local) lines.push('🏙 建物：自動生成の街並み');
     if (T.sigText) lines.push(T.sigText);
+    if (world.shops && world.shops.length) lines.push(`🏪 お店 ${world.shops.length}軒（コンビニ ${world.shops.filter(q => q.type !== 'super').length}・スーパー ${world.shops.filter(q => q.type === 'super').length}）`);
     lines.push(T.climb > 1.5 ? `⛰ 高低差 ${Math.round(T.climb)} m${settings.elev > 1 ? `（実際の${settings.elev}倍）` : ''}` : settings.elev > 0 && !c.local ? '⛰ 高低差：ほぼ平ら（または標高データなし）' : '⛰ 高低差：なし');
     startRace(c, dir, { lines: lines.concat(notes) });
   } catch (e) {
@@ -2085,6 +2192,7 @@ function drawMiniBase() {
   g.beginPath(); T.pts.forEach((p, i) => { const [x, y] = miniTf(p[0], p[1]); i ? g.lineTo(x, y) : g.moveTo(x, y); }); if (T.closed) g.closePath();
   g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 11; g.stroke(); g.strokeStyle = '#fff'; g.lineWidth = 6; g.stroke();
   if (!T.closed) { const gp = T.at(T.finishS), [gx, gy] = miniTf(gp.x, gp.z); g.fillStyle = '#ffd23f'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(gx, gy, 8, 0, 7); g.fill(); g.stroke(); }
+  if (world && world.shops) for (const it of world.shops) { const [x, y] = miniTf(it.x, it.z); g.fillStyle = it.color; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.fillRect(x - 4, y - 4, 8, 8); g.strokeRect(x - 4, y - 4, 8, 8); }
   if (world && world.signals) for (const it of world.signals) { const a = T.at(it.s), [x, y] = miniTf(a.x, a.z); g.fillStyle = '#2bff9a'; g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill(); }
   const sp0 = T.at(T.startS), [sx, sy] = miniTf(sp0.x, sp0.z); g.fillStyle = '#111'; g.fillRect(sx - 5, sy - 5, 10, 10); g.fillStyle = '#fff'; g.fillRect(sx - 5, sy - 5, 5, 5); g.fillRect(sx, sy, 5, 5);
 }
@@ -2113,7 +2221,7 @@ function updateJct() {
   if (key === jctShown) return; jctShown = key;
   $('#jct').hidden = !best;
   if (best) {
-    $('#jctName').textContent = (best.sig ? '🚥 ' : '📍 ') + (best.name || '交差点');
+    $('#jctName').textContent = (best.icon || (best.sig ? '🚥' : '📍')) + ' ' + (best.name || '交差点');
     $('#jctEn').textContent = [best.en && !best.guess ? best.en : '', dist > 0 ? 'あと ' + dist + ' m' : '', best.guess ? '地図から推定' : ''].filter(Boolean).join('・');
   }
 }
@@ -2333,7 +2441,7 @@ function courseMenu(c) {
   $('#cmRefetch').textContent = m ? '🔄 建物・道路を最新に取り直す' : '⬇️ 建物・道路を読み込んで走る';
   const close = () => show('#courseMenu', false);
   $('#cmEdit').hidden = !!c.local;
-  $('#cmEdit').textContent = user ? '🗺️ コースを編集（ルート・交差点・信号）' : '🗺️ コピーして編集（交差点・信号を追加）';
+  $('#cmEdit').textContent = user ? '🗺️ コースを編集（ルート・交差点・お店）' : '🗺️ コピーして編集（交差点・お店を追加）';
   $('#cmEdit').onclick = () => { close(); editCourse(c); };
   $('#cmRename').onclick = () => { close(); const n = prompt('コース名', c.name); if (n == null || !n.trim()) return; const l = userCourses(); const x = l.find(x => x.id === c.id); if (x) { x.name = n.trim().slice(0, 24); saveUserCourses(l); renderCourses(); } };
   $('#cmRefetch').onclick = () => { close(); if (isOneway(c)) pickDir(c, true); else playCourse(c, 'fwd', true); };
@@ -2387,6 +2495,7 @@ $('#importFile').onchange = async e => {
       if (ids.has(c.id)) { if (validScen(c.scenery) && !(await sceneDB.get(c.id))) scn.push([c.id, c.scenery]); continue; }
       const nc = { id: typeof c.id === 'string' && /^u[0-9a-z]+$/.test(c.id) ? c.id : 'u' + (Date.now() + n).toString(36), name: c.name.slice(0, 24), wps: c.wps, line: c.line, len: +c.len || lineLength(c.line), desc: '', type: c.type === 'oneway' ? 'oneway' : 'loop' };
       if (Array.isArray(c.elev) && c.elev.every(q => Array.isArray(q) && q.length === 3 && q.every(isFinite))) nc.elev = c.elev;
+      if (Array.isArray(c.shops)) nc.shops = c.shops.filter(q => Array.isArray(q) && isFinite(q[0]) && isFinite(q[1])).slice(0, 30).map(q => [+q[0], +q[1], q[2] === 'super' ? 'super' : 'cvs', String(q[3] || '').slice(0, 14), /^#[0-9a-f]{6}$/i.test(q[4]) ? q[4] : SHOP_COLORS[0]]);
       if (Array.isArray(c.jx)) nc.jx = c.jx.filter(q => Array.isArray(q) && isFinite(q[0]) && isFinite(q[1])).slice(0, 60).map(q => [+q[0], +q[1], String(q[2] || '').slice(0, 20), q[3] ? 1 : 0]);
       list.push(nc); ids.add(nc.id); n++;
       if (validScen(c.scenery)) scn.push([nc.id, c.scenery]);
@@ -2440,19 +2549,19 @@ function toTitle() { show('#title', true); show('#editor', false); renderCourses
    コースエディタ（Leaflet）
    ========================================================= */
 let map = null, wps = [], wpMarkers = [], routeLine = null, routeData = null, routeSeq = 0, edType = 'loop';
-let edMode = 'route', jx = [], jxMarkers = [], editing = null, routeDirty = false, edDirty = false;
+let edMode = 'route', jx = [], jxMarkers = [], shops = [], shopMarkers = [], editing = null, routeDirty = false, edDirty = false;
 const minPts = () => edType === 'oneway' ? 2 : 3;
 function initMap() {
   if (map) return;
   map = L.map('map', { zoomControl: false, attributionControl: true }).setView([35.681, 139.767], 15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, subdomains: 'abc', attribution: '© OpenStreetMap contributors' }).addTo(map);
-  map.on('click', e => edMode === 'jx' ? addJx([e.latlng.lat, e.latlng.lng]) : addWp([e.latlng.lat, e.latlng.lng]));
+  map.on('click', e => { const ll = [e.latlng.lat, e.latlng.lng]; edMode === 'jx' ? addJx(ll) : edMode === 'shop' ? addShop(ll) : addWp(ll); });
   // 前回の位置
   const lastView = store.get('mapView', null); if (lastView) map.setView([lastView[0], lastView[1]], lastView[2]);
   map.on('moveend', () => { const c = map.getCenter(); store.set('mapView', [c.lat, c.lng, map.getZoom()]); });
 }
 function resetEditor() {
-  wps = []; jx = []; editing = null; routeDirty = false; edDirty = false; routeData = null; routeSeq++;
+  wps = []; jx = []; shops = []; editing = null; routeDirty = false; edDirty = false; routeData = null; routeSeq++;
   if (routeLine) { routeLine.remove(); routeLine = null; }
   $('#cname').value = ''; setEdMode('route');
 }
@@ -2460,14 +2569,14 @@ function openEditor() {
   show('#title', false); show('#editor', true); initMap();
   if (editing) resetEditor();
   setTimeout(() => map.invalidateSize(), 50);
-  updateEditor(); drawJx();
+  updateEditor(); drawJx(); drawShops();
 }
 // 作成済みのコースを編集（プリセットはコピーを作る）
 async function editCourse(c) {
   show('#title', false); show('#editor', true); initMap(); resetEditor();
   let line = c.line || store.get('pline.' + c.id, null);
   edType = isOneway(c) ? 'oneway' : 'loop'; syncType();
-  wps = c.wps.map(p => p.slice()); jx = (c.jx || []).map(q => q.slice());
+  wps = c.wps.map(p => p.slice()); jx = (c.jx || []).map(q => q.slice()); shops = (c.shops || []).map(q => q.slice());
   editing = c.id.startsWith('p-') ? { copyOf: c } : { id: c.id };
   $('#cname').value = editing.copyOf ? c.name + '（編集）' : c.name;
   setTimeout(() => map.invalidateSize(), 50);
@@ -2477,11 +2586,11 @@ async function editCourse(c) {
     map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
     updateEditor(false);
   } else { map.fitBounds(L.latLngBounds(wps), { padding: [30, 30] }); updateEditor(true); }
-  setEdMode('jx'); drawJx();
+  setEdMode('jx'); drawJx(); drawShops();
 }
 function setEdMode(m) {
   edMode = m; $('#segEdMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
-  document.querySelector('.edPanel').classList.toggle('jx', m === 'jx');
+  document.querySelector('.edPanel').classList.toggle('jx', m === 'jx'); document.querySelector('.edPanel').classList.toggle('shop', m === 'shop');
   $('#edUndo').textContent = '↶ 戻す'; $('#edClear').textContent = '🗑 全消去';
   refreshInfo();
 }
@@ -2533,6 +2642,48 @@ function jxDialog(idx, ll) {
   $('#jxCancel').onclick = close;
 }
 $('#jxName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#jxOk').click(); } });
+/* ---- お店（コンビニ・スーパー）を置く ---- */
+const SHOP_COLORS = ['#1f6fd1', '#1f9d55', '#d63b2f', '#f08a1c', '#7b4fd1', '#8a5a32', '#e0407a', '#2b2f36'];
+const SHOP_LABEL = { cvs: 'コンビニ', super: 'スーパー' };
+function addShop(ll) {
+  if (!routeData) return toast('先に「🏁 ルート」でコースを作ってください');
+  const n = nearestOnLine(routeData.line, ll);
+  if (n.d > 80) return toast('コースの近く（80m以内）をタップしてください');
+  if (n.d < 4) return toast('道路の真上ではなく、お店を建てたい側を少し離れてタップしてください');
+  if (shops.length >= 30) return toast('お店は30軒までです');
+  shopDialog(null, [+ll[0].toFixed(6), +ll[1].toFixed(6)]);
+}
+function shopDialog(idx, ll) {
+  const cur = idx != null ? shops[idx] : null;
+  let type = cur ? cur[2] : 'cvs', color = cur ? cur[4] : SHOP_COLORS[0];
+  const syncT = () => $('#shopType').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === type));
+  const syncC = () => { $('#shopColors').innerHTML = ''; for (const c of SHOP_COLORS) { const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.classList.toggle('on', c === color); b.onclick = () => { color = c; syncC(); }; $('#shopColors').appendChild(b); } };
+  $('#shopType').onclick = e => { const b = e.target.closest('button'); if (b) { type = b.dataset.v; syncT(); } };
+  syncT(); syncC();
+  $('#shopName').value = cur ? cur[3] : ''; $('#shopDel').hidden = idx == null;
+  show('#shopDlg', true);
+  const close = () => { show('#shopDlg', false); $('#shopName').blur(); };
+  $('#shopOk').onclick = () => {
+    const name = $('#shopName').value.trim().slice(0, 14);
+    if (cur) { cur[2] = type; cur[3] = name; cur[4] = color; } else shops.push([ll[0], ll[1], type, name, color]);
+    edDirty = true; close(); drawShops(); refreshInfo();
+  };
+  $('#shopDel').onclick = () => { shops.splice(idx, 1); edDirty = true; close(); drawShops(); refreshInfo(); };
+  $('#shopCancel').onclick = close;
+}
+$('#shopName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#shopOk').click(); } });
+function drawShops() {
+  shopMarkers.forEach(m => m.remove()); shopMarkers = [];
+  if (!map) return;
+  shops.forEach((q, i) => {
+    const d = document.createElement('div'); d.className = 'jxm shop'; d.innerHTML = `<i>${q[2] === 'super' ? '🛒' : '🏪'}</i><b></b>`;
+    d.querySelector('b').textContent = q[3] || SHOP_LABEL[q[2]]; d.querySelector('b').style.background = q[4];
+    const m = L.marker([q[0], q[1]], { icon: L.divIcon({ className: '', html: d, iconSize: [0, 0] }), draggable: true, zIndexOffset: 900 }).addTo(map);
+    m.on('click', () => shopDialog(i));
+    m.on('dragend', () => { const ll = m.getLatLng(); const n = routeData ? nearestOnLine(routeData.line, [ll.lat, ll.lng]) : null; if (!n || (n.d <= 80 && n.d >= 4)) { q[0] = +ll.lat.toFixed(6); q[1] = +ll.lng.toFixed(6); } else toast('お店はコースから4〜80mの所に置いてください'); edDirty = true; drawShops(); });
+    shopMarkers.push(m);
+  });
+}
 function drawJx() {
   jxMarkers.forEach(m => m.remove()); jxMarkers = [];
   if (!map) return;
@@ -2548,6 +2699,9 @@ function refreshInfo(status) {
   const n = wps.length, info = $('#edInfo'), ow = edType === 'oneway', need = minPts(), minLen = ow ? 300 : 400;
   const head = editing ? `<b>「${($('#cname').value || '').replace(/[<&>]/g, '')}」を編集中</b><br>` : '';
   if (status) info.innerHTML = head + status;
+  else if (edMode === 'shop') info.innerHTML = head + (routeData
+    ? `お店を建てたい<b>道路の横</b>をタップしてください（タップした側に建ちます。コースから80m以内）。<b>コンビニ</b>か<b>スーパー</b>、店名、看板の色を選べます。印をタップで変更・削除、ドラッグで移動。<br>設定済み：${shops.length}軒`
+    : '先に「🏁 ルート」でコースを作ってください。');
   else if (edMode === 'jx') info.innerHTML = head + (routeData
     ? `コース上の交差点をタップして<b>交差点名</b>と<b>信号機</b>を設定できます（コースに吸い付きます）。置いた印をタップで変更・削除、ドラッグで移動。<br>設定済み：${jx.length}か所（信号機 ${jx.filter(q => q[3]).length}基）`
     : '先に「🏁 ルート」でコースを作ってください。');
@@ -2579,13 +2733,15 @@ async function buildRoute() {
 $('#toEditor').onclick = openEditor;
 $('#edUndo').onclick = () => {
   if (edMode === 'jx') { if (jx.length) { jx.pop(); edDirty = true; drawJx(); refreshInfo(); } return; }
+  if (edMode === 'shop') { if (shops.length) { shops.pop(); edDirty = true; drawShops(); refreshInfo(); } return; }
   wps.pop(); routeDirty = edDirty = true; updateEditor(true);
 };
 $('#edClear').onclick = () => {
   if (edMode === 'jx') { if (jx.length && confirm('置いた交差点を全部消しますか？')) { jx = []; edDirty = true; drawJx(); refreshInfo(); } return; }
+  if (edMode === 'shop') { if (shops.length && confirm('置いたお店を全部消しますか？')) { shops = []; edDirty = true; drawShops(); refreshInfo(); } return; }
   if (wps.length && !confirm('ポイントを全部消しますか？')) return; wps = []; routeDirty = edDirty = true; updateEditor(true);
 };
-$('#edBack').onclick = () => { if (edDirty && !confirm('変更を保存せずに戻りますか？')) return; resetEditor(); drawJx(); updateEditor(false); toTitle(); };
+$('#edBack').onclick = () => { if (edDirty && !confirm('変更を保存せずに戻りますか？')) return; resetEditor(); drawJx(); drawShops(); updateEditor(false); toTitle(); };
 $('#snap').onchange = () => { routeDirty = edDirty = true; updateEditor(true); };
 $('#cname').addEventListener('input', () => { edDirty = true; });
 $('#edLoc').onclick = () => {
@@ -2614,14 +2770,14 @@ function saveCourse() {
       Object.assign(c, { wps: wps.slice(), line: routeData.line, len: routeData.len, type: edType }); delete c.elev;
       sceneDB.del(c.id); for (const k of ['scn.', 'osteps.', 'jn.', 'elev.']) store.del(k + c.id);
     }
-    c.name = name; c.jx = jx.map(q => q.slice());
+    c.name = name; c.jx = jx.map(q => q.slice()); c.shops = shops.map(q => q.slice());
   } else {
-    c = { id: 'u' + Date.now().toString(36), name, wps: wps.slice(), line: routeData.line, len: routeData.len, desc: '', type: edType, jx: jx.map(q => q.slice()) };
+    c = { id: 'u' + Date.now().toString(36), name, wps: wps.slice(), line: routeData.line, len: routeData.len, desc: '', type: edType, jx: jx.map(q => q.slice()), shops: shops.map(q => q.slice()) };
     if (editing && editing.copyOf && !routeDirty && editing.copyOf.elev) c.elev = editing.copyOf.elev;
     list.push(c);
   }
   if (!saveUserCourses(list)) { toast('保存容量がいっぱいです。古いコースを削除してください'); return null; }
-  resetEditor(); drawJx(); updateEditor(false);
+  resetEditor(); drawJx(); drawShops(); updateEditor(false);
   return c;
 }
 $('#edSave').onclick = () => { const c = saveCourse(); if (!c) return; if (isOneway(c)) { toTitle(); pickDir(c); } else playCourse(c); };
@@ -2685,7 +2841,7 @@ showCar();
 applyQuality();
 renderCourses();
 requestAnimationFrame(frame);
-window.__mr = { playCourse, PRESETS, updatePlayer, newPlayer, get race() { return race; }, get T() { return T; }, keys };
+window.__mr = { playCourse, PRESETS, updatePlayer, newPlayer, world: () => world, camera, get race() { return race; }, get T() { return T; }, keys };
 
 if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 </script>
