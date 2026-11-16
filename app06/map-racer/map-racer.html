@@ -133,8 +133,9 @@
   .wp.g{background:#ffd23f;color:#111;width:32px;height:32px;line-height:27px;font-size:15px}
   .edOpt .seg button{min-height:36px;font-size:13px}
   .edRow .big.ghost{padding:0 12px}
-  .edPanel.jx .edRoute,.edPanel.shop .edRoute{display:none}
-  #segEdMode button{padding:0 8px}
+  .edPanel.jx .edRoute,.edPanel.shop .edRoute,.edPanel.tunnel .edRoute{display:none}
+  #segEdMode{flex:1}
+  #segEdMode button{flex:1;padding:0 2px;font-size:12.5px;min-width:0}
   .jxm{display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);position:absolute;left:0;top:0;pointer-events:auto}
   .jxm i{font-style:normal;font-size:20px;width:34px;height:34px;line-height:30px;text-align:center;border-radius:50%;background:#fff;border:2.5px solid #1d4fb8;box-shadow:0 2px 6px rgba(0,0,0,.4)}
   .jxm b{margin-top:2px;background:#1d4fb8;color:#fff;border:1.5px solid #fff;border-radius:5px;padding:1px 6px;font-size:12px;white-space:nowrap}
@@ -328,7 +329,7 @@
   </form>
   <div class="edPanel">
     <p id="edInfo"></p>
-    <div class="edOpt"><span>置くもの</span><div class="seg" id="segEdMode"><button data-v="route" type="button">🏁 ルート</button><button data-v="jx" type="button">🚥 交差点</button><button data-v="shop" type="button">🏪 お店</button></div></div>
+    <div class="edOpt"><div class="seg" id="segEdMode"><button data-v="route" type="button">🏁 ルート</button><button data-v="jx" type="button">🚥 交差点</button><button data-v="shop" type="button">🏪 お店</button><button data-v="tunnel" type="button">🚇 トンネル</button></div></div>
     <div class="edOpt edRoute"><span>コースの形</span><div class="seg" id="segType"><button data-v="loop" type="button">🔁 周回</button><button data-v="oneway" type="button">➡️ 片道</button></div></div>
     <div class="edOpt edRoute"><span>道路に沿ってコースを作る</span><span class="sw"><input type="checkbox" id="snap" checked><i></i></span></div>
     <div class="edBtns">
@@ -403,6 +404,18 @@
     <button class="big ghost" id="pReset">🚗 コースに戻す</button>
     <button class="big ghost" id="pCal">📱 傾きの中心を合わせる</button>
     <button class="big ghost" id="pQuit">コース選択へ</button>
+  </div>
+</div>
+
+<!-- ================= トンネルの設定 ================= -->
+<div id="tunDlg" class="screen dim" hidden>
+  <div class="card">
+    <h3 style="font-size:20px;font-style:normal;font-family:inherit">🚇 トンネル</h3>
+    <p id="tunLen" style="text-align:center;margin:0 0 6px;font-size:14px;opacity:.85"></p>
+    <input id="tunName" type="text" maxlength="12" placeholder="トンネル名（例：みどり山トンネル）" enterkeyhint="done" style="width:100%;height:50px;border-radius:12px;border:0;padding:0 12px;font-size:16px;background:rgba(255,255,255,.12);margin:4px 0 6px">
+    <button class="big primary" id="tunOk">OK</button>
+    <button class="big ghost" id="tunDel" style="color:#ff8a7a">🗑 このトンネルを消す</button>
+    <button class="big ghost" id="tunCancel">キャンセル</button>
   </div>
 </div>
 
@@ -895,7 +908,7 @@ const SKY = new THREE.Color('#9fd2ff');
 }
 scene.fog = new THREE.Fog(SKY, 160, 650);
 const camera = new THREE.PerspectiveCamera(62, 1, 0.3, 1500);
-scene.add(new THREE.HemisphereLight('#dff0ff', '#6b7a55', 1.3));
+const hemi = new THREE.HemisphereLight('#dff0ff', '#6b7a55', 1.3); scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff3dd', 2.2);
 sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
 Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 220 });
@@ -1037,7 +1050,7 @@ function streetGeo(list, G = () => 0) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
 
-function buildWorld(T, scen, proj, HF, jcl, shopsXZ = []) {
+function buildWorld(T, scen, proj, HF, jcl, shopsXZ = [], tunnelsXZ = []) {
   makeTextures();
   disposeWorld();
   const root = new THREE.Group(); scene.add(root);
@@ -1066,6 +1079,10 @@ function buildWorld(T, scen, proj, HF, jcl, shopsXZ = []) {
   // 道路の側面（高い所を走るときに下が透けないように）
   if (HF) { const skM = new THREE.MeshLambertMaterial({ color: '#8a8478', side: THREE.DoubleSide }); for (const s of [-1, 1]) root.add(new THREE.Mesh(wallRibbon(T, s * (W / 2 + SH + .4), -6, .045, () => true), skM)); }
   // 縁石（カーブ）
+  // トンネル区間（ガードレール・道路脇の物・建物はこの区間に置かない）
+  const tun = tunnelSpans(T, tunnelsXZ), tunK = new Uint8Array(T.N);
+  for (let k = 0; k < T.N; k++) tunK[k] = tun.some(sp => inSpan(T, sp, T.cum[k], 3)) ? 1 : 0;
+  const tunAt = (s0, m = 0) => tun.some(sp => inSpan(T, sp, s0, m));
   const kerbOn = k => Math.abs(T.curv[k]) > 1 / 70;
   const kMat = new THREE.MeshLambertMaterial({ map: TEX.kerb, side: THREE.DoubleSide });
   for (const s of [-1, 1]) root.add(new THREE.Mesh(ribbon(T, s * W / 2, s * (W / 2 + 1.3), .075, 4, kerbOn), kMat));
@@ -1076,10 +1093,12 @@ function buildWorld(T, scen, proj, HF, jcl, shopsXZ = []) {
   for (const s of [-1, 1]) {
     const ok = railOk[s] = new Uint8Array(T.N);
     for (let k = 0; k < T.N; k++) { const p = T.pts[k], n = T.nrm[k]; ok[k] = T.nearest(p[0] + n[0] * s * (railOff + 1.5), p[1] + n[1] * s * (railOff + 1.5), railOff + 2, k, 14) > railOff + .5 ? 1 : 0; }
-    const m = new THREE.Mesh(wallRibbon(T, s * railOff, 0, .9, k => ok[k]), rMat); m.castShadow = true; root.add(m);
+    const m = new THREE.Mesh(wallRibbon(T, s * railOff, 0, .9, k => ok[k] && !tunK[k]), rMat); m.castShadow = true; root.add(m);
   }
-  const shopPl = placeShops(T, shopsXZ, railOff);
-  buildRoadside(T, root, railOk, railOff, shopPl);
+  const shopPl = placeShops(T, shopsXZ, railOff).filter(pl => !tunAt(pl.s, pl.w / 2 + 12));
+  const tunInfo = tun.map(sp => buildTunnel(T, sp, root));
+  const hitsTun = pc => tunInfo.length && pc.some(q => { const d = T.nearest(q[0], q[1], 40), i = T.nearIdx(); return i >= 0 && tunK[i] && d < (tunInfo.find(t => t.wAt[i] != null) || { wAt: {} }).wAt[i] + 2; });
+  buildRoadside(T, root, railOk, railOff, shopPl, tunK);
   shopPl.forEach(pl => buildShop(root, pl));
   // スタート・ゴールのゲート（片道はゴールにも）
   const postM = new THREE.MeshLambertMaterial({ color: '#333' });
@@ -1107,7 +1126,7 @@ function buildWorld(T, scen, proj, HF, jcl, shopsXZ = []) {
   const clearR = railOff + 2.6;
   if (scen && proj) {
     const P = c => c.map(p => proj.fwd(p[0], p[1]));
-    const bl = []; for (const [c, h] of scen.b) { const pc = P(c); if (pc.some(q => T.nearest(q[0], q[1], clearR + 1) < clearR)) continue; let cut = false; for (let i = 0; i < pc.length && !cut; i++) { const q = pc[i], r = pc[(i + 1) % pc.length]; if (T.nearest((q[0] + r[0]) / 2, (q[1] + r[1]) / 2, clearR + 1) < clearR) cut = true; } if (!cut && !hitsShop(pc, shopPl)) bl.push([pc, h, HF ? Math.min(...pc.map(q => G(q[0], q[1]))) : 0]); }
+    const bl = []; for (const [c, h] of scen.b) { const pc = P(c); if (pc.some(q => T.nearest(q[0], q[1], clearR + 1) < clearR)) continue; let cut = false; for (let i = 0; i < pc.length && !cut; i++) { const q = pc[i], r = pc[(i + 1) % pc.length]; if (T.nearest((q[0] + r[0]) / 2, (q[1] + r[1]) / 2, clearR + 1) < clearR) cut = true; } if (!cut && !hitsShop(pc, shopPl) && !hitsTun(pc)) bl.push([pc, h, HF ? Math.min(...pc.map(q => G(q[0], q[1]))) : 0]); }
     if (bl.length) { const m = new THREE.Mesh(buildingGeo(bl), new THREE.MeshLambertMaterial({ vertexColors: true, map: TEX.win, side: THREE.DoubleSide })); m.castShadow = true; m.receiveShadow = true; root.add(m); }
     if (scen.h.length) { const m = new THREE.Mesh(streetGeo(scen.h.map(([c, t]) => [P(c), t]), G), new THREE.MeshLambertMaterial({ color: '#5d6168', side: THREE.DoubleSide })); m.receiveShadow = true; root.add(m); }
     if (scen.g.length) { const m = new THREE.Mesh(flatPolys(scen.g.map(P), .03, G), new THREE.MeshLambertMaterial({ color: '#79a85c', side: THREE.DoubleSide })); m.receiveShadow = true; root.add(m); }
@@ -1123,10 +1142,10 @@ function buildWorld(T, scen, proj, HF, jcl, shopsXZ = []) {
         if (r < .45) {
           const off = W / 2 + 14 + rnd() * 40, x = a.x + a.rx * off * side, z = a.z + a.rz * off * side, w = 8 + rnd() * 14, d = 8 + rnd() * 14;
           const c = [[-w, -d], [w, -d], [w, d], [-w, d]].map(([u, v]) => [x + (a.tx * v + a.rx * u) / 2, z + (a.tz * v + a.rz * u) / 2]);
-          if (c.every(q => T.nearest(q[0], q[1], clearR + 4) > clearR + 3) && T.nearest(x, z, clearR + 4) > clearR + 3 && !hitsShop(c, shopPl)) bl.push([c, 6 + rnd() * rnd() * 40, HF ? Math.min(...c.map(q => G(q[0], q[1]))) : 0]);
+          if (c.every(q => T.nearest(q[0], q[1], clearR + 4) > clearR + 3) && T.nearest(x, z, clearR + 4) > clearR + 3 && !hitsShop(c, shopPl) && !hitsTun(c)) bl.push([c, 6 + rnd() * rnd() * 40, HF ? Math.min(...c.map(q => G(q[0], q[1]))) : 0]);
         } else if (r < .8) {
           const off = W / 2 + 8 + rnd() * 30, x = a.x + a.rx * off * side, z = a.z + a.rz * off * side;
-          if (T.nearest(x, z, clearR) >= clearR) trees.push([x, z, .8 + rnd() * .7, G(x, z)]);
+          if (T.nearest(x, z, clearR) >= clearR && !hitsTun([[x, z]])) trees.push([x, z, .8 + rnd() * .7, G(x, z)]);
         }
       }
     }
@@ -1139,14 +1158,14 @@ function buildWorld(T, scen, proj, HF, jcl, shopsXZ = []) {
       leaf.castShadow = trunk.castShadow = true; root.add(leaf, trunk);
     }
   }
-  world = { root, railOff, signals: [], jcts: shopPl.map(pl => ({ s: pl.s, name: pl.name, icon: pl.type === 'super' ? '🛒' : '🏪' })), shops: shopPl };
+  world = { root, railOff, signals: [], jcts: shopPl.map(pl => ({ s: pl.s, name: pl.name, icon: pl.type === 'super' ? '🛒' : '🏪' })).concat(tun.map(sp => ({ s: sp.sA, name: sp.name, icon: '🚇', en: '全長 ' + lenTxt(sp.len) }))), shops: shopPl, tunnels: tun, tunAt };
   if (jcl && jcl.length) buildSignals(T, jcl, root, world);
   return world;
 }
 
 /* ---------- 道路脇の物（反射ポール・街灯・電柱と電線・植え込み） ----------
    すぐ横を流れていく物があるとスピード感が出る。インスタンス描画で軽く */
-function buildRoadside(T, root, railOk, railOff, shopPl = []) {
+function buildRoadside(T, root, railOk, railOff, shopPl = [], tunK = null) {
   const W = T.W, dummy = new THREE.Object3D(), list = {};
   const put = (key, k, side, off, lx, ly, lz, rx = 0, sc = null) => {
     const p = T.pts[k], n = T.nrm[k], t = T.tan[k];
@@ -1159,7 +1178,7 @@ function buildRoadside(T, root, railOk, railOff, shopPl = []) {
   const okAt = (k, side) => railOk[side][k] && railOk[side][(k + 1) % T.N] && Math.abs(T.curv[k]) < 1 / 18;
   const step = T.len / T.N; let lastWire = { '-1': null, '1': null }; const wires = [];
   for (let k = 0; k < T.N; k++) {
-    const s0 = T.cum[k]; if (near(s0, 10)) { lastWire = { '-1': null, '1': null }; continue; }
+    const s0 = T.cum[k]; if (near(s0, 10) || (tunK && (tunK[k] || tunK[(k + 2) % T.N] || tunK[(k - 2 + T.N) % T.N]))) { lastWire = { '-1': null, '1': null }; continue; }
     const i8 = Math.floor(s0 / 8), i12 = Math.floor(s0 / 12), i36 = Math.floor(s0 / 36), i30 = Math.floor(s0 / 30);
     const first = (n) => Math.floor((s0 - step) / n) !== Math.floor(s0 / n);
     for (const side of [-1, 1]) {
@@ -1201,6 +1220,120 @@ function buildRoadside(T, root, railOk, railOff, shopPl = []) {
     root.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#2a2d33' })));
   }
 }
+
+/* ---------- トンネル ---------- */
+const TUN_HW = 3.8, TUN_HT = 6.9; // 壁の高さ・天井の高さ(m)
+function tunnelSpans(T, list) {
+  const L = T.len, out = [];
+  for (const t of list || []) {
+    const la = T.locate(t.a[0], t.a[1], null), lb = T.locate(t.b[0], t.b[1], null);
+    if (la.d2 > 45 * 45 || lb.d2 > 45 * 45) continue;
+    let sa = la.s, sb = lb.s, len;
+    if (T.closed) { len = ((sb - sa) % L + L) % L; if (len > L / 2) { [sa, sb] = [sb, sa]; len = L - len; } }
+    else { if (sa > sb) [sa, sb] = [sb, sa]; len = sb - sa; }
+    if (len < 20) continue;
+    out.push({ sA: sa, len, name: t.name || 'トンネル' });
+  }
+  return out;
+}
+function inSpan(T, sp, s0, m = 0) {
+  if (T.closed) { const L = T.len; return (((s0 - sp.sA + m) % L) + L) % L <= sp.len + 2 * m; }
+  return s0 >= sp.sA - m && s0 <= sp.sA + sp.len + m;
+}
+let concTex = null;
+function buildTunnel(T, sp, root) {
+  const W = T.W, A = W / 2 + 2.2, N = T.N, L = T.len;
+  const rel = s0 => T.closed ? ((s0 - sp.sA) % L + L) % L : s0 - sp.sA;
+  const ks = []; let k = (T.at(sp.sA).i + 1) % N;
+  for (let c = 0; c < N && rel(T.cum[k]) <= sp.len; c++) { ks.push(k); k = T.closed ? (k + 1) % N : k + 1; if (k >= N) break; }
+  if (ks.length < 3) return { wAt: {} };
+  // トンネルの断面（壁＋アーチ）
+  const arch = [[-A, 0], [-A, TUN_HW]];
+  for (let i = 1; i < 12; i++) { const a = Math.PI - Math.PI * i / 12; arch.push([Math.cos(a) * A, TUN_HW + Math.sin(a) * (TUN_HT - TUN_HW)]); }
+  arch.push([A, TUN_HW], [A, 0]);
+  // 山の広さ：他の区間の道路にかからない範囲で
+  const wAt = {}, LmS = {};
+  for (const k of ks) {
+    const p = T.pts[k], n = T.nrm[k];
+    for (const side of [-1, 1]) {
+      let Lm = A + 4;
+      for (let l = A + 4; l <= 36; l += 3) { if (T.nearest(p[0] + n[0] * side * l, p[1] + n[1] * side * l, W / 2 + 7, k, 25) < W / 2 + 6) break; Lm = l; }
+      LmS[k + ':' + side] = Lm;
+    }
+    wAt[k] = Math.max(LmS[k + ':-1'], LmS[k + ':1']);
+  }
+  const mound = (k) => {
+    const pts = [], top = TUN_HT + 1.6;
+    for (const side of [-1, 1]) {
+      const Lm = LmS[k + ':' + side], arr = [];
+      for (let i = 0; i <= 6; i++) { const l = A + 1 + (Lm - A - 1) * i / 6, t = (l - A - 1) / Math.max(1, Lm - A - 1); arr.push([side * l, top * (1 - t * t)]); }
+      if (side < 0) pts.push(...arr.reverse()); else pts.push([0, top + .5], ...arr);
+    }
+    return pts;
+  };
+  const strip = (profile, yOff = 0) => {
+    const pos = [], uv = [], idx = []; let m = 0;
+    ks.forEach((k, j) => {
+      const p = T.pts[k], n = T.nrm[k], prof = profile(k); m = prof.length; let u = 0;
+      prof.forEach(([l, y], i) => { pos.push(p[0] + n[0] * l, T.h[k] + y + yOff, p[1] + n[1] * l); if (i) u += Math.hypot(l - prof[i - 1][0], y - prof[i - 1][1]); uv.push(u / 4, T.cum[k] / 6); });
+      if (j) { const a = (j - 1) * m, b = j * m; for (let i = 0; i < m - 1; i++) idx.push(a + i, b + i, a + i + 1, a + i + 1, b + i, b + i + 1); }
+    });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g;
+  };
+  if (!concTex) concTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#c9c6bd'; g.fillRect(0, 0, w, h); for (let i = 0; i < 900; i++) { const v = 170 + Math.random() * 50 | 0; g.fillStyle = `rgba(${v},${v},${v - 6},.5)`; g.fillRect(Math.random() * w, Math.random() * h, 2, 2); } g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 0, w, 3); g.fillRect(0, 0, 3, h); });
+  const tube = new THREE.Mesh(strip(() => arch), new THREE.MeshLambertMaterial({ map: concTex, side: THREE.DoubleSide }));
+  tube.castShadow = tube.receiveShadow = true; root.add(tube);
+  const hill = new THREE.Mesh(strip(mound, .02), new THREE.MeshLambertMaterial({ color: '#5d8f4a', side: THREE.DoubleSide }));
+  hill.castShadow = hill.receiveShadow = true; root.add(hill);
+  // 歩道（両側の段差）
+  const walkM = new THREE.MeshLambertMaterial({ color: '#9b978d' }), inT = kk => wAt[kk] != null;
+  for (const sd of [-1, 1]) root.add(new THREE.Mesh(ribbon(T, sd * (W / 2 + .1), sd * A, .26, 6, inT), walkM));
+  // 天井の照明（オレンジ色、6mおき）
+  const lamps = [], dummy = new THREE.Object3D();
+  for (const k of ks) {
+    const s0 = T.cum[k]; if (Math.floor(s0 / 6) === Math.floor((s0 - T.len / N) / 6)) continue;
+    for (const lx of [-.42, .42]) {
+      const l = lx * A, y = TUN_HW + (TUN_HT - TUN_HW) * Math.sqrt(1 - lx * lx) - .18, p = T.pts[k], n = T.nrm[k], t = T.tan[k];
+      dummy.position.set(p[0] + n[0] * l, T.h[k] + y, p[1] + n[1] * l); dummy.rotation.set(0, Math.atan2(t[0], t[1]), lx * -.7); dummy.updateMatrix(); lamps.push(dummy.matrix.clone());
+    }
+  }
+  if (lamps.length) { const im = new THREE.InstancedMesh(new THREE.BoxGeometry(.5, .12, 1.6), new THREE.MeshBasicMaterial({ color: '#ffc46b' }), lamps.length); lamps.forEach((m, i) => im.setMatrixAt(i, m)); root.add(im); }
+  // 入口・出口の坑口（コンクリートの壁＋トンネル名の銘板）
+  const conc = new THREE.MeshLambertMaterial({ color: '#b8b4aa' });
+  for (const [k, outward] of [[ks[0], -1], [ks[ks.length - 1], 1]]) {
+    const p = T.pts[k], t = T.tan[k], prof = mound(k);
+    const archHole = () => { const h = new THREE.Path(); h.moveTo(-arch[0][0], .02); arch.forEach(([l, y]) => h.lineTo(-l, Math.max(.02, y))); h.lineTo(-arch[arch.length - 1][0], .02); h.closePath(); return h; };
+    // 山の断面（緑の土）…トンネルの穴をあける
+    const cap = new THREE.Shape(); cap.moveTo(-prof[0][0], -.5); prof.forEach(([l, y]) => cap.lineTo(-l, y + .02)); cap.lineTo(-prof[prof.length - 1][0], -.5); cap.closePath(); cap.holes.push(archHole());
+    const cg = new THREE.ShapeGeometry(cap); const cm = new THREE.Mesh(cg, new THREE.MeshLambertMaterial({ color: '#4f7f3e', side: THREE.DoubleSide }));
+    cm.position.set(p[0] + t[0] * outward * .2, T.h[k], p[1] + t[1] * outward * .2); cm.rotation.y = Math.atan2(t[0], t[1]); root.add(cm);
+    // コンクリートの坑口（トンネルのまわりだけ）
+    const fw = A + 2.6, fh = TUN_HT + 2.4, sh = new THREE.Shape();
+    sh.moveTo(-fw, -.5); sh.lineTo(fw, -.5); sh.lineTo(fw, fh); sh.lineTo(-fw, fh); sh.closePath(); sh.holes.push(archHole());
+    const fg = new THREE.ExtrudeGeometry(sh, { depth: 1.2, bevelEnabled: false }); fg.translate(0, 0, -.6);
+    const fm = new THREE.Mesh(fg, conc); fm.position.set(p[0] + t[0] * outward * .5, T.h[k], p[1] + t[1] * outward * .5); fm.rotation.y = Math.atan2(t[0], t[1]); fm.castShadow = true; root.add(fm);
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(2 * A - 1, 1.2 + sp.name.length * 1.05), 1.3), new THREE.MeshBasicMaterial({ map: signTex(sp.name, '#4d5258', '#fff', 512, 96) }));
+    plate.position.set(0, TUN_HT + 1.2, outward * .62); if (outward < 0) plate.rotation.y = Math.PI; fm.add(plate);
+  }
+  return { wAt };
+}
+// トンネルの中では暗く（入口から少しずつ）
+function tunnelLight(dt) {
+  let tf = 0;
+  if (race && world && world.tunnels && world.tunnels.length) {
+    const s0 = race.p.s;
+    for (const sp of world.tunnels) {
+      if (!inSpan(T, sp, s0, 6)) continue;
+      const r = T.closed ? ((s0 - sp.sA) % T.len + T.len) % T.len : s0 - sp.sA, depth = Math.min(r, sp.len - r);
+      tf = Math.max(tf, clamp((depth + 6) / 30, 0, 1));
+    }
+  }
+  race && (race.tf = lerp(race.tf || 0, tf, 1 - Math.exp(-dt * 5)));
+  const f = race ? race.tf : 0;
+  hemi.intensity = 1.3 * (1 - .72 * f); sun.intensity = 2.2 * (1 - .9 * f);
+  scene.fog.color.copy(SKY).lerp(TUN_FOG, f); scene.fog.near = lerp(160, 40, f); scene.fog.far = lerp(650, 260, f);
+}
+const TUN_FOG = new THREE.Color('#2b2722');
 
 /* ---------- お店（コンビニ・スーパー） ---------- */
 const SHOP_DIM = { cvs: { w: 14, d: 10, h: 4.6, lot: 9 }, super: { w: 34, d: 24, h: 7.5, lot: 16 } };
@@ -1417,6 +1550,7 @@ function buildSignals(T, cl, root, world) {
     if (!c.sig && !name) continue;
     for (const r of junctionRuns(T, c)) {
       const sAt = T.cum[r.i];
+      if (world.tunAt && world.tunAt(sAt, 10)) continue; // トンネルの中には置かない
       const a = T.at(sAt), grp = new THREE.Group(); grp.position.set(a.x, a.y, a.z); grp.rotation.y = Math.atan2(a.tx, a.tz); root.add(grp);
       const sc = 1.3; // 見やすいよう実物より少し大きめ
       const px = W / 2 + (T.SH || 5) + .8; // 左側の歩道あたり（日本は左側通行）
@@ -1910,7 +2044,8 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
       if (settings.sigInfer && jcl.some(q => !q.name)) { try { await nameJunctions(c, jcl, proj, T, ac.signal, msg); } catch (e) { if (ac.signal.aborted) return; } }
     }
     const shopsXZ = proj && Array.isArray(c.shops) ? c.shops.map(q => ({ x: proj.fwd(q[0], q[1])[0], z: proj.fwd(q[0], q[1])[1], type: q[2], name: q[3], color: q[4] })) : [];
-    buildWorld(T, scen, scen ? proj : null, HF, jcl, shopsXZ);
+    const tunnelsXZ = proj && Array.isArray(c.tunnels) ? c.tunnels.map(q => ({ a: proj.fwd(q[0], q[1]), b: proj.fwd(q[2], q[3]), name: q[4] })) : [];
+    buildWorld(T, scen, scen ? proj : null, HF, jcl, shopsXZ, tunnelsXZ);
     // 信号機の表示結果をお知らせ（表示できなかった時は理由も）
     if (settings.signals) {
       const nS = world.signals.length, nN = world.jcts.filter(j => j.name && !j.icon).length;
@@ -1928,6 +2063,7 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
     if (scen) lines.push(`🏙 建物 ${scen.b.length.toLocaleString()}件・道路 ${scen.h.length.toLocaleString()}本（OpenStreetMap）`);
     else if (!c.local) lines.push('🏙 建物：自動生成の街並み');
     if (T.sigText) lines.push(T.sigText);
+    if (world.tunnels && world.tunnels.length) lines.push(`🚇 トンネル ${world.tunnels.length}か所（${world.tunnels.map(t => t.name + ' ' + lenTxt(t.len)).join('、')}）`);
     if (world.shops && world.shops.length) lines.push(`🏪 お店 ${world.shops.length}軒（コンビニ ${world.shops.filter(q => q.type !== 'super').length}・スーパー ${world.shops.filter(q => q.type === 'super').length}）`);
     lines.push(T.climb > 1.5 ? `⛰ 高低差 ${Math.round(T.climb)} m${settings.elev > 1 ? `（実際の${settings.elev}倍）` : ''}` : settings.elev > 0 && !c.local ? '⛰ 高低差：ほぼ平ら（または標高データなし）' : '⛰ 高低差：なし');
     startRace(c, dir, { lines: lines.concat(notes) });
@@ -2139,7 +2275,7 @@ function placeCamera(snap, dt = 1 / 60) {
   const pull = hood ? 0 : clamp(p.accSm * .05 + (p.boost > 0 ? 1.2 : 0), -.8, 2) * I;
   const portrait = camera.aspect < 1, back = hood ? C.d : C.d * (portrait ? 1.25 : 1) * (1 - .2 * f * I) + pull;
   const py = p.vy != null ? p.vy : (p.y || 0), sl = p.vslope || 0, camH = hood ? C.h : C.h * (portrait ? 1.15 : 1) * (1 - .24 * f * I);
-  const want = new THREE.Vector3(p.x - dx * back, py - sl * back + camH, p.z - dz * back);
+  const want = new THREE.Vector3(p.x - dx * back, py - sl * back + (race.tf > .05 ? Math.min(camH, lerp(camH, TUN_HT - 2.6, race.tf)) : camH), p.z - dz * back);
   const look = new THREE.Vector3(p.x + fx * C.look, py + sl * C.look + C.lh, p.z + fz * C.look);
   if (snap) { camPos.copy(want); camLook.copy(look); }
   else { const k = settings.cam === 2 ? 1 : 1 - Math.exp(-dt * 7); camPos.lerp(want, k); camLook.lerp(look, settings.cam === 2 ? 1 : 1 - Math.exp(-dt * 12)); }
@@ -2191,6 +2327,7 @@ function drawMiniBase() {
   g.lineJoin = g.lineCap = 'round';
   g.beginPath(); T.pts.forEach((p, i) => { const [x, y] = miniTf(p[0], p[1]); i ? g.lineTo(x, y) : g.moveTo(x, y); }); if (T.closed) g.closePath();
   g.strokeStyle = 'rgba(0,0,0,.6)'; g.lineWidth = 11; g.stroke(); g.strokeStyle = '#fff'; g.lineWidth = 6; g.stroke();
+  if (world && world.tunnels) for (const sp of world.tunnels) { g.beginPath(); for (let d = 0; d <= sp.len; d += 6) { const a = T.at(sp.sA + d), [x, y] = miniTf(a.x, a.z); d ? g.lineTo(x, y) : g.moveTo(x, y); } g.strokeStyle = '#3a3f47'; g.lineWidth = 7; g.stroke(); }
   if (!T.closed) { const gp = T.at(T.finishS), [gx, gy] = miniTf(gp.x, gp.z); g.fillStyle = '#ffd23f'; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(gx, gy, 8, 0, 7); g.fill(); g.stroke(); }
   if (world && world.shops) for (const it of world.shops) { const [x, y] = miniTf(it.x, it.z); g.fillStyle = it.color; g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.fillRect(x - 4, y - 4, 8, 8); g.strokeRect(x - 4, y - 4, 8, 8); }
   if (world && world.signals) for (const it of world.signals) { const a = T.at(it.s), [x, y] = miniTf(a.x, a.z); g.fillStyle = '#2bff9a'; g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill(); }
@@ -2284,6 +2421,7 @@ function frame(now) {
   syncCar(p.car, p.x, p.vy, p.z, p.th, p.wheelRot, p.steer, p.roll, p.pitch, p.vslope);
   for (const c of race.cpus) syncCar(c.car, c.x, c.y, c.z, c.th, c.wheelRot, 0, 0, 0, c.slope);
   effects(p, dt);
+  tunnelLight(dt);
   placeCamera(false, dt);
   speedLines(dt);
   // サウンド
@@ -2347,7 +2485,7 @@ function togglePause(force) {
 }
 function quitRace() {
   if (race) { scene.remove(race.p.car); race.cpus.forEach(c => scene.remove(c.car)); }
-  race = null; Snd.mute(); speedLines(0); show('#ready', false); show('#hud', false); show('#controls', false); show('#pause', false); show('#result', false);
+  race = null; tunnelLight(0); Snd.mute(); speedLines(0); show('#ready', false); show('#hud', false); show('#controls', false); show('#pause', false); show('#result', false);
   pointers.clear(); refreshTouch(); toTitle();
 }
 $('#rdGo').onclick = async () => {
@@ -2441,7 +2579,7 @@ function courseMenu(c) {
   $('#cmRefetch').textContent = m ? '🔄 建物・道路を最新に取り直す' : '⬇️ 建物・道路を読み込んで走る';
   const close = () => show('#courseMenu', false);
   $('#cmEdit').hidden = !!c.local;
-  $('#cmEdit').textContent = user ? '🗺️ コースを編集（ルート・交差点・お店）' : '🗺️ コピーして編集（交差点・お店を追加）';
+  $('#cmEdit').textContent = user ? '🗺️ コースを編集（ルート・交差点・お店・トンネル）' : '🗺️ コピーして編集（交差点・お店・トンネルを追加）';
   $('#cmEdit').onclick = () => { close(); editCourse(c); };
   $('#cmRename').onclick = () => { close(); const n = prompt('コース名', c.name); if (n == null || !n.trim()) return; const l = userCourses(); const x = l.find(x => x.id === c.id); if (x) { x.name = n.trim().slice(0, 24); saveUserCourses(l); renderCourses(); } };
   $('#cmRefetch').onclick = () => { close(); if (isOneway(c)) pickDir(c, true); else playCourse(c, 'fwd', true); };
@@ -2495,6 +2633,7 @@ $('#importFile').onchange = async e => {
       if (ids.has(c.id)) { if (validScen(c.scenery) && !(await sceneDB.get(c.id))) scn.push([c.id, c.scenery]); continue; }
       const nc = { id: typeof c.id === 'string' && /^u[0-9a-z]+$/.test(c.id) ? c.id : 'u' + (Date.now() + n).toString(36), name: c.name.slice(0, 24), wps: c.wps, line: c.line, len: +c.len || lineLength(c.line), desc: '', type: c.type === 'oneway' ? 'oneway' : 'loop' };
       if (Array.isArray(c.elev) && c.elev.every(q => Array.isArray(q) && q.length === 3 && q.every(isFinite))) nc.elev = c.elev;
+      if (Array.isArray(c.tunnels)) nc.tunnels = c.tunnels.filter(q => Array.isArray(q) && [0, 1, 2, 3].every(i => isFinite(q[i]))).slice(0, 10).map(q => [+q[0], +q[1], +q[2], +q[3], String(q[4] || '').slice(0, 12)]);
       if (Array.isArray(c.shops)) nc.shops = c.shops.filter(q => Array.isArray(q) && isFinite(q[0]) && isFinite(q[1])).slice(0, 30).map(q => [+q[0], +q[1], q[2] === 'super' ? 'super' : 'cvs', String(q[3] || '').slice(0, 14), /^#[0-9a-f]{6}$/i.test(q[4]) ? q[4] : SHOP_COLORS[0]]);
       if (Array.isArray(c.jx)) nc.jx = c.jx.filter(q => Array.isArray(q) && isFinite(q[0]) && isFinite(q[1])).slice(0, 60).map(q => [+q[0], +q[1], String(q[2] || '').slice(0, 20), q[3] ? 1 : 0]);
       list.push(nc); ids.add(nc.id); n++;
@@ -2549,19 +2688,19 @@ function toTitle() { show('#title', true); show('#editor', false); renderCourses
    コースエディタ（Leaflet）
    ========================================================= */
 let map = null, wps = [], wpMarkers = [], routeLine = null, routeData = null, routeSeq = 0, edType = 'loop';
-let edMode = 'route', jx = [], jxMarkers = [], shops = [], shopMarkers = [], editing = null, routeDirty = false, edDirty = false;
+let edMode = 'route', jx = [], jxMarkers = [], shops = [], shopMarkers = [], tunnels = [], tunLayers = [], tunPend = null, editing = null, routeDirty = false, edDirty = false;
 const minPts = () => edType === 'oneway' ? 2 : 3;
 function initMap() {
   if (map) return;
   map = L.map('map', { zoomControl: false, attributionControl: true }).setView([35.681, 139.767], 15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, subdomains: 'abc', attribution: '© OpenStreetMap contributors' }).addTo(map);
-  map.on('click', e => { const ll = [e.latlng.lat, e.latlng.lng]; edMode === 'jx' ? addJx(ll) : edMode === 'shop' ? addShop(ll) : addWp(ll); });
+  map.on('click', e => { const ll = [e.latlng.lat, e.latlng.lng]; edMode === 'jx' ? addJx(ll) : edMode === 'shop' ? addShop(ll) : edMode === 'tunnel' ? addTunnelPt(ll) : addWp(ll); });
   // 前回の位置
   const lastView = store.get('mapView', null); if (lastView) map.setView([lastView[0], lastView[1]], lastView[2]);
   map.on('moveend', () => { const c = map.getCenter(); store.set('mapView', [c.lat, c.lng, map.getZoom()]); });
 }
 function resetEditor() {
-  wps = []; jx = []; shops = []; editing = null; routeDirty = false; edDirty = false; routeData = null; routeSeq++;
+  wps = []; jx = []; shops = []; tunnels = []; tunPend = null; editing = null; routeDirty = false; edDirty = false; routeData = null; routeSeq++;
   if (routeLine) { routeLine.remove(); routeLine = null; }
   $('#cname').value = ''; setEdMode('route');
 }
@@ -2569,14 +2708,14 @@ function openEditor() {
   show('#title', false); show('#editor', true); initMap();
   if (editing) resetEditor();
   setTimeout(() => map.invalidateSize(), 50);
-  updateEditor(); drawJx(); drawShops();
+  updateEditor(); drawJx(); drawShops(); drawTunnels();
 }
 // 作成済みのコースを編集（プリセットはコピーを作る）
 async function editCourse(c) {
   show('#title', false); show('#editor', true); initMap(); resetEditor();
   let line = c.line || store.get('pline.' + c.id, null);
   edType = isOneway(c) ? 'oneway' : 'loop'; syncType();
-  wps = c.wps.map(p => p.slice()); jx = (c.jx || []).map(q => q.slice()); shops = (c.shops || []).map(q => q.slice());
+  wps = c.wps.map(p => p.slice()); jx = (c.jx || []).map(q => q.slice()); shops = (c.shops || []).map(q => q.slice()); tunnels = (c.tunnels || []).map(q => q.slice());
   editing = c.id.startsWith('p-') ? { copyOf: c } : { id: c.id };
   $('#cname').value = editing.copyOf ? c.name + '（編集）' : c.name;
   setTimeout(() => map.invalidateSize(), 50);
@@ -2586,11 +2725,12 @@ async function editCourse(c) {
     map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
     updateEditor(false);
   } else { map.fitBounds(L.latLngBounds(wps), { padding: [30, 30] }); updateEditor(true); }
-  setEdMode('jx'); drawJx(); drawShops();
+  setEdMode('jx'); drawJx(); drawShops(); drawTunnels();
 }
 function setEdMode(m) {
   edMode = m; $('#segEdMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
-  document.querySelector('.edPanel').classList.toggle('jx', m === 'jx'); document.querySelector('.edPanel').classList.toggle('shop', m === 'shop');
+  document.querySelector('.edPanel').classList.toggle('jx', m === 'jx'); document.querySelector('.edPanel').classList.toggle('shop', m === 'shop'); document.querySelector('.edPanel').classList.toggle('tunnel', m === 'tunnel');
+  if (m !== 'tunnel' && tunPend) { tunPend = null; drawTunnels(); }
   $('#edUndo').textContent = '↶ 戻す'; $('#edClear').textContent = '🗑 全消去';
   refreshInfo();
 }
@@ -2642,6 +2782,71 @@ function jxDialog(idx, ll) {
   $('#jxCancel').onclick = close;
 }
 $('#jxName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#jxOk').click(); } });
+/* ---- トンネルを置く（入口と出口をタップ） ---- */
+// ルートの線上の位置（スタートからの距離m）
+function lineInfo(line) { const cum = [0]; for (let i = 1; i < line.length; i++) cum.push(cum[i - 1] + lineLength([line[i - 1], line[i]])); return cum; }
+function lineParam(line, cum, ll) {
+  const pr = makeProj(ll[0], ll[1]); let best = { d: Infinity };
+  for (let i = 0; i < line.length - 1; i++) {
+    const a = pr.fwd(line[i][0], line[i][1]), b = pr.fwd(line[i + 1][0], line[i + 1][1]), dx = b[0] - a[0], dz = b[1] - a[1], L2 = dx * dx + dz * dz || 1;
+    const t = clamp((-a[0] * dx - a[1] * dz) / L2, 0, 1), d = Math.hypot(a[0] + dx * t, a[1] + dz * t);
+    if (d < best.d) best = { d, s: cum[i] + (cum[i + 1] - cum[i]) * t, ll: pr.inv(a[0] + dx * t, a[1] + dz * t) };
+  }
+  return best;
+}
+function linePoint(line, cum, s0) {
+  const L = cum[cum.length - 1]; s0 = edType === 'oneway' ? clamp(s0, 0, L) : ((s0 % L) + L) % L;
+  let i = 0; while (i < cum.length - 2 && cum[i + 1] < s0) i++;
+  const t = (s0 - cum[i]) / ((cum[i + 1] - cum[i]) || 1); return [lerp(line[i][0], line[i + 1][0], t), lerp(line[i][1], line[i + 1][1], t)];
+}
+// トンネル区間（周回コースは短い向きを選ぶ）
+function tunnelPath(q) {
+  if (!routeData) return null;
+  const line = routeData.line, cum = routeData.cum || (routeData.cum = lineInfo(line)), L = cum[cum.length - 1];
+  const a = lineParam(line, cum, [q[0], q[1]]), b = lineParam(line, cum, [q[2], q[3]]);
+  if (a.d > 45 || b.d > 45) return null;
+  let sa = a.s, len;
+  if (edType !== 'oneway') { len = ((b.s - a.s) % L + L) % L; if (len > L / 2) { sa = b.s; len = L - len; } } else { sa = Math.min(a.s, b.s); len = Math.abs(b.s - a.s); }
+  const pts = []; for (let d = 0; d <= len; d += Math.max(3, len / 80)) pts.push(linePoint(line, cum, sa + d)); pts.push(linePoint(line, cum, sa + len));
+  return { pts, len };
+}
+function addTunnelPt(ll) {
+  if (!routeData) return toast('先に「🏁 ルート」でコースを作ってください');
+  const cum = routeData.cum || (routeData.cum = lineInfo(routeData.line)), n = lineParam(routeData.line, cum, ll);
+  if (n.d > 40) return toast('コースの線の上（40m以内）をタップしてください');
+  const p = [+n.ll[0].toFixed(6), +n.ll[1].toFixed(6)];
+  if (!tunPend) { tunPend = p; drawTunnels(); refreshInfo(); return; }
+  const q = [tunPend[0], tunPend[1], p[0], p[1], ''], path = tunnelPath(q);
+  if (!path || path.len < 20) return toast('トンネルは20m以上にしてください');
+  if (path.len > 3000) return toast('トンネルは3km以内にしてください');
+  if (tunnels.length >= 10) return toast('トンネルは10か所までです');
+  tunPend = null; tunnelDialog(null, q, path.len);
+}
+function tunnelDialog(idx, q, len) {
+  const cur = idx != null ? tunnels[idx] : null;
+  $('#tunName').value = cur ? cur[4] : ''; $('#tunLen').textContent = '長さ ' + lenTxt(len); $('#tunDel').hidden = idx == null;
+  show('#tunDlg', true);
+  const close = () => { show('#tunDlg', false); $('#tunName').blur(); drawTunnels(); refreshInfo(); };
+  $('#tunOk').onclick = () => { const nm = $('#tunName').value.trim().slice(0, 12); if (cur) cur[4] = nm; else { q[4] = nm; tunnels.push(q); } edDirty = true; close(); };
+  $('#tunDel').onclick = () => { tunnels.splice(idx, 1); edDirty = true; close(); };
+  $('#tunCancel').onclick = close;
+}
+$('#tunName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#tunOk').click(); } });
+function drawTunnels() {
+  tunLayers.forEach(m => m.remove()); tunLayers = [];
+  if (!map) return;
+  tunnels.forEach((q, i) => {
+    const path = tunnelPath(q); if (!path) return;
+    const back = L.polyline(path.pts, { color: '#1d2026', weight: 12, opacity: .85, lineCap: 'butt' }).addTo(map);
+    const dash = L.polyline(path.pts, { color: '#ffc46b', weight: 2, dashArray: '3 7', interactive: false }).addTo(map);
+    back.on('click', e => { L.DomEvent.stopPropagation(e); tunnelDialog(i, q, path.len); });
+    const mid = path.pts[Math.floor(path.pts.length / 2)], d = document.createElement('div'); d.className = 'jxm'; d.innerHTML = '<i>🚇</i><b></b>'; d.querySelector('b').textContent = (q[4] || 'トンネル') + ' ' + lenTxt(path.len); d.querySelector('b').style.background = '#3a3f47';
+    const mk = L.marker(mid, { icon: L.divIcon({ className: '', html: d, iconSize: [0, 0] }), zIndexOffset: 800 }).addTo(map); mk.on('click', () => tunnelDialog(i, q, path.len));
+    tunLayers.push(back, dash, mk);
+  });
+  if (tunPend) { const d = document.createElement('div'); d.className = 'jxm'; d.innerHTML = '<i>🚇</i><b>入口</b>'; tunLayers.push(L.marker(tunPend, { icon: L.divIcon({ className: '', html: d, iconSize: [0, 0] }), zIndexOffset: 1000 }).addTo(map)); }
+}
+
 /* ---- お店（コンビニ・スーパー）を置く ---- */
 const SHOP_COLORS = ['#1f6fd1', '#1f9d55', '#d63b2f', '#f08a1c', '#7b4fd1', '#8a5a32', '#e0407a', '#2b2f36'];
 const SHOP_LABEL = { cvs: 'コンビニ', super: 'スーパー' };
@@ -2699,6 +2904,9 @@ function refreshInfo(status) {
   const n = wps.length, info = $('#edInfo'), ow = edType === 'oneway', need = minPts(), minLen = ow ? 300 : 400;
   const head = editing ? `<b>「${($('#cname').value || '').replace(/[<&>]/g, '')}」を編集中</b><br>` : '';
   if (status) info.innerHTML = head + status;
+  else if (edMode === 'tunnel') info.innerHTML = head + (routeData
+    ? (tunPend ? '次に<b>出口</b>（トンネルの終わり）をコース上でタップしてください。' : `コース上の<b>入口</b>→<b>出口</b>の順にタップすると、その区間がトンネルになります（20m〜3km）。トンネルの線をタップで名前の変更・削除。<br>設定済み：${tunnels.length}か所`)
+    : '先に「🏁 ルート」でコースを作ってください。');
   else if (edMode === 'shop') info.innerHTML = head + (routeData
     ? `お店を建てたい<b>道路の横</b>をタップしてください（タップした側に建ちます。コースから80m以内）。<b>コンビニ</b>か<b>スーパー</b>、店名、看板の色を選べます。印をタップで変更・削除、ドラッグで移動。<br>設定済み：${shops.length}軒`
     : '先に「🏁 ルート」でコースを作ってください。');
@@ -2728,20 +2936,23 @@ async function buildRoute() {
   // ルートが変わったら、離れてしまった交差点を知らせる
   const far = jx.filter(q => nearestOnLine(line, q).d > 80).length;
   if (far) toast(`交差点 ${far}か所がコースから離れました（走るときは表示されません）`);
+  drawTunnels();
   refreshInfo();
 }
 $('#toEditor').onclick = openEditor;
 $('#edUndo').onclick = () => {
   if (edMode === 'jx') { if (jx.length) { jx.pop(); edDirty = true; drawJx(); refreshInfo(); } return; }
   if (edMode === 'shop') { if (shops.length) { shops.pop(); edDirty = true; drawShops(); refreshInfo(); } return; }
+  if (edMode === 'tunnel') { if (tunPend) tunPend = null; else if (tunnels.length) { tunnels.pop(); edDirty = true; } drawTunnels(); refreshInfo(); return; }
   wps.pop(); routeDirty = edDirty = true; updateEditor(true);
 };
 $('#edClear').onclick = () => {
   if (edMode === 'jx') { if (jx.length && confirm('置いた交差点を全部消しますか？')) { jx = []; edDirty = true; drawJx(); refreshInfo(); } return; }
   if (edMode === 'shop') { if (shops.length && confirm('置いたお店を全部消しますか？')) { shops = []; edDirty = true; drawShops(); refreshInfo(); } return; }
+  if (edMode === 'tunnel') { if (tunnels.length && confirm('トンネルを全部消しますか？')) { tunnels = []; tunPend = null; edDirty = true; drawTunnels(); refreshInfo(); } return; }
   if (wps.length && !confirm('ポイントを全部消しますか？')) return; wps = []; routeDirty = edDirty = true; updateEditor(true);
 };
-$('#edBack').onclick = () => { if (edDirty && !confirm('変更を保存せずに戻りますか？')) return; resetEditor(); drawJx(); drawShops(); updateEditor(false); toTitle(); };
+$('#edBack').onclick = () => { if (edDirty && !confirm('変更を保存せずに戻りますか？')) return; resetEditor(); drawJx(); drawShops(); drawTunnels(); updateEditor(false); toTitle(); };
 $('#snap').onchange = () => { routeDirty = edDirty = true; updateEditor(true); };
 $('#cname').addEventListener('input', () => { edDirty = true; });
 $('#edLoc').onclick = () => {
@@ -2770,14 +2981,14 @@ function saveCourse() {
       Object.assign(c, { wps: wps.slice(), line: routeData.line, len: routeData.len, type: edType }); delete c.elev;
       sceneDB.del(c.id); for (const k of ['scn.', 'osteps.', 'jn.', 'elev.']) store.del(k + c.id);
     }
-    c.name = name; c.jx = jx.map(q => q.slice()); c.shops = shops.map(q => q.slice());
+    c.name = name; c.jx = jx.map(q => q.slice()); c.shops = shops.map(q => q.slice()); c.tunnels = tunnels.map(q => q.slice());
   } else {
-    c = { id: 'u' + Date.now().toString(36), name, wps: wps.slice(), line: routeData.line, len: routeData.len, desc: '', type: edType, jx: jx.map(q => q.slice()), shops: shops.map(q => q.slice()) };
+    c = { id: 'u' + Date.now().toString(36), name, wps: wps.slice(), line: routeData.line, len: routeData.len, desc: '', type: edType, jx: jx.map(q => q.slice()), shops: shops.map(q => q.slice()), tunnels: tunnels.map(q => q.slice()) };
     if (editing && editing.copyOf && !routeDirty && editing.copyOf.elev) c.elev = editing.copyOf.elev;
     list.push(c);
   }
   if (!saveUserCourses(list)) { toast('保存容量がいっぱいです。古いコースを削除してください'); return null; }
-  resetEditor(); drawJx(); drawShops(); updateEditor(false);
+  resetEditor(); drawJx(); drawShops(); drawTunnels(); updateEditor(false);
   return c;
 }
 $('#edSave').onclick = () => { const c = saveCourse(); if (!c) return; if (isOneway(c)) { toTitle(); pickDir(c); } else playCourse(c); };
