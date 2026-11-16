@@ -133,9 +133,9 @@
   .wp.g{background:#ffd23f;color:#111;width:32px;height:32px;line-height:27px;font-size:15px}
   .edOpt .seg button{min-height:36px;font-size:13px}
   .edRow .big.ghost{padding:0 12px}
-  .edPanel.jx .edRoute,.edPanel.shop .edRoute,.edPanel.tunnel .edRoute{display:none}
-  #segEdMode{flex:1}
-  #segEdMode button{flex:1;padding:0 2px;font-size:12.5px;min-width:0}
+  .edPanel.jx .edRoute,.edPanel.shop .edRoute,.edPanel.tunnel .edRoute,.edPanel.rail .edRoute{display:none}
+  #segEdMode{flex:1;display:grid;grid-template-columns:repeat(5,1fr)}
+  #segEdMode button{padding:0 1px;font-size:11.5px;min-width:0;white-space:nowrap}
   .jxm{display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);position:absolute;left:0;top:0;pointer-events:auto}
   .jxm i{font-style:normal;font-size:20px;width:34px;height:34px;line-height:30px;text-align:center;border-radius:50%;background:#fff;border:2.5px solid #1d4fb8;box-shadow:0 2px 6px rgba(0,0,0,.4)}
   .jxm b{margin-top:2px;background:#1d4fb8;color:#fff;border:1.5px solid #fff;border-radius:5px;padding:1px 6px;font-size:12px;white-space:nowrap}
@@ -298,6 +298,7 @@
     <div class="row"><label>周回数</label><div class="seg" id="segLaps"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
     <div class="row"><label>最高速度<small id="speedNote"></small></label><div class="seg" id="segSpeed"><button data-v="slow">遅め</button><button data-v="normal">普通</button><button data-v="fast">速め</button></div></div>
     <div class="row"><label>スピード感<small>カメラ・スピード線・振動・風の音の強さ。酔いやすい人は「ひかえめ」に</small></label><div class="seg" id="segFeel"><button data-v="low">ひかえめ</button><button data-v="normal">ふつう</button><button data-v="high">強め</button></div></div>
+    <div class="row"><label>コース両側の赤白バリア<small>オフにしても見えない壁でコースからは出ません。自分で付けたガードレールは表示されます</small></label><span class="sw"><input type="checkbox" id="barrier"><i></i></span></div>
     <div class="row"><label>道幅<small>狭いほど速く感じるが、運転は難しくなる</small></label><div class="seg" id="segRoadW"><button data-v="wide">広い</button><button data-v="normal">ふつう</button><button data-v="narrow">狭い</button></div></div>
     <div class="row"><label>高低差<small>実際の標高から坂を作る。強調するとジェットコースター風</small></label><div class="seg" id="segElev"><button data-v="0">なし</button><button data-v="1">実際</button><button data-v="2">×2</button><button data-v="4">×4</button></div></div>
     <div class="row"><label>信号機と交差点名<small>OpenStreetMap にある実在の信号機・交差点名を表示</small></label><span class="sw"><input type="checkbox" id="signals"><i></i></span></div>
@@ -329,7 +330,7 @@
   </form>
   <div class="edPanel">
     <p id="edInfo"></p>
-    <div class="edOpt"><div class="seg" id="segEdMode"><button data-v="route" type="button">🏁 ルート</button><button data-v="jx" type="button">🚥 交差点</button><button data-v="shop" type="button">🏪 お店</button><button data-v="tunnel" type="button">🚇 トンネル</button></div></div>
+    <div class="edOpt"><div class="seg" id="segEdMode"><button data-v="route" type="button">🏁 ルート</button><button data-v="jx" type="button">🚥 交差点</button><button data-v="shop" type="button">🏪 お店</button><button data-v="tunnel" type="button">🚇 トンネル</button><button data-v="rail" type="button">🛡 ガード</button></div></div>
     <div class="edOpt edRoute"><span>コースの形</span><div class="seg" id="segType"><button data-v="loop" type="button">🔁 周回</button><button data-v="oneway" type="button">➡️ 片道</button></div></div>
     <div class="edOpt edRoute"><span>道路に沿ってコースを作る</span><span class="sw"><input type="checkbox" id="snap" checked><i></i></span></div>
     <div class="edBtns">
@@ -404,6 +405,19 @@
     <button class="big ghost" id="pReset">🚗 コースに戻す</button>
     <button class="big ghost" id="pCal">📱 傾きの中心を合わせる</button>
     <button class="big ghost" id="pQuit">コース選択へ</button>
+  </div>
+</div>
+
+<!-- ================= ガードレールの設定 ================= -->
+<div id="grDlg" class="screen dim" hidden>
+  <div class="card">
+    <h3 style="font-size:20px;font-style:normal;font-family:inherit">🛡 ガードレール</h3>
+    <p id="grLen" style="text-align:center;margin:0 0 6px;font-size:14px;opacity:.85"></p>
+    <div class="row"><label>付ける側<small>スタートから進む向きで見て</small></label><div class="seg" id="grSide"><button data-v="L" type="button">左</button><button data-v="R" type="button">右</button><button data-v="B" type="button">両側</button></div></div>
+    <div class="row"><label>種類</label><div class="seg" id="grStyle"><button data-v="beam" type="button">ガードレール</button><button data-v="pipe" type="button">パイプ</button><button data-v="wall" type="button">壁</button></div></div>
+    <button class="big primary" id="grOk">OK</button>
+    <button class="big ghost" id="grDel" style="color:#ff8a7a">🗑 このガードレールを消す</button>
+    <button class="big ghost" id="grCancel">キャンセル</button>
   </div>
 </div>
 
@@ -547,7 +561,7 @@ async function loadScenery(id) {
 }
 const validScen = d => d && Array.isArray(d.b) && Array.isArray(d.h) && Array.isArray(d.g) && Array.isArray(d.w);
 const mb = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1e3)) + 'KB';
-const settings = Object.assign({ feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
+const settings = Object.assign({ barrier: true, feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 const fmt = t => { if (!isFinite(t) || t == null) return '--:--.--'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
 let toastT;
@@ -984,12 +998,12 @@ function ribbon(T, off0, off1, y, vScale, filter) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
   return g;
 }
-function wallRibbon(T, off, y0, y1, filter) {
+function wallRibbon(T, off, y0, y1, filter, single = false) {
   const pos = [], uv = [], idx = [], N = T.N, rows = T.closed ? N + 1 : N;
   for (let i = 0; i < rows; i++) {
     const k = i % N, p = T.pts[k], n = T.nrm[k], x = p[0] + n[0] * off, z = p[1] + n[1] * off, v = (i === N ? T.len : T.cum[k]) / 4;
     pos.push(x, T.h[k] + y0, z, x, T.h[k] + y1, z); uv.push(v, 0, v, 1);
-    if (i < rows - 1 && filter(k) && filter((k + 1) % N)) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2, a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    if (i < rows - 1 && filter(k) && filter((k + 1) % N)) { const a = i * 2; if (single) idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); else idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2, a, a + 2, a + 1, a + 1, a + 2, a + 3); }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
@@ -1050,7 +1064,7 @@ function streetGeo(list, G = () => 0) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
 }
 
-function buildWorld(T, scen, proj, HF, jcl, shopsXZ = [], tunnelsXZ = []) {
+function buildWorld(T, scen, proj, HF, jcl, shopsXZ = [], tunnelsXZ = [], railsXZ = []) {
   makeTextures();
   disposeWorld();
   const root = new THREE.Group(); scene.add(root);
@@ -1083,6 +1097,9 @@ function buildWorld(T, scen, proj, HF, jcl, shopsXZ = [], tunnelsXZ = []) {
   const tun = tunnelSpans(T, tunnelsXZ), tunK = new Uint8Array(T.N);
   for (let k = 0; k < T.N; k++) tunK[k] = tun.some(sp => inSpan(T, sp, T.cum[k], 3)) ? 1 : 0;
   const tunAt = (s0, m = 0) => tun.some(sp => inSpan(T, sp, s0, m));
+  // 自分で付けたガードレール（その区間・その側は赤白バリアの代わりに表示）
+  const grs = railSpans(T, railsXZ), grK = { '-1': new Uint8Array(T.N), '1': new Uint8Array(T.N) };
+  for (const g of grs) for (let k = 0; k < T.N; k++) if (inSpan(T, g, T.cum[k], 1)) for (const sd of g.sides) grK[sd][k] = Math.max(grK[sd][k], g.styleN);
   const kerbOn = k => Math.abs(T.curv[k]) > 1 / 70;
   const kMat = new THREE.MeshLambertMaterial({ map: TEX.kerb, side: THREE.DoubleSide });
   for (const s of [-1, 1]) root.add(new THREE.Mesh(ribbon(T, s * W / 2, s * (W / 2 + 1.3), .075, 4, kerbOn), kMat));
@@ -1093,12 +1110,13 @@ function buildWorld(T, scen, proj, HF, jcl, shopsXZ = [], tunnelsXZ = []) {
   for (const s of [-1, 1]) {
     const ok = railOk[s] = new Uint8Array(T.N);
     for (let k = 0; k < T.N; k++) { const p = T.pts[k], n = T.nrm[k]; ok[k] = T.nearest(p[0] + n[0] * s * (railOff + 1.5), p[1] + n[1] * s * (railOff + 1.5), railOff + 2, k, 14) > railOff + .5 ? 1 : 0; }
-    const m = new THREE.Mesh(wallRibbon(T, s * railOff, 0, .9, k => ok[k] && !tunK[k]), rMat); m.castShadow = true; root.add(m);
+    if (settings.barrier !== false) { const m = new THREE.Mesh(wallRibbon(T, s * railOff, 0, .9, k => ok[k] && !tunK[k] && !grK[s][k]), rMat); m.castShadow = true; root.add(m); }
   }
   const shopPl = placeShops(T, shopsXZ, railOff).filter(pl => !tunAt(pl.s, pl.w / 2 + 12));
   const tunInfo = tun.map(sp => buildTunnel(T, sp, root));
   const hitsTun = pc => tunInfo.length && pc.some(q => { const d = T.nearest(q[0], q[1], 40), i = T.nearIdx(); return i >= 0 && tunK[i] && d < (tunInfo.find(t => t.wAt[i] != null) || { wAt: {} }).wAt[i] + 2; });
-  buildRoadside(T, root, railOk, railOff, shopPl, tunK);
+  buildRoadside(T, root, railOk, railOff, shopPl, tunK, grK);
+  buildGuardrails(T, root, grK, railOff, tunK);
   shopPl.forEach(pl => buildShop(root, pl));
   // スタート・ゴールのゲート（片道はゴールにも）
   const postM = new THREE.MeshLambertMaterial({ color: '#333' });
@@ -1158,14 +1176,14 @@ function buildWorld(T, scen, proj, HF, jcl, shopsXZ = [], tunnelsXZ = []) {
       leaf.castShadow = trunk.castShadow = true; root.add(leaf, trunk);
     }
   }
-  world = { root, railOff, signals: [], jcts: shopPl.map(pl => ({ s: pl.s, name: pl.name, icon: pl.type === 'super' ? '🛒' : '🏪' })).concat(tun.map(sp => ({ s: sp.sA, name: sp.name, icon: '🚇', en: '全長 ' + lenTxt(sp.len) }))), shops: shopPl, tunnels: tun, tunAt };
+  world = { root, railOff, signals: [], jcts: shopPl.map(pl => ({ s: pl.s, name: pl.name, icon: pl.type === 'super' ? '🛒' : '🏪' })).concat(tun.map(sp => ({ s: sp.sA, name: sp.name, icon: '🚇', en: '全長 ' + lenTxt(sp.len) }))), shops: shopPl, tunnels: tun, tunAt, rails: grs };
   if (jcl && jcl.length) buildSignals(T, jcl, root, world);
   return world;
 }
 
 /* ---------- 道路脇の物（反射ポール・街灯・電柱と電線・植え込み） ----------
    すぐ横を流れていく物があるとスピード感が出る。インスタンス描画で軽く */
-function buildRoadside(T, root, railOk, railOff, shopPl = [], tunK = null) {
+function buildRoadside(T, root, railOk, railOff, shopPl = [], tunK = null, grK = null) {
   const W = T.W, dummy = new THREE.Object3D(), list = {};
   const put = (key, k, side, off, lx, ly, lz, rx = 0, sc = null) => {
     const p = T.pts[k], n = T.nrm[k], t = T.tan[k];
@@ -1185,7 +1203,7 @@ function buildRoadside(T, root, railOk, railOff, shopPl = [], tunK = null) {
       if (shopPl.some(pl => pl.side === side && pl.nearS(s0))) { if (side === -1) lastWire['-1'] = null; continue; }
       if (!okAt(k, side)) { if (side === -1) lastWire['-1'] = null; continue; }
       // 反射ポール（白い柱＋オレンジの反射板）12mおき
-      if (first(12)) { put('post', k, side, railOff - .25, 0, .55, 0); put('refl', k, side, railOff - .25, .07, .95, 0); }
+      if (first(12) && !(grK && grK[side][k])) { put('post', k, side, railOff - .25, 0, .55, 0); put('refl', k, side, railOff - .25, .07, .95, 0); }
       // 街灯：右側に36mおき（道路側へアームを出す）
       if (side === 1 && first(36)) { put('lpole', k, side, railOff + .9, 0, 4.2, 0); put('larm', k, side, railOff + .9, -1.3, 8.3, 0); put('lhead', k, side, railOff + .9, -2.5, 8.15, 0); }
       // 電柱：左側に30mおき、電線でつなぐ
@@ -1219,6 +1237,46 @@ function buildRoadside(T, root, railOk, railOff, shopPl = [], tunK = null) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     root.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: '#2a2d33' })));
   }
+}
+
+/* ---------- ガードレール（指定区間） ---------- */
+const GR_STYLES = { beam: 1, pipe: 2, wall: 3 };
+const GR_LABEL = { beam: 'ガードレール', pipe: 'ガードパイプ', wall: 'コンクリート壁' }, GR_SIDE = { L: '左側', R: '右側', B: '両側' };
+function railSpans(T, list) {
+  const L = T.len, out = [];
+  for (const t of list || []) {
+    const la = T.locate(t.a[0], t.a[1], null), lb = T.locate(t.b[0], t.b[1], null);
+    if (la.d2 > 45 * 45 || lb.d2 > 45 * 45) continue;
+    let sa = la.s, sb = lb.s, len;
+    if (T.closed) { len = ((sb - sa) % L + L) % L; if (len > L / 2) { [sa, sb] = [sb, sa]; len = L - len; } }
+    else { if (sa > sb) [sa, sb] = [sb, sa]; len = sb - sa; }
+    if (len < 5) continue;
+    // 左右はコースの向き（右=+1）。復路で走るときは反対になる
+    const sides = t.side === 'B' ? [-1, 1] : [(t.side === 'R' ? 1 : -1) * (t.flip ? -1 : 1)];
+    out.push({ sA: sa, len, sides, style: t.style in GR_STYLES ? t.style : 'beam', styleN: GR_STYLES[t.style] || 1 });
+  }
+  return out;
+}
+function buildGuardrails(T, root, grK, railOff, tunK) {
+  const white = new THREE.MeshLambertMaterial({ color: '#f1f1ec', side: THREE.DoubleSide }), postM = new THREE.MeshLambertMaterial({ color: '#d9d9d4' });
+  const conc = new THREE.MeshLambertMaterial({ color: '#b7b3a9', side: THREE.DoubleSide }), dummy = new THREE.Object3D(), posts = [];
+  for (const sd of [-1, 1]) {
+    const has = st => k => grK[sd][k] === st && grK[sd][(k + 1) % T.N] === st && !tunK[k];
+    const off = sd * railOff;
+    // ガードレール：波形の板（上下2段に見える白い帯）＋支柱
+    if (grK[sd].includes(1)) { const f = has(1); root.add(new THREE.Mesh(wallRibbon(T, off, .58, .74, f, true), white), new THREE.Mesh(wallRibbon(T, off - sd * .04, .74, .9, f, true), white)); }
+    // ガードパイプ：3本の白いパイプ
+    if (grK[sd].includes(2)) { const f = has(2); for (const y of [.36, .6, .84]) root.add(new THREE.Mesh(wallRibbon(T, off, y, y + .07, f, true), white)); }
+    // コンクリート壁（上に笠石）
+    if (grK[sd].includes(3)) { const f = has(3); const w1 = new THREE.Mesh(wallRibbon(T, off, -.3, 1.0, f, true), conc); w1.castShadow = true; root.add(w1, new THREE.Mesh(ribbon(T, off - .18, off + .18, 1.0, 4, f, true), conc)); }
+    // 支柱（2mおき）
+    for (let k = 0; k < T.N; k++) {
+      const st = grK[sd][k]; if (!st || st === 3 || tunK[k]) continue;
+      if (Math.floor(T.cum[k] / 2) === Math.floor((T.cum[k] - T.len / T.N) / 2)) continue;
+      const p = T.pts[k], n = T.nrm[k]; dummy.position.set(p[0] + n[0] * (off + sd * .12), T.h[k] + .45, p[1] + n[1] * (off + sd * .12)); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); posts.push(dummy.matrix.clone());
+    }
+  }
+  if (posts.length) { const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(.06, .06, .95, 6), postM, posts.length); posts.forEach((m, i) => im.setMatrixAt(i, m)); im.castShadow = true; root.add(im); }
 }
 
 /* ---------- トンネル ---------- */
@@ -2045,7 +2103,8 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
     }
     const shopsXZ = proj && Array.isArray(c.shops) ? c.shops.map(q => ({ x: proj.fwd(q[0], q[1])[0], z: proj.fwd(q[0], q[1])[1], type: q[2], name: q[3], color: q[4] })) : [];
     const tunnelsXZ = proj && Array.isArray(c.tunnels) ? c.tunnels.map(q => ({ a: proj.fwd(q[0], q[1]), b: proj.fwd(q[2], q[3]), name: q[4] })) : [];
-    buildWorld(T, scen, scen ? proj : null, HF, jcl, shopsXZ, tunnelsXZ);
+    const railsXZ = proj && Array.isArray(c.rails) ? c.rails.map(q => ({ a: proj.fwd(q[0], q[1]), b: proj.fwd(q[2], q[3]), side: q[4], style: q[5], flip: ow && dir === 'rev' })) : [];
+    buildWorld(T, scen, scen ? proj : null, HF, jcl, shopsXZ, tunnelsXZ, railsXZ);
     // 信号機の表示結果をお知らせ（表示できなかった時は理由も）
     if (settings.signals) {
       const nS = world.signals.length, nN = world.jcts.filter(j => j.name && !j.icon).length;
@@ -2063,6 +2122,7 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
     if (scen) lines.push(`🏙 建物 ${scen.b.length.toLocaleString()}件・道路 ${scen.h.length.toLocaleString()}本（OpenStreetMap）`);
     else if (!c.local) lines.push('🏙 建物：自動生成の街並み');
     if (T.sigText) lines.push(T.sigText);
+    if (world.rails && world.rails.length) lines.push(`🛡 ガードレールなど ${world.rails.length}か所（合計 ${lenTxt(world.rails.reduce((a, g) => a + g.len * g.sides.length, 0))}）`);
     if (world.tunnels && world.tunnels.length) lines.push(`🚇 トンネル ${world.tunnels.length}か所（${world.tunnels.map(t => t.name + ' ' + lenTxt(t.len)).join('、')}）`);
     if (world.shops && world.shops.length) lines.push(`🏪 お店 ${world.shops.length}軒（コンビニ ${world.shops.filter(q => q.type !== 'super').length}・スーパー ${world.shops.filter(q => q.type === 'super').length}）`);
     lines.push(T.climb > 1.5 ? `⛰ 高低差 ${Math.round(T.climb)} m${settings.elev > 1 ? `（実際の${settings.elev}倍）` : ''}` : settings.elev > 0 && !c.local ? '⛰ 高低差：ほぼ平ら（または標高データなし）' : '⛰ 高低差：なし');
@@ -2579,7 +2639,7 @@ function courseMenu(c) {
   $('#cmRefetch').textContent = m ? '🔄 建物・道路を最新に取り直す' : '⬇️ 建物・道路を読み込んで走る';
   const close = () => show('#courseMenu', false);
   $('#cmEdit').hidden = !!c.local;
-  $('#cmEdit').textContent = user ? '🗺️ コースを編集（ルート・交差点・お店・トンネル）' : '🗺️ コピーして編集（交差点・お店・トンネルを追加）';
+  $('#cmEdit').textContent = user ? '🗺️ コースを編集（ルート・交差点・お店・トンネル・ガードレール）' : '🗺️ コピーして編集（交差点・お店・トンネルなどを追加）';
   $('#cmEdit').onclick = () => { close(); editCourse(c); };
   $('#cmRename').onclick = () => { close(); const n = prompt('コース名', c.name); if (n == null || !n.trim()) return; const l = userCourses(); const x = l.find(x => x.id === c.id); if (x) { x.name = n.trim().slice(0, 24); saveUserCourses(l); renderCourses(); } };
   $('#cmRefetch').onclick = () => { close(); if (isOneway(c)) pickDir(c, true); else playCourse(c, 'fwd', true); };
@@ -2633,6 +2693,7 @@ $('#importFile').onchange = async e => {
       if (ids.has(c.id)) { if (validScen(c.scenery) && !(await sceneDB.get(c.id))) scn.push([c.id, c.scenery]); continue; }
       const nc = { id: typeof c.id === 'string' && /^u[0-9a-z]+$/.test(c.id) ? c.id : 'u' + (Date.now() + n).toString(36), name: c.name.slice(0, 24), wps: c.wps, line: c.line, len: +c.len || lineLength(c.line), desc: '', type: c.type === 'oneway' ? 'oneway' : 'loop' };
       if (Array.isArray(c.elev) && c.elev.every(q => Array.isArray(q) && q.length === 3 && q.every(isFinite))) nc.elev = c.elev;
+      if (Array.isArray(c.rails)) nc.rails = c.rails.filter(q => Array.isArray(q) && [0, 1, 2, 3].every(i => isFinite(q[i]))).slice(0, 40).map(q => [+q[0], +q[1], +q[2], +q[3], ['L', 'R', 'B'].includes(q[4]) ? q[4] : 'B', q[5] in GR_STYLES ? q[5] : 'beam']);
       if (Array.isArray(c.tunnels)) nc.tunnels = c.tunnels.filter(q => Array.isArray(q) && [0, 1, 2, 3].every(i => isFinite(q[i]))).slice(0, 10).map(q => [+q[0], +q[1], +q[2], +q[3], String(q[4] || '').slice(0, 12)]);
       if (Array.isArray(c.shops)) nc.shops = c.shops.filter(q => Array.isArray(q) && isFinite(q[0]) && isFinite(q[1])).slice(0, 30).map(q => [+q[0], +q[1], q[2] === 'super' ? 'super' : 'cvs', String(q[3] || '').slice(0, 14), /^#[0-9a-f]{6}$/i.test(q[4]) ? q[4] : SHOP_COLORS[0]]);
       if (Array.isArray(c.jx)) nc.jx = c.jx.filter(q => Array.isArray(q) && isFinite(q[0]) && isFinite(q[1])).slice(0, 60).map(q => [+q[0], +q[1], String(q[2] || '').slice(0, 20), q[3] ? 1 : 0]);
@@ -2664,6 +2725,7 @@ seg('#segRiv', 'rivals');
 seg('#segElev', 'elev', v => +v);
 seg('#segFeel', 'feel');
 seg('#segRoadW', 'roadW');
+$('#barrier').checked = settings.barrier !== false; $('#barrier').onchange = e => { settings.barrier = e.target.checked; saveSettings(); };
 const syncSpeedNote = () => { $('#speedNote').textContent = `最高 約${Math.round(52 * spk() * 3.6 / 5) * 5} km/h（ライバル車も同じ割合）`; };
 seg('#segSpeed', 'speed', v => v, () => { syncSpeedNote(); renderCourses(); });
 syncSpeedNote();
@@ -2688,19 +2750,19 @@ function toTitle() { show('#title', true); show('#editor', false); renderCourses
    コースエディタ（Leaflet）
    ========================================================= */
 let map = null, wps = [], wpMarkers = [], routeLine = null, routeData = null, routeSeq = 0, edType = 'loop';
-let edMode = 'route', jx = [], jxMarkers = [], shops = [], shopMarkers = [], tunnels = [], tunLayers = [], tunPend = null, editing = null, routeDirty = false, edDirty = false;
+let edMode = 'route', jx = [], jxMarkers = [], shops = [], shopMarkers = [], tunnels = [], tunLayers = [], tunPend = null, rails = [], grLayers = [], grPend = null, editing = null, routeDirty = false, edDirty = false;
 const minPts = () => edType === 'oneway' ? 2 : 3;
 function initMap() {
   if (map) return;
   map = L.map('map', { zoomControl: false, attributionControl: true }).setView([35.681, 139.767], 15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, subdomains: 'abc', attribution: '© OpenStreetMap contributors' }).addTo(map);
-  map.on('click', e => { const ll = [e.latlng.lat, e.latlng.lng]; edMode === 'jx' ? addJx(ll) : edMode === 'shop' ? addShop(ll) : edMode === 'tunnel' ? addTunnelPt(ll) : addWp(ll); });
+  map.on('click', e => { const ll = [e.latlng.lat, e.latlng.lng]; edMode === 'jx' ? addJx(ll) : edMode === 'shop' ? addShop(ll) : edMode === 'tunnel' ? addTunnelPt(ll) : edMode === 'rail' ? addRailPt(ll) : addWp(ll); });
   // 前回の位置
   const lastView = store.get('mapView', null); if (lastView) map.setView([lastView[0], lastView[1]], lastView[2]);
   map.on('moveend', () => { const c = map.getCenter(); store.set('mapView', [c.lat, c.lng, map.getZoom()]); });
 }
 function resetEditor() {
-  wps = []; jx = []; shops = []; tunnels = []; tunPend = null; editing = null; routeDirty = false; edDirty = false; routeData = null; routeSeq++;
+  wps = []; jx = []; shops = []; tunnels = []; tunPend = null; rails = []; grPend = null; editing = null; routeDirty = false; edDirty = false; routeData = null; routeSeq++;
   if (routeLine) { routeLine.remove(); routeLine = null; }
   $('#cname').value = ''; setEdMode('route');
 }
@@ -2715,7 +2777,7 @@ async function editCourse(c) {
   show('#title', false); show('#editor', true); initMap(); resetEditor();
   let line = c.line || store.get('pline.' + c.id, null);
   edType = isOneway(c) ? 'oneway' : 'loop'; syncType();
-  wps = c.wps.map(p => p.slice()); jx = (c.jx || []).map(q => q.slice()); shops = (c.shops || []).map(q => q.slice()); tunnels = (c.tunnels || []).map(q => q.slice());
+  wps = c.wps.map(p => p.slice()); jx = (c.jx || []).map(q => q.slice()); shops = (c.shops || []).map(q => q.slice()); tunnels = (c.tunnels || []).map(q => q.slice()); rails = (c.rails || []).map(q => q.slice());
   editing = c.id.startsWith('p-') ? { copyOf: c } : { id: c.id };
   $('#cname').value = editing.copyOf ? c.name + '（編集）' : c.name;
   setTimeout(() => map.invalidateSize(), 50);
@@ -2729,8 +2791,9 @@ async function editCourse(c) {
 }
 function setEdMode(m) {
   edMode = m; $('#segEdMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
-  document.querySelector('.edPanel').classList.toggle('jx', m === 'jx'); document.querySelector('.edPanel').classList.toggle('shop', m === 'shop'); document.querySelector('.edPanel').classList.toggle('tunnel', m === 'tunnel');
+  document.querySelector('.edPanel').classList.toggle('jx', m === 'jx'); document.querySelector('.edPanel').classList.toggle('shop', m === 'shop'); document.querySelector('.edPanel').classList.toggle('tunnel', m === 'tunnel'); document.querySelector('.edPanel').classList.toggle('rail', m === 'rail');
   if (m !== 'tunnel' && tunPend) { tunPend = null; drawTunnels(); }
+  if (m !== 'rail' && grPend) { grPend = null; drawTunnels(); }
   $('#edUndo').textContent = '↶ 戻す'; $('#edClear').textContent = '🗑 全消去';
   refreshInfo();
 }
@@ -2832,7 +2895,55 @@ function tunnelDialog(idx, q, len) {
   $('#tunCancel').onclick = close;
 }
 $('#tunName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#tunOk').click(); } });
+// ガードレールの区間を置く（始まりと終わりをタップ）
+function addRailPt(ll) {
+  if (!routeData) return toast('先に「🏁 ルート」でコースを作ってください');
+  const cum = routeData.cum || (routeData.cum = lineInfo(routeData.line)), n = lineParam(routeData.line, cum, ll);
+  if (n.d > 40) return toast('コースの線の上（40m以内）をタップしてください');
+  const p = [+n.ll[0].toFixed(6), +n.ll[1].toFixed(6)];
+  if (!grPend) { grPend = p; drawTunnels(); refreshInfo(); return; }
+  const q = [grPend[0], grPend[1], p[0], p[1], 'B', 'beam'], path = tunnelPath(q);
+  if (!path || path.len < 5) return toast('もう少し離れた場所をタップしてください');
+  if (rails.length >= 40) return toast('ガードレールは40か所までです');
+  grPend = null; railDialog(null, q, path.len);
+}
+function railDialog(idx, q, len) {
+  const cur = idx != null ? rails[idx] : null; let side = cur ? cur[4] : 'B', style = cur ? cur[5] : 'beam';
+  const sync = () => { $('#grSide').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === side)); $('#grStyle').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === style)); };
+  $('#grSide').onclick = e => { const b = e.target.closest('button'); if (b) { side = b.dataset.v; sync(); } };
+  $('#grStyle').onclick = e => { const b = e.target.closest('button'); if (b) { style = b.dataset.v; sync(); } };
+  sync(); $('#grLen').textContent = '長さ ' + lenTxt(len); $('#grDel').hidden = idx == null; show('#grDlg', true);
+  const close = () => { show('#grDlg', false); drawTunnels(); refreshInfo(); };
+  $('#grOk').onclick = () => { if (cur) { cur[4] = side; cur[5] = style; } else { q[4] = side; q[5] = style; rails.push(q); } edDirty = true; close(); };
+  $('#grDel').onclick = () => { rails.splice(idx, 1); edDirty = true; close(); };
+  $('#grCancel').onclick = close;
+}
+// コースの横に少しずらした線（付ける側が分かるように）
+function offsetPts(pts, meters) {
+  return pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], pr = makeProj(p[0], p[1]), pa = pr.fwd(a[0], a[1]), pb = pr.fwd(b[0], b[1]);
+    let tx = pb[0] - pa[0], tz = pb[1] - pa[1]; const L = Math.hypot(tx, tz) || 1; tx /= L; tz /= L;
+    return pr.inv(-tz * meters, tx * meters);
+  });
+}
+function drawRails() {
+  grLayers.forEach(m => m.remove()); grLayers = [];
+  if (!map) return;
+  const col = { beam: '#f4f4ef', pipe: '#cfe3ff', wall: '#a9a39a' };
+  rails.forEach((q, i) => {
+    const path = tunnelPath(q); if (!path) return;
+    const sides = q[4] === 'B' ? [-1, 1] : [q[4] === 'R' ? 1 : -1];
+    for (const sd of sides) {
+      const pts = offsetPts(path.pts, sd * 11);
+      const ln = L.polyline(pts, { color: '#1d2026', weight: 7, opacity: .9 }).addTo(map), inner = L.polyline(pts, { color: col[q[5]] || '#fff', weight: 4, interactive: false }).addTo(map);
+      ln.on('click', e => { L.DomEvent.stopPropagation(e); railDialog(i, q, path.len); });
+      grLayers.push(ln, inner);
+    }
+  });
+  if (grPend) { const d = document.createElement('div'); d.className = 'jxm'; d.innerHTML = '<i>🛡</i><b>始まり</b>'; grLayers.push(L.marker(grPend, { icon: L.divIcon({ className: '', html: d, iconSize: [0, 0] }), zIndexOffset: 1000 }).addTo(map)); }
+}
 function drawTunnels() {
+  drawRails();
   tunLayers.forEach(m => m.remove()); tunLayers = [];
   if (!map) return;
   tunnels.forEach((q, i) => {
@@ -2904,6 +3015,9 @@ function refreshInfo(status) {
   const n = wps.length, info = $('#edInfo'), ow = edType === 'oneway', need = minPts(), minLen = ow ? 300 : 400;
   const head = editing ? `<b>「${($('#cname').value || '').replace(/[<&>]/g, '')}」を編集中</b><br>` : '';
   if (status) info.innerHTML = head + status;
+  else if (edMode === 'rail') info.innerHTML = head + (routeData
+    ? (grPend ? '次に<b>終わりの場所</b>をコース上でタップしてください。' : `コース上の<b>始まり</b>→<b>終わり</b>の順にタップして、ガードレールを付ける区間を決めます。付ける側（左・右・両側）と種類（ガードレール・ガードパイプ・コンクリート壁）を選べます。線をタップで変更・削除。<br>設定済み：${rails.length}か所`)
+    : '先に「🏁 ルート」でコースを作ってください。');
   else if (edMode === 'tunnel') info.innerHTML = head + (routeData
     ? (tunPend ? '次に<b>出口</b>（トンネルの終わり）をコース上でタップしてください。' : `コース上の<b>入口</b>→<b>出口</b>の順にタップすると、その区間がトンネルになります（20m〜3km）。トンネルの線をタップで名前の変更・削除。<br>設定済み：${tunnels.length}か所`)
     : '先に「🏁 ルート」でコースを作ってください。');
@@ -2943,12 +3057,14 @@ $('#toEditor').onclick = openEditor;
 $('#edUndo').onclick = () => {
   if (edMode === 'jx') { if (jx.length) { jx.pop(); edDirty = true; drawJx(); refreshInfo(); } return; }
   if (edMode === 'shop') { if (shops.length) { shops.pop(); edDirty = true; drawShops(); refreshInfo(); } return; }
+  if (edMode === 'rail') { if (grPend) grPend = null; else if (rails.length) { rails.pop(); edDirty = true; } drawTunnels(); refreshInfo(); return; }
   if (edMode === 'tunnel') { if (tunPend) tunPend = null; else if (tunnels.length) { tunnels.pop(); edDirty = true; } drawTunnels(); refreshInfo(); return; }
   wps.pop(); routeDirty = edDirty = true; updateEditor(true);
 };
 $('#edClear').onclick = () => {
   if (edMode === 'jx') { if (jx.length && confirm('置いた交差点を全部消しますか？')) { jx = []; edDirty = true; drawJx(); refreshInfo(); } return; }
   if (edMode === 'shop') { if (shops.length && confirm('置いたお店を全部消しますか？')) { shops = []; edDirty = true; drawShops(); refreshInfo(); } return; }
+  if (edMode === 'rail') { if (rails.length && confirm('ガードレールを全部消しますか？')) { rails = []; grPend = null; edDirty = true; drawTunnels(); refreshInfo(); } return; }
   if (edMode === 'tunnel') { if (tunnels.length && confirm('トンネルを全部消しますか？')) { tunnels = []; tunPend = null; edDirty = true; drawTunnels(); refreshInfo(); } return; }
   if (wps.length && !confirm('ポイントを全部消しますか？')) return; wps = []; routeDirty = edDirty = true; updateEditor(true);
 };
@@ -2981,9 +3097,9 @@ function saveCourse() {
       Object.assign(c, { wps: wps.slice(), line: routeData.line, len: routeData.len, type: edType }); delete c.elev;
       sceneDB.del(c.id); for (const k of ['scn.', 'osteps.', 'jn.', 'elev.']) store.del(k + c.id);
     }
-    c.name = name; c.jx = jx.map(q => q.slice()); c.shops = shops.map(q => q.slice()); c.tunnels = tunnels.map(q => q.slice());
+    c.name = name; c.jx = jx.map(q => q.slice()); c.shops = shops.map(q => q.slice()); c.tunnels = tunnels.map(q => q.slice()); c.rails = rails.map(q => q.slice());
   } else {
-    c = { id: 'u' + Date.now().toString(36), name, wps: wps.slice(), line: routeData.line, len: routeData.len, desc: '', type: edType, jx: jx.map(q => q.slice()), shops: shops.map(q => q.slice()), tunnels: tunnels.map(q => q.slice()) };
+    c = { id: 'u' + Date.now().toString(36), name, wps: wps.slice(), line: routeData.line, len: routeData.len, desc: '', type: edType, jx: jx.map(q => q.slice()), shops: shops.map(q => q.slice()), tunnels: tunnels.map(q => q.slice()), rails: rails.map(q => q.slice()) };
     if (editing && editing.copyOf && !routeDirty && editing.copyOf.elev) c.elev = editing.copyOf.elev;
     list.push(c);
   }
