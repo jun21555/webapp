@@ -297,6 +297,7 @@
     <div class="row"><label>オートアクセル<small>オンだとアクセルは自動。ドリフト・ブレーキだけ操作</small></label><span class="sw"><input type="checkbox" id="auto"><i></i></span></div>
     <div class="row"><label>周回数</label><div class="seg" id="segLaps"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
     <div class="row"><label>最高速度<small id="speedNote"></small></label><div class="seg" id="segSpeed"><button data-v="slow">遅め</button><button data-v="normal">普通</button><button data-v="fast">速め</button></div></div>
+    <div class="row"><label>時間帯<small>夕方・夜は街灯や窓の明かり、車のライトが点きます</small></label><div class="seg" id="segTod"><button data-v="day">☀️ 昼</button><button data-v="evening">🌇 夕方</button><button data-v="night">🌙 夜</button></div></div>
     <div class="row"><label>スピード感<small>カメラ・スピード線・振動・風の音の強さ。酔いやすい人は「ひかえめ」に</small></label><div class="seg" id="segFeel"><button data-v="low">ひかえめ</button><button data-v="normal">ふつう</button><button data-v="high">強め</button></div></div>
     <div class="row"><label>コース両側の赤白バリア<small>オフにしても見えない壁でコースからは出ません。自分で付けたガードレールは表示されます</small></label><span class="sw"><input type="checkbox" id="barrier"><i></i></span></div>
     <div class="row"><label>道幅<small>狭いほど速く感じるが、運転は難しくなる</small></label><div class="seg" id="segRoadW"><button data-v="wide">広い</button><button data-v="normal">ふつう</button><button data-v="narrow">狭い</button></div></div>
@@ -561,7 +562,7 @@ async function loadScenery(id) {
 }
 const validScen = d => d && Array.isArray(d.b) && Array.isArray(d.h) && Array.isArray(d.g) && Array.isArray(d.w);
 const mb = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1e3)) + 'KB';
-const settings = Object.assign({ barrier: true, feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
+const settings = Object.assign({ tod: 'day', barrier: true, feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 const fmt = t => { if (!isFinite(t) || t == null) return '--:--.--'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
 let toastT;
@@ -924,6 +925,48 @@ scene.fog = new THREE.Fog(SKY, 160, 650);
 const camera = new THREE.PerspectiveCamera(62, 1, 0.3, 1500);
 const hemi = new THREE.HemisphereLight('#dff0ff', '#6b7a55', 1.3); scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff3dd', 2.2);
+/* ---------- 時間帯（昼・夕方・夜） ---------- */
+const TODS = {
+  day: { sky: ['#3f86e0', '#9fd2ff', '#dcefff'], fog: '#9fd2ff', near: 160, far: 650, hs: '#dff0ff', hg: '#6b7a55', hi: 1.3, sc: '#fff3dd', si: 2.2, off: [30, 80, 22], lights: 0 },
+  evening: { sky: ['#2b3a78', '#c86a63', '#ffb46a'], fog: '#d98f6e', near: 120, far: 560, hs: '#ffc39a', hg: '#4a3a40', hi: .95, sc: '#ffa24f', si: 1.9, off: [-75, 24, 38], lights: .65 },
+  night: { sky: ['#01030a', '#081230', '#1a2648'], fog: '#0c1328', near: 45, far: 360, hs: '#3a4a7a', hg: '#0e0e16', hi: .38, sc: '#a8bcff', si: .35, off: [-30, 80, -40], lights: 1 }
+};
+let TODV = TODS.day; const skyTexCache = {};
+function skyTex(id) {
+  if (skyTexCache[id]) return skyTexCache[id];
+  const [a, b, c2] = TODS[id].sky, c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, a); gr.addColorStop(.55, b); gr.addColorStop(1, c2); g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; return skyTexCache[id] = tx;
+}
+let stars = null;
+function applyTOD() {
+  const id = TODS[settings.tod] ? settings.tod : 'day'; TODV = TODS[id];
+  scene.background = skyTex(id); SKY.set(TODV.fog); scene.fog.color.copy(SKY); scene.fog.near = TODV.near; scene.fog.far = TODV.far;
+  hemi.color.set(TODV.hs); hemi.groundColor.set(TODV.hg); hemi.intensity = TODV.hi; sun.color.set(TODV.sc); sun.intensity = TODV.si;
+  // 夜は星
+  if (id === 'night' && !stars) {
+    const pos = []; for (let i = 0; i < 900; i++) { const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, y = Math.abs(u) * .9 + .08, r = Math.sqrt(1 - y * y); pos.push(Math.cos(th) * r * 900, y * 900, Math.sin(th) * r * 900); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    stars = new THREE.Points(g, new THREE.PointsMaterial({ color: '#dfe8ff', size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: .85 })); stars.frustumCulled = false; scene.add(stars);
+  }
+  if (stars) stars.visible = id === 'night';
+  if (race) for (const car of [race.p.car, ...race.cpus.map(c => c.car)]) carLights(car, car === race.p.car);
+}
+// 車のライト：前の路面を照らす光（全車）と、自車のスポットライト
+let lightPoolTex = null;
+function carLights(car, isPlayer) {
+  const u = car.userData, lv = TODV.lights;
+  if (!u.pool) {
+    if (!lightPoolTex) lightPoolTex = canvasTex(128, 256, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h * .15, 4, w / 2, h * .4, h * .62); gr.addColorStop(0, 'rgba(255,244,214,1)'); gr.addColorStop(.5, 'rgba(255,236,190,.45)'); gr.addColorStop(1, 'rgba(255,230,180,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+    u.pool = new THREE.Mesh(new THREE.PlaneGeometry(7, 14), new THREE.MeshBasicMaterial({ map: lightPoolTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    u.pool.rotation.x = -Math.PI / 2; u.pool.rotation.z = Math.PI; u.pool.position.set(0, .14, u.spec.L / 2 + 6.5); car.add(u.pool);
+  }
+  u.pool.visible = lv > 0; u.pool.material.opacity = .35 + .45 * lv;
+  if (isPlayer) {
+    if (!u.spot) { u.spot = new THREE.SpotLight('#fff1d6', 60, 70, .5, .55, 1.2); u.spot.position.set(0, .7, u.spec.L / 2); u.spot.target.position.set(0, 0, 25); car.add(u.spot, u.spot.target); }
+    u.spot.visible = lv > 0; u.spot.intensity = 40 * lv;
+  }
+}
 sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
 Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 220 });
 sun.shadow.bias = -0.0008;
@@ -982,6 +1025,18 @@ function disposeWorld() {
   scene.remove(world.root);
   world.root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => m.dispose()); } });
   world = null;
+}
+
+// 建物の材質：夕方・夜は窓に明かり
+let winNightTex = null;
+function buildingMat() {
+  const lv = (TODS[settings.tod] || TODS.day).lights;
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true, map: TEX.win, side: THREE.DoubleSide });
+  if (lv > 0) {
+    if (!winNightTex) winNightTex = canvasTex(64, 64, (g) => { g.fillStyle = '#000'; g.fillRect(0, 0, 64, 64); for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { const r = Math.random(); if (r < .45) { g.fillStyle = r < .12 ? '#bfe0ff' : r < .3 ? '#ffd690' : '#ffe9b8'; g.fillRect(x * 16 + 3, y * 16 + 4, 10, 8); } } });
+    m.emissive = new THREE.Color('#ffffff'); m.emissiveMap = winNightTex; m.emissiveIntensity = .2 + .65 * lv;
+  }
+  return m;
 }
 
 /* ---------- コース形状メッシュ ---------- */
@@ -1145,7 +1200,7 @@ function buildWorld(T, scen, proj, HF, jcl, shopsXZ = [], tunnelsXZ = [], railsX
   if (scen && proj) {
     const P = c => c.map(p => proj.fwd(p[0], p[1]));
     const bl = []; for (const [c, h] of scen.b) { const pc = P(c); if (pc.some(q => T.nearest(q[0], q[1], clearR + 1) < clearR)) continue; let cut = false; for (let i = 0; i < pc.length && !cut; i++) { const q = pc[i], r = pc[(i + 1) % pc.length]; if (T.nearest((q[0] + r[0]) / 2, (q[1] + r[1]) / 2, clearR + 1) < clearR) cut = true; } if (!cut && !hitsShop(pc, shopPl) && !hitsTun(pc)) bl.push([pc, h, HF ? Math.min(...pc.map(q => G(q[0], q[1]))) : 0]); }
-    if (bl.length) { const m = new THREE.Mesh(buildingGeo(bl), new THREE.MeshLambertMaterial({ vertexColors: true, map: TEX.win, side: THREE.DoubleSide })); m.castShadow = true; m.receiveShadow = true; root.add(m); }
+    if (bl.length) { const m = new THREE.Mesh(buildingGeo(bl), buildingMat()); m.castShadow = true; m.receiveShadow = true; root.add(m); }
     if (scen.h.length) { const m = new THREE.Mesh(streetGeo(scen.h.map(([c, t]) => [P(c), t]), G), new THREE.MeshLambertMaterial({ color: '#5d6168', side: THREE.DoubleSide })); m.receiveShadow = true; root.add(m); }
     if (scen.g.length) { const m = new THREE.Mesh(flatPolys(scen.g.map(P), .03, G), new THREE.MeshLambertMaterial({ color: '#79a85c', side: THREE.DoubleSide })); m.receiveShadow = true; root.add(m); }
     if (scen.w.length) root.add(new THREE.Mesh(flatPolys(scen.w.map(P), .04, G, true), new THREE.MeshLambertMaterial({ color: '#4f94cf', side: THREE.DoubleSide })));
@@ -1167,7 +1222,7 @@ function buildWorld(T, scen, proj, HF, jcl, shopsXZ = [], tunnelsXZ = [], railsX
         }
       }
     }
-    if (bl.length) { const m = new THREE.Mesh(buildingGeo(bl), new THREE.MeshLambertMaterial({ vertexColors: true, map: TEX.win, side: THREE.DoubleSide })); m.castShadow = true; m.receiveShadow = true; root.add(m); }
+    if (bl.length) { const m = new THREE.Mesh(buildingGeo(bl), buildingMat()); m.castShadow = true; m.receiveShadow = true; root.add(m); }
     if (trees.length) {
       const leaf = new THREE.InstancedMesh(new THREE.ConeGeometry(2.6, 7, 7), new THREE.MeshLambertMaterial({ color: '#3f8a3a' }), trees.length);
       const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(.35, .45, 2.4, 6), new THREE.MeshLambertMaterial({ color: '#6b4a2b' }), trees.length);
@@ -1231,6 +1286,19 @@ function buildRoadside(T, root, railOk, railOff, shopPl = [], tunK = null, grK =
   for (const key in list) {
     const [g, m] = geos[key], arr = list[key], im = new THREE.InstancedMesh(g, m, arr.length);
     arr.forEach((mx, i) => im.setMatrixAt(i, mx)); im.castShadow = key !== 'refl' && key !== 'lhead'; im.receiveShadow = key === 'hedge'; root.add(im);
+  }
+  // 夕方・夜：街灯の下の光の輪と、灯具の光
+  const lv = (TODS[settings.tod] || TODS.day).lights;
+  if (lv > 0 && list.lhead) {
+    const tex = canvasTex(128, 128, (g, w, h) => { const gr = g.createRadialGradient(64, 64, 2, 64, 64, 64); gr.addColorStop(0, 'rgba(255,214,150,1)'); gr.addColorStop(.45, 'rgba(255,200,130,.45)'); gr.addColorStop(1, 'rgba(255,190,120,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+    const poolM = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: .55 * lv });
+    const pg = new THREE.PlaneGeometry(14, 14); pg.rotateX(-Math.PI / 2);
+    const pools = new THREE.InstancedMesh(pg, poolM, list.lhead.length), glows = [], v = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+    list.lhead.forEach((mx, i) => { mx.decompose(v, q, sc); glows.push(v.x, v.y - .1, v.z); const m = new THREE.Matrix4().makeTranslation(v.x, v.y - 8.15 + .13, v.z); pools.setMatrixAt(i, m); });
+    root.add(pools);
+    const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(glows, 3));
+    root.add(new THREE.Points(gg, new THREE.PointsMaterial({ map: tex, size: 3.2, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: .9 * lv })));
+    mats.lamp.color.set('#fff2c4');
   }
   if (wires.length) {
     const pos = new Float32Array(wires.length * 3); wires.forEach((q, i) => pos.set(q, i * 3));
@@ -1389,8 +1457,8 @@ function tunnelLight(dt) {
   }
   race && (race.tf = lerp(race.tf || 0, tf, 1 - Math.exp(-dt * 5)));
   const f = race ? race.tf : 0;
-  hemi.intensity = 1.3 * (1 - .72 * f); sun.intensity = 2.2 * (1 - .9 * f);
-  scene.fog.color.copy(SKY).lerp(TUN_FOG, f); scene.fog.near = lerp(160, 40, f); scene.fog.far = lerp(650, 260, f);
+  hemi.intensity = TODV.hi * (1 - .72 * f); sun.intensity = TODV.si * (1 - .9 * f);
+  scene.fog.color.copy(SKY).lerp(TUN_FOG, f); scene.fog.near = lerp(TODV.near, 40, f); scene.fog.far = lerp(TODV.far, 260, f);
 }
 const TUN_FOG = new THREE.Color('#2b2722');
 
@@ -2203,7 +2271,7 @@ function startRace(course, dir = 'fwd', ready = null) {
   const p = newPlayer(T), cpus = newCPUs(T);
   const laps = T.closed ? settings.laps : 1;
   race = { course, dir, p, cpus, laps, dist: T.closed ? laps * T.len : T.raceLen, t: 0, state: ready ? 'ready' : 'count', count: 3.6, finishOrder: 0, best: store.get(bestKey(course, laps, dir), null), camShake: 0, msgT: 0 };
-  drawMiniBase(); jctShown = '\u0000';
+  drawMiniBase(); jctShown = '\u0000'; applyTOD();
   cpus.forEach(c => updateCPU(c, 0, true));
   placeCamera(true);
   show('#loading', false); show('#pause', false); show('#result', false);
@@ -2412,7 +2480,8 @@ function placeCamera(snap, dt = 1 / 60) {
   camera.lookAt(camLook);
   const baseF = portrait ? 72 : 58; camera.fov = lerp(camera.fov, baseF + (6 + 16 * I) * Math.min(f, 1.1) + (p.boost > 0 ? 10 * I : 0), snap ? 1 : 1 - Math.exp(-dt * 3)); camera.updateProjectionMatrix();
   race.feelF = f;
-  sun.position.set(p.x + 30, py + 80, p.z + 22); sun.target.position.set(p.x, py, p.z);
+  sun.position.set(p.x + TODV.off[0], py + TODV.off[1], p.z + TODV.off[2]); sun.target.position.set(p.x, py, p.z);
+  if (stars && stars.visible) stars.position.copy(camera.position);
 }
 
 /* ---------- スピード線（画面の端を流れる線） ---------- */
@@ -2789,6 +2858,7 @@ seg('#segLaps', 'laps', v => +v, () => renderCourses());
 seg('#segRiv', 'rivals');
 seg('#segElev', 'elev', v => +v);
 seg('#segFeel', 'feel');
+seg('#segTod', 'tod');
 seg('#segRoadW', 'roadW');
 $('#barrier').checked = settings.barrier !== false; $('#barrier').onchange = e => { settings.barrier = e.target.checked; saveSettings(); };
 const syncSpeedNote = () => { $('#speedNote').textContent = `最高 約${Math.round(52 * spk() * 3.6 / 5) * 5} km/h（ライバル車も同じ割合）`; };
