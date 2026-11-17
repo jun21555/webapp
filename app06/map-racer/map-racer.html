@@ -1681,6 +1681,38 @@ const CARS = {
     glass: [[.65, .94], [.0, 1.34], [-.85, 1.36], [-1.58, 1.02]],
     head: 'angle', tail: 'strip', wing: 'gt', flares: true, vents: true, rim: '#3d4148', colors: ['#9aa3ad', '#141518', '#f3f3f0', '#1f3f8a', '#b51d1d', '#f0b400', '#5b6a3f', '#5a2d82'],
     stats: { top: 1.05, acc: 1.06, grip: 1.05, drift: .85 }
+  },
+  tsubame: {
+    name: 'TSUBAME 燕', type: 'FF ホットハッチ（90年代風）', desc: '小さな3ドアハッチ。高回転のエンジンで軽快、グリップ走行が得意',
+    L: 4.0, W: 1.70, fz: 1.25, rz: -1.3, R: .30, ride: .26, smooth: false,
+    body: [[2.0, .3], [2.03, .55], [1.92, .7], [1.0, .82], [.6, .86], [-.6, .92], [-1.6, .94], [-1.95, .93], [-2.0, .7], [-1.98, .3]],
+    glass: [[.6, .86], [-.05, 1.3], [-1.5, 1.33], [-1.93, .98]],
+    head: 'rect', tail: 'rect', wing: 'roof', bumpers: false, rim: '#e8e8e8', colors: ['#f4f4f0', '#d7261e', '#f2c200', '#1c1c1e', '#1f4fa3', '#9aa2ab', '#2f8f5b', '#e86a17'],
+    stats: { top: .95, acc: 1.03, grip: 1.07, drift: .86 }
+  },
+  hotaru: {
+    name: 'HOTARU 蛍', type: '軽ミッドシップ・オープン（現代風）', desc: '小さく低いオープンカー。軽くてよく曲がるが、最高速は控えめ',
+    L: 3.4, W: 1.48, fz: 1.05, rz: -1.0, R: .29, ride: .24, smooth: false, open: true,
+    body: [[1.7, .28], [1.74, .46], [1.6, .6], [.9, .72], [.35, .78], [-.5, .84], [-1.2, .86], [-1.65, .86], [-1.72, .66], [-1.68, .28]],
+    glass: [[.35, .78], [-.12, 1.08], [-.6, 1.08], [-.75, .84]],
+    head: 'slim', tail: 'bar2', wing: 'duck', intake: true, rim: '#2b2f36', colors: ['#f2f2ee', '#d81e1e', '#f2c200', '#1d1f24', '#3a6fd8', '#ff7a1a', '#7a8590', '#13a36b'],
+    stats: { top: .88, acc: .97, grip: 1.12, drift: 1.0 }
+  },
+  suzume: {
+    name: 'SUZUME 雀', type: '軽オープン（90年代風）', desc: '丸っこい小さなオープンカー。とても軽く、ひらひら曲がる',
+    L: 3.3, W: 1.40, fz: 1.0, rz: -1.0, R: .27, ride: .24, smooth: true, open: true,
+    body: [[1.65, .3], [1.68, .5], [1.5, .64], [.8, .72], [.3, .76], [-.5, .8], [-1.3, .82], [-1.6, .78], [-1.65, .55], [-1.6, .3]],
+    glass: [[.3, .76], [-.1, 1.04], [-.6, 1.04], [-.7, .8]],
+    head: 'round', tail: 'wide', wing: 'none', rim: '#c9ccd1', colors: ['#d8262c', '#f6f2e6', '#f2c200', '#2a6b45', '#1f4fa3', '#1c1c1e', '#e86a17', '#8a8f96'],
+    stats: { top: .85, acc: .95, grip: 1.09, drift: 1.06 }
+  },
+  shiranui: {
+    name: 'SHIRANUI 不知火', type: 'FR ドリフトクーペ', desc: 'ノッチバックの2ドアクーペ。いちばんドリフトしやすい',
+    L: 4.5, W: 1.70, fz: 1.3, rz: -1.25, R: .32, ride: .26, smooth: false,
+    body: [[2.25, .3], [2.28, .52], [2.15, .68], [.9, .82], [.65, .84], [-.6, .88], [-1.4, .9], [-2.2, .92], [-2.28, .7], [-2.25, .3]],
+    glass: [[.65, .84], [.0, 1.25], [-.85, 1.27], [-1.45, .92]],
+    head: 'slim', tail: 'wide', wing: 'duck', rim: '#d8d8d8', colors: ['#f4f4f0', '#c41e2a', '#1c1c1e', '#5a2d82', '#1f4fa3', '#2f8f9b', '#9aa2ab', '#e86a17'],
+    stats: { top: .97, acc: 1.0, grip: .95, drift: 1.25 }
   }
 };
 const CAR_IDS = Object.keys(CARS);
@@ -1728,7 +1760,7 @@ function makeCar(color, num, typeId = 'shiden', env) {
   const hl = new THREE.MeshBasicMaterial({ color: '#fffbea' }), tl = new THREE.MeshBasicMaterial({ color: '#ff1e10' }), amber = new THREE.MeshBasicMaterial({ color: '#ffa31a' });
   const add = (geo, mat, x, y, z, parent = body, cast = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; parent.add(m); return m; };
   const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
-  const front = S.body[1][0], rear = S.body[S.body.length - 1][0] - .02;
+  const front = Math.max(...S.body.map(q => q[0])) + .06, rear = Math.min(...S.body.map(q => q[0])) - .07; // 角の丸め（約6cm）の外側
   const yAt = z => { // 車体上面の高さ（前後位置から）
     const b = S.body; for (let i = 0; i < b.length - 1; i++) { const a = b[i], c = b[i + 1]; if ((a[0] - z) * (c[0] - z) <= 0 && a[0] !== c[0]) return lerp(a[1], c[1], (z - a[0]) / (c[0] - a[0])); } return .8; };
   // 車体（タイヤハウスの切り欠き付き）
@@ -1736,11 +1768,31 @@ function makeCar(color, num, typeId = 'shiden', env) {
   add(sideExtrude(S.body, W, S.smooth, .08, [[S.rz, archR, archY], [S.fz, archR, archY]]), paint, 0, 0, 0);
   // キャビン（ガラス）と屋根
   const gl = S.glass, gW = W * .8;
-  add(sideExtrude(gl, gW, S.smooth, .05), glass, 0, -.005, 0);
+  if (S.open) {
+    // オープンカー：フロントガラス・座席・ロールバー
+    const ws = [[gl[0][0], gl[0][1] - .02], [gl[1][0], gl[1][1]], [gl[1][0] - .05, gl[1][1]], [gl[0][0] - .07, gl[0][1] - .02]];
+    add(sideExtrude(ws, gW, false, .02), glass, 0, 0, 0);
+    add(box(gW + .04, .05, .07), dark, 0, gl[1][1], gl[1][0] - .02);   // フロントガラスの上枠
+    const cz0 = gl[0][0] - .12, cz1 = gl[3][0], by = yAt((cz0 + cz1) / 2);
+    add(box(gW, .03, cz0 - cz1), dark, 0, by + .015, (cz0 + cz1) / 2, body, false); // 室内の床（黒）
+    const seatM = new THREE.MeshStandardMaterial({ color: '#2a2c31', roughness: .8 });
+    for (const sx of [-1, 1]) {
+      add(box(gW * .36, .12, .5), seatM, sx * gW * .23, by + .08, cz1 + .45, body, false);
+      add(box(gW * .34, .5, .1), seatM, sx * gW * .23, by + .28, cz1 + .18, body, false).rotation.x = -.18;
+      add(box(gW * .2, .17, .09), seatM, sx * gW * .23, by + .6, cz1 + .12, body, false);
+      // ロールバー
+      add(box(.06, .42, .06), paint, sx * gW * .23 - .2, by + .22, cz1 + .02); add(box(.06, .42, .06), paint, sx * gW * .23 + .2, by + .22, cz1 + .02);
+      add(box(.46, .06, .06), paint, sx * gW * .23, by + .44, cz1 + .02);
+    }
+    add(new THREE.TorusGeometry(.17, .025, 6, 14), dark, -gW * .23, by + .42, cz0 - .18, body, false).rotation.x = -1.1; // ハンドル
+  }
+  if (!S.open) add(sideExtrude(gl, gW, S.smooth, .05), glass, 0, -.005, 0);
+  if (!S.open) {
   const roof = [[gl[1][0] - .05, gl[1][1] - .02], [gl[1][0] + .02, gl[1][1] + .035], [gl[2][0] - .02, gl[2][1] + .035], [gl[2][0] + .08, gl[2][1] - .02]];
   add(sideExtrude(roof, gW + .06, false, .03), paint, 0, 0, 0);
+  }
   // 窓枠（ピラー）：横から見た窓のまわりを車体色の枠で囲む
-  {
+  if (!S.open) {
     let P = gl.map(([z, y]) => new THREE.Vector2(z, y)); if (S.smooth) P = new THREE.SplineCurve(P).getPoints(40);
     let cz = 0, cy = 0; P.forEach(v => { cz += v.x; cy += v.y; }); cz /= P.length; cy /= P.length;
     const ring = new THREE.Shape(); ring.moveTo(P[0].x, P[0].y); P.slice(1).forEach(v => ring.lineTo(v.x, v.y)); ring.closePath();
@@ -1761,7 +1813,8 @@ function makeCar(color, num, typeId = 'shiden', env) {
   // ヘッドライト
   const fy = yAt(front - .1), lx = W / 2 - .3;
   for (const sx of [-1, 1]) {
-    if (S.head === 'slim') { add(box(.42, .055, .3), hl, sx * lx, fy - .02, front - .17).rotation.x = .25; }
+    if (S.head === 'round') { const rg = new THREE.CylinderGeometry(.11, .11, .06, 16); rg.rotateX(Math.PI / 2); add(rg, hl, sx * (lx - .02), fy - .06, front - .1).rotation.x = -.35; }
+    else if (S.head === 'slim') { add(box(.42, .055, .3), hl, sx * lx, fy - .02, front - .17).rotation.x = .25; }
     else if (S.head === 'flush') { add(box(.36, .05, .06), hl, sx * lx, .5, front - .02); add(box(.12, .05, .06), amber, sx * (lx + .26), .5, front - .04); }
     else if (S.head === 'rect') { add(box(.42, .17, .06), hl, sx * (lx - .02), .6, front - .03); add(box(.14, .17, .06), amber, sx * (lx + .27), .6, front - .05); }
     else { const m = add(box(.5, .09, .34), hl, sx * (lx - .03), fy - .03, front - .2); m.rotation.set(.3, 0, sx * -.12); }
@@ -1781,6 +1834,7 @@ function makeCar(color, num, typeId = 'shiden', env) {
   const ty = yAt(rear + .25);
   if (S.wing === 'duck') add(box(W - .2, .05, .3), paint, 0, ty + .03, rear + .18).rotation.x = -.2;
   if (S.wing === 'lip') add(box(W - .3, .04, .22), dark, 0, ty + .04, rear + .14).rotation.x = -.15;
+  if (S.wing === 'roof') add(box(gW + .04, .05, .32), paint, 0, gl[2][1] + .04, gl[2][0] - .08).rotation.x = .12; // ルーフスポイラー
   if (S.wing === 'gt') {
     add(box(W - .1, .05, .36), dark, 0, ty + .36, rear + .25).rotation.x = -.08;
     for (const sx of [-1, 1]) { add(box(.05, .34, .14), dark, sx * (W / 2 - .45), ty + .17, rear + .28); add(box(.04, .2, .42), dark, sx * (W / 2 - .07), ty + .38, rear + .25); }
@@ -1795,7 +1849,7 @@ function makeCar(color, num, typeId = 'shiden', env) {
   if (num != null) {
     const nt = canvasTex(64, 64, (c) => { c.fillStyle = '#fff'; c.beginPath(); c.arc(32, 32, 30, 0, 7); c.fill(); c.fillStyle = '#111'; c.font = '900 40px "Arial Black",sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(num, 32, 35); });
     const pl = new THREE.Mesh(new THREE.PlaneGeometry(.6, .6), new THREE.MeshLambertMaterial({ map: nt, transparent: true })); pl.rotation.x = -Math.PI / 2;
-    pl.position.set(0, Math.max(gl[1][1], gl[2][1]) + .07, (gl[1][0] + gl[2][0]) / 2); body.add(pl);
+    if (S.open) pl.position.set(0, yAt(S.fz) + .02, S.fz); else pl.position.set(0, Math.max(gl[1][1], gl[2][1]) + .07, (gl[1][0] + gl[2][0]) / 2); body.add(pl);
   }
   // ホイール（タイヤ＋スポーク付きホイール＋ブレーキ）
   const R = S.R, tireG = new THREE.CylinderGeometry(R, R, .27, 22); tireG.rotateZ(Math.PI / 2);
@@ -2017,7 +2071,8 @@ function newCPUs(T) {
   const hard = settings.rivals === 'hard', list = [];
   const grid = [[-8, -2.6], [-14, 2.6], [-20, -2.6]];
   for (let i = 0; i < 3; i++) {
-    const ids = CAR_IDS.filter(x => x !== settings.car), id = ids[(i + Math.floor(Math.random() * 3)) % ids.length], sp = CARS[id];
+    if (!newCPUs.pick) newCPUs.pick = []; if (i === 0) newCPUs.pick = CAR_IDS.filter(x => x !== settings.car).sort(() => Math.random() - .5);
+    const id = newCPUs.pick[i % newCPUs.pick.length], sp = CARS[id];
     const col = sp.colors[(i * 3 + 1 + Math.floor(Math.random() * 4)) % sp.colors.length];
     const car = makeCar(col, i + 2, id); scene.add(car);
     const skill = (hard ? 1.04 : .9) - i * .03 + Math.random() * .02;
@@ -3153,7 +3208,7 @@ function showCar() {
   const S = carSpec(settings.car);
   if (!S.colors.includes(settings.carColor)) settings.carColor = S.colors[0];
   $('#carName').textContent = S.name; $('#carType').textContent = S.type; $('#carDesc').textContent = S.desc;
-  const st = S.stats, rows = [['最高速', st.top, .9, 1.08], ['加速', st.acc, .9, 1.08], ['グリップ', st.grip, .9, 1.12], ['ドリフト', st.drift, .8, 1.25]];
+  const st = S.stats, rows = [['最高速', st.top, .82, 1.08], ['加速', st.acc, .9, 1.08], ['グリップ', st.grip, .9, 1.14], ['ドリフト', st.drift, .8, 1.27]];
   $('#carStats').innerHTML = rows.map(([n, v, lo, hi]) => `<span>${n}</span><i><b style="width:${Math.round(25 + 75 * (v - lo) / (hi - lo))}%"></b></i>`).join('');
   $('#carColors').innerHTML = '';
   for (const c of S.colors) { const b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', '色 ' + c); b.classList.toggle('on', c === settings.carColor); b.onclick = () => { settings.carColor = c; saveSettings(); showCar(); }; $('#carColors').appendChild(b); }
