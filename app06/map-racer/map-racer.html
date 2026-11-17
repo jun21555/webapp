@@ -298,6 +298,7 @@
     <div class="row"><label>周回数</label><div class="seg" id="segLaps"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
     <div class="row"><label>最高速度<small id="speedNote"></small></label><div class="seg" id="segSpeed"><button data-v="slow">遅め</button><button data-v="normal">普通</button><button data-v="fast">速め</button></div></div>
     <div class="row"><label>時間帯<small>夕方・夜は街灯や窓の明かり、車のライトが点きます</small></label><div class="seg" id="segTod"><button data-v="day">☀️ 昼</button><button data-v="evening">🌇 夕方</button><button data-v="night">🌙 夜</button></div></div>
+    <div class="row"><label>ドリフトの効き<small>弱めほど車体の向きが変わりにくく、滑る角度も浅くなる</small></label><div class="seg" id="segDrift"><button data-v="weak">弱め</button><button data-v="normal">ふつう</button><button data-v="strong">強め</button></div></div>
     <div class="row"><label>スピード感<small>カメラ・スピード線・振動・風の音の強さ。酔いやすい人は「ひかえめ」に</small></label><div class="seg" id="segFeel"><button data-v="low">ひかえめ</button><button data-v="normal">ふつう</button><button data-v="high">強め</button></div></div>
     <div class="row"><label>コース両側の赤白バリア<small>オフにしても見えない壁でコースからは出ません。自分で付けたガードレールは表示されます</small></label><span class="sw"><input type="checkbox" id="barrier"><i></i></span></div>
     <div class="row"><label>道幅<small>狭いほど速く感じるが、運転は難しくなる</small></label><div class="seg" id="segRoadW"><button data-v="wide">広い</button><button data-v="normal">ふつう</button><button data-v="narrow">狭い</button></div></div>
@@ -562,7 +563,7 @@ async function loadScenery(id) {
 }
 const validScen = d => d && Array.isArray(d.b) && Array.isArray(d.h) && Array.isArray(d.g) && Array.isArray(d.w);
 const mb = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1e3)) + 'KB';
-const settings = Object.assign({ tod: 'day', barrier: true, feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
+const settings = Object.assign({ driftStr: 'normal', tod: 'day', barrier: true, feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 const fmt = t => { if (!isFinite(t) || t == null) return '--:--.--'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
 let toastT;
@@ -596,6 +597,9 @@ const ROADW = { wide: 13, normal: 10, narrow: 8 };
 const roadW = () => ROADW[settings.roadW] || 10;
 const shoulderW = W => W >= 13 ? 5 : 3.4;
 const FEEL = { low: .45, normal: 1, high: 1.6 };
+// ドリフトの効き：振り出し・回り込み・横滑りの強さ（強め＝以前の効き）
+const DRIFT_STR = { weak: { flick: .45, yaw: .8, grip: 1.9 }, normal: { flick: .7, yaw: .9, grip: 1.4 }, strong: { flick: .9, yaw: 1, grip: 1 } };
+const dstr = () => DRIFT_STR[settings.driftStr] || DRIFT_STR.normal;
 const feel = () => FEEL[settings.feel] ?? 1;
 // ベスト記録は速度ごとに別々（速めは以前の記録をそのまま使う）
 const bestKey = (c, laps, dir = 'fwd') => (isOneway(c) ? 'best.' + c.id + '.ow.' + dir : 'best.' + c.id + '.' + laps) + (settings.speed === 'fast' ? '' : '.' + settings.speed);
@@ -2414,7 +2418,7 @@ function updatePlayer(p, inp, dt) {
   let yawT = vf * Math.tan(dmax * st) / L;
   // ドリフト開始・終了
   if (!p.drifting && inp.drift && Math.abs(st) > .25 && vf > 11 * Math.min(1, k + .15)) {
-    p.drifting = true; p.driftDir = Math.sign(st); p.driftT = 0; p.w += p.driftDir * .9; p.vx *= .985; p.vz *= .985;
+    p.drifting = true; p.driftDir = Math.sign(st); p.driftT = 0; p.w += p.driftDir * dstr().flick; p.vx *= .985; p.vz *= .985;
   }
   if (p.drifting && (!inp.drift || vf < 7 || inp.brake)) {
     // ドリフト終了：長さに応じてミニターボ
@@ -2426,7 +2430,7 @@ function updatePlayer(p, inp, dt) {
   }
   if (p.drifting) {
     const k = p.driftDir * st; // 1 = 深く / -1 = カウンター
-    yawT = p.driftDir * (1.05 + .62 * k) * clamp(vf / 18, .45, 1) * 1.28 * (.85 + .15 * CS.drift);
+    yawT = p.driftDir * (1.05 + .62 * k) * clamp(vf / 18, .45, 1) * 1.28 * (.85 + .15 * CS.drift) * dstr().yaw;
     p.driftT += dt;
   } else {
     const latMax = (onRoad ? 13.5 : 8) * CS.grip;
@@ -2441,7 +2445,7 @@ function updatePlayer(p, inp, dt) {
   let slip = 0;
   if (speed > 1.5 && vf > 0) {
     let phi = Math.atan2(p.vx, p.vz); const dlt = wrapAng(p.th - phi); slip = dlt;
-    const g = p.drifting ? 2.5 / CS.drift : (onRoad ? 10 : 4.5) * CS.grip;
+    const g = p.drifting ? 2.5 * dstr().grip / CS.drift : (onRoad ? 10 : 4.5) * CS.grip;
     phi += dlt * (1 - Math.exp(-g * dt));
     const scrub = (p.drifting ? .3 / CS.drift : .8) * Math.abs(Math.sin(dlt)) * speed * dt;
     const ns = Math.max(0, speed - scrub);
@@ -2973,6 +2977,7 @@ seg('#segLaps', 'laps', v => +v, () => renderCourses());
 seg('#segRiv', 'rivals');
 seg('#segElev', 'elev', v => +v);
 seg('#segFeel', 'feel');
+seg('#segDrift', 'driftStr');
 seg('#segTod', 'tod');
 seg('#segRoadW', 'roadW');
 $('#barrier').checked = settings.barrier !== false; $('#barrier').onchange = e => { settings.barrier = e.target.checked; saveSettings(); };
