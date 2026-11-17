@@ -598,7 +598,7 @@ const roadW = () => ROADW[settings.roadW] || 10;
 const shoulderW = W => W >= 13 ? 5 : 3.4;
 const FEEL = { low: .45, normal: 1, high: 1.6 };
 // ドリフトの効き：振り出し・回り込み・横滑りの強さ（強め＝以前の効き）
-const DRIFT_STR = { weak: { flick: .45, yaw: .8, grip: 1.9 }, normal: { flick: .7, yaw: .9, grip: 1.4 }, strong: { flick: .9, yaw: 1, grip: 1 } };
+const DRIFT_STR = { weak: { flick: .15, yaw: .66, grip: 3.3 }, normal: { flick: .7, yaw: .9, grip: 1.4 }, strong: { flick: .9, yaw: 1, grip: 1 } };
 const dstr = () => DRIFT_STR[settings.driftStr] || DRIFT_STR.normal;
 const feel = () => FEEL[settings.feel] ?? 1;
 // ベスト記録は速度ごとに別々（速めは以前の記録をそのまま使う）
