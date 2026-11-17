@@ -1570,14 +1570,14 @@ async function inferFromRoute(c, ow, signal) {
   return pts;
 }
 // 名前のない交差点に、国土地理院の住所（町名・丁目）か交わる道路名を付ける
-async function nameJunctions(c, cls, proj, T, signal, msg) {
+async function nameJunctions(c, cls, proj, T, signal, msg, net = true) {
   const key = 'jn.' + c.id, cache = store.get(key, {}); let changed = false, budget = Date.now() + 20000, n = 0, gsiDown = false, nomiN = 0;
   for (const cl of cls) {
     if (cl.name) continue;
     if (!junctionRuns(T, cl).length) continue; // コースが通らない交差点は不要
     const [lat, lon] = proj.inv(cl.x, cl.z), k = lat.toFixed(4) + ',' + lon.toFixed(4);
     let nm = cache[k];
-    if (nm === undefined && Date.now() < budget && n < 40) {
+    if (nm === undefined && net && Date.now() < budget && n < 40) {
       n++; if (msg && n === 1) msg('交差点名を地図データから調べています…<br><small>国土地理院 住所検索</small>');
       if (!gsiDown) {
         try {
@@ -2035,7 +2035,7 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
   const msg = t => $('#loadMsg').innerHTML = t;
   $('#loadCancel').onclick = () => { ac.abort(); show('#loading', false); toTitle(); };
   try {
-    let pts, scen = null, proj = null, elevXZ = null, sigErr = false; const notes = [];
+    let pts, scen = null, proj = null, elevXZ = null, sigErr = false, allowNet = false; const notes = [];
     if (c.local) {
       msg('コースを作成中…'); let raw = ow ? sampleSprintPts() : sampleCoursePts();
       elevXZ = ow ? synthElev(raw, t => 30 * t + 9 * Math.sin(t * 14)) : synthElev(raw, t => 11 * Math.sin(t * Math.PI * 4 + .5) + 6 * Math.sin(t * Math.PI * 6));
@@ -2044,9 +2044,13 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
     else {
       let line = c.line || store.get('pline.' + c.id, null);
       if (!line) { msg('道路に沿ってルートを計算中…<br><small>OSRM</small>'); line = (await routeOSRM(c.wps, ac.signal, !ow)).line; if (c.id.startsWith('p-')) store.set('pline.' + c.id, line); }
+      // 通信でデータを読み込むのは初回だけ。2回目以降は「⋯」→「取り直す」と指示した時だけ
+      const cached = await loadScenery(c.id);
+      const played = store.get('fetched.' + c.id, 0) || !!cached || !!c.elev || !!store.get('elev.' + c.id, null) || !!store.get('jn.' + c.id, null);
+      allowNet = refetch || !played;
       // 標高データ（コースごとに保存）
       let elev = c.elev || store.get('elev.' + c.id, null);
-      if (!elev && settings.elev > 0) {
+      if (!elev && settings.elev > 0 && allowNet) {
         msg('コースの高低差（標高）を取得中…<br><small>Open-Meteo Elevation API</small>');
         try { elev = await fetchElevation(line, ac.signal); saveElev(c, elev); }
         catch (e) { if (ac.signal.aborted) return; toast('標高データを取得できなかったので、平らなコースで走ります'); }
@@ -2055,15 +2059,16 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
       proj = makeProj(line[0][0], line[0][1]);
       if (elev) elevXZ = elev.map(q => proj.fwd(q[0], q[1]).concat([q[2]]));
       pts = processLine(line.map(p => proj.fwd(p[0], p[1])), !ow);
-      if (refetch) { await sceneDB.del(c.id); store.del('scn.' + c.id); }
-      else { msg('保存してある建物・道路データを読み込み中…'); scen = await loadScenery(c.id); }
-      if (scen && (!scen.s || (!scen.s.length && Date.now() - (scen.sAt || 0) > 864e5)) && settings.signals) {
-        // 信号データがない（以前の保存データ）か、前回0件だった時は取り直す
+      if (refetch) { await sceneDB.del(c.id); for (const k of ['scn.', 'jn.', 'osteps.']) store.del(k + c.id); }
+      else scen = cached;
+      if (scen && !scen.s && settings.signals && allowNet) {
+        // 以前の保存データに信号機がない時（初回のみ）
         msg('信号機と交差点名を読み込み中…<br><small>OpenStreetMap / Overpass API</small>');
         try { scen.s = await fetchSignals(line, ac.signal); scen.sAt = Date.now(); await sceneDB.set(c.id, scen); }
         catch (e) { if (ac.signal.aborted) return; sigErr = true; }
       }
-      if (!scen) {
+      if (!scen && !allowNet) notes.push('ℹ️ 建物・道路は保存データがないので自動生成の街並みです（読み込むには、コース一覧の「⋯」→「建物・道路を読み込んで走る」）');
+      if (!scen && allowNet) {
         msg('まわりの建物・道路を読み込み中…<br><small>OpenStreetMap / Overpass API（数秒〜20秒ほど）</small>');
         const skipP = new Promise(res => { $('#loadSkip').onclick = () => { skipScen = true; res(null); }; });
         setTimeout(() => { if (!$('#loading').hidden) show('#loadSkip', true); }, 2500);
@@ -2097,10 +2102,10 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
       // コース上に OpenStreetMap の信号機が1つもなければ地図データから推定
       if (!info.osmNear && settings.sigInfer) {
         let inf = scen && scen.h ? inferFromRoads(T, scen, proj) : [];
-        if (!inf.length && !c.local) { try { inf = (await inferFromRoute(c, ow, ac.signal)).map(q => [...proj.fwd(q[0], q[1]), '', '', 1, 'map', q[2]]); } catch (e) { if (ac.signal.aborted) return; } }
+        if (!inf.length && !c.local && (allowNet || store.get('osteps.' + c.id, null))) { try { inf = (await inferFromRoute(c, ow, ac.signal)).map(q => [...proj.fwd(q[0], q[1]), '', '', 1, 'map', q[2]]); } catch (e) { if (ac.signal.aborted) return; } }
         if (inf.length) { nodes.push(...inf); jcl = clusterJunctions(nodes); T.sigGuess = true; }
       }
-      if (settings.sigInfer && jcl.some(q => !q.name)) { try { await nameJunctions(c, jcl, proj, T, ac.signal, msg); } catch (e) { if (ac.signal.aborted) return; } }
+      if (settings.sigInfer && jcl.some(q => !q.name)) { try { await nameJunctions(c, jcl, proj, T, ac.signal, msg, allowNet); } catch (e) { if (ac.signal.aborted) return; } }
     }
     const shopsXZ = proj && Array.isArray(c.shops) ? c.shops.map(q => ({ x: proj.fwd(q[0], q[1])[0], z: proj.fwd(q[0], q[1])[1], type: q[2], name: q[3], color: q[4] })) : [];
     const tunnelsXZ = proj && Array.isArray(c.tunnels) ? c.tunnels.map(q => ({ a: proj.fwd(q[0], q[1]), b: proj.fwd(q[2], q[3]), name: q[4] })) : [];
@@ -2127,6 +2132,8 @@ async function playCourse(c, dir = 'fwd', refetch = false) {
     if (world.tunnels && world.tunnels.length) lines.push(`🚇 トンネル ${world.tunnels.length}か所（${world.tunnels.map(t => t.name + ' ' + lenTxt(t.len)).join('、')}）`);
     if (world.shops && world.shops.length) lines.push(`🏪 お店 ${world.shops.length}軒（コンビニ ${world.shops.filter(q => q.type !== 'super').length}・スーパー ${world.shops.filter(q => q.type === 'super').length}）`);
     lines.push(T.climb > 1.5 ? `⛰ 高低差 ${Math.round(T.climb)} m${settings.elev > 1 ? `（実際の${settings.elev}倍）` : ''}` : settings.elev > 0 && !c.local ? '⛰ 高低差：ほぼ平ら（または標高データなし）' : '⛰ 高低差：なし');
+    if (!c.local && allowNet) store.set('fetched.' + c.id, Date.now());
+    if (!c.local && !allowNet && scen) lines.push('💾 保存データを使用（通信なし）。最新にするには「⋯」→「建物・道路を最新に取り直す」');
     startRace(c, dir, { lines: lines.concat(notes) });
   } catch (e) {
     if (ac.signal.aborted) return;
@@ -2629,7 +2636,7 @@ async function refreshScnBadges() {
   scnMeta = await sceneDB.metas();
   for (const el of document.querySelectorAll('.cd.scn')) {
     const m = scnMeta[el.dataset.id] || (store.get('scn.' + el.dataset.id, null) ? { b: -1 } : null);
-    el.textContent = m ? (m.b >= 0 ? `🏙 建物・道路 保存済み（${mb(m.size)}）` : '🏙 建物・道路 保存済み') : '☁️ 建物・道路は初回に読み込み';
+    el.textContent = m ? (m.b >= 0 ? `🏙 建物・道路 保存済み（${mb(m.size)}）` : '🏙 建物・道路 保存済み') : store.get('fetched.' + el.dataset.id, 0) ? '🏙 建物・道路データなし（「⋯」から読み込めます）' : '☁️ 建物・道路は初回に読み込み';
   }
 }
 /* コースのメニュー（名前変更・建物の取り直し・削除） */
@@ -2646,8 +2653,8 @@ function courseMenu(c) {
   $('#cmEdit').onclick = () => { close(); editCourse(c); };
   $('#cmRename').onclick = () => { close(); const n = prompt('コース名', c.name); if (n == null || !n.trim()) return; const l = userCourses(); const x = l.find(x => x.id === c.id); if (x) { x.name = n.trim().slice(0, 24); saveUserCourses(l); renderCourses(); } };
   $('#cmRefetch').onclick = () => { close(); if (isOneway(c)) pickDir(c, true); else playCourse(c, 'fwd', true); };
-  $('#cmClear').onclick = async () => { if (!confirm('保存してある建物・道路データを消しますか？（次に走るときにまた読み込みます）')) return; await sceneDB.del(c.id); store.del('scn.' + c.id); close(); renderCourses(); toast('建物・道路データを消しました'); };
-  $('#cmDelete').onclick = async () => { if (!confirm(`「${c.name}」を削除しますか？`)) return; saveUserCourses(userCourses().filter(x => x.id !== c.id)); await sceneDB.del(c.id); store.del('scn.' + c.id); close(); renderCourses(); };
+  $('#cmClear').onclick = async () => { if (!confirm('保存してある建物・道路データを消しますか？\n（消したあとは自動生成の街並みになります。読み込むときは「⋯」→「建物・道路を読み込んで走る」）')) return; await sceneDB.del(c.id); store.del('scn.' + c.id); close(); renderCourses(); toast('建物・道路データを消しました'); };
+  $('#cmDelete').onclick = async () => { if (!confirm(`「${c.name}」を削除しますか？`)) return; saveUserCourses(userCourses().filter(x => x.id !== c.id)); await sceneDB.del(c.id); for (const k of ['scn.', 'osteps.', 'jn.', 'fetched.']) store.del(k + c.id); close(); renderCourses(); };
   $('#cmClose').onclick = close;
   show('#courseMenu', true);
 }
@@ -3098,7 +3105,7 @@ function saveCourse() {
     if (routeDirty) {
       // ルートが変わったら、古い建物・標高・交差点名のデータを消して次回取り直す
       Object.assign(c, { wps: wps.slice(), line: routeData.line, len: routeData.len, type: edType }); delete c.elev;
-      sceneDB.del(c.id); for (const k of ['scn.', 'osteps.', 'jn.', 'elev.']) store.del(k + c.id);
+      sceneDB.del(c.id); for (const k of ['scn.', 'osteps.', 'jn.', 'elev.', 'fetched.']) store.del(k + c.id);
     }
     c.name = name; c.jx = jx.map(q => q.slice()); c.shops = shops.map(q => q.slice()); c.tunnels = tunnels.map(q => q.slice()); c.rails = rails.map(q => q.slice());
   } else {
