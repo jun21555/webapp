@@ -51,6 +51,7 @@
   .app:nth-child(10) .icon{animation-delay:.36s}.app:nth-child(11) .icon{animation-delay:.4s}
   .app:nth-child(12) .icon{animation-delay:.44s}
   .app:nth-child(13) .icon{animation-delay:.48s}.app:nth-child(14) .icon{animation-delay:.52s}
+  .app:nth-child(15) .icon{animation-delay:.56s}
   @keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
   .dots{display:flex;justify-content:center;gap:7px;margin:40px 0 0}
   .dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4)}
@@ -244,6 +245,11 @@
     <div class="icon"><img src="map-racer/apple-touch-icon.png" alt=""></div>
     <span class="name">MAP RACER</span>
   </a>
+  <!-- 今日は何の日（記念日・できごと・誕生日） -->
+  <a class="app" href="kyou-nan-no-hi/kyou-nan-no-hi.html">
+    <div class="icon"><img src="kyou-nan-no-hi/apple-touch-icon.png" alt=""></div>
+    <span class="name">今日は何の日</span>
+  </a>
 </nav>
 
 <div class="dots"><i></i></div>
@@ -265,6 +271,7 @@
         const rs=await navigator.serviceWorker.getRegistrations();
         await Promise.race([Promise.all(rs.map(r=>r.update().catch(()=>{}))),new Promise(r=>setTimeout(r,1500))]);
       }
+      if('caches' in window){const ks=await caches.keys();await Promise.all(ks.map(k=>caches.delete(k)));}
     }catch(_){}
     location.reload();
   });

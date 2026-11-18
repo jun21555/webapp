@@ -9,6 +9,7 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [app07 ランチャー](app07/index.html) | app07 のアプリをホーム画面風に並べたランチャー |
 | [ふせチャレ](app07/phone-down/phone-down.html) | スマホを伏せて置いている時間が長いほど高スコア。デトックスの森に生きものが集まるスマホ依存対策アプリ |
 | [app06 ランチャー](app06/index.html) | app06 のアプリをホーム画面風に並べたランチャー |
+| [今日は何の日](app06/kyou-nan-no-hi/kyou-nan-no-hi.html) | 今日（または選んだ日）の記念日・できごと・誕生日・忌日をウィキペディア日本語版から表示。祝日・和暦・「◯年前」・シェア・左右スワイプで日付移動 |
 | [そら模様](app06/weather/weather.html) | 現在地の天気・気温・湿度・降水確率・気圧・花粉・黄砂・PM2.5 を表示 |
 | [ゲレンデ積雪](app06/snow/snow.html) | 地域からスキー場を選び、推定積雪・新雪・7日間の降雪予報と近くのアメダス積雪を表示。お気に入り3件まで登録 |
 | [EVOLVE](app06/evolve/evolve.html) | 遊ぶほどゲームそのものが進化するシューティング。クラシック → 自由移動 → 色とビート → スプレッド → ロックオンレーザー → 巨大ボス → 無限へ |
@@ -18,6 +19,14 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [カップ麺タイマー](app06/cup-noodle-timer/cup-noodle-timer.html) | 3分・5分をワンタップで計測し、できあがりをプッシュ通知とアラーム音で知らせる |
 | [ゆで卵タイマー](app06/boiled-egg-timer/boiled-egg-timer.html) | ゆで時間ごとの卵の断面（とろとろ〜固ゆで）を見ながら時間をセットし、ゆで上がりをプッシュ通知とアラーム音で知らせる |
 | [ピンボール](app06/pinball.html) / [コップの水](app06/cup.html) / [Gメーター](app06/gmeter.html) / [現在地](app06/location.html) / [マップ](app06/map.html) / [サウンド](app06/visualizer.html) | app06 のその他のアプリ |
+
+### 今日は何の日（app06/kyou-nan-no-hi）
+
+- 開いた日の「記念日・年中行事／できごと／誕生日／忌日」をタブで切り替えて表示。日本の記念日を優先して「今日は○○の日」を大きく表示し、🎲 でほかの記念日に切り替え
+- ‹ › ボタン・左右スワイプ・日付タップ（カレンダー）で好きな日へ移動、「今日へ」で戻る
+- 曜日・日本の祝日（振替休日・国民の休日を含む）・和暦・「今年の何日目／あと何日」を表示。できごとには「◯年前」を表示
+- 各項目をタップするとウィキペディアの記事を開く。共有ボタンで「◯月◯日は△△の日！」をシェア
+- データはウィキペディア日本語版の日付ページ（例:「11月19日」）を MediaWiki API で取得（APIキー不要、CC BY-SA 4.0）。取得した内容は端末内（localStorage）に3日間保存し、オフラインでも一度見た日は表示できます
 
 ### ふせチャレ（app07/phone-down）
 
@@ -131,6 +140,7 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 ```sh
 python3 -m http.server 8000
 # → http://localhost:8000/app06/weather/weather.html
+# → http://localhost:8000/app06/kyou-nan-no-hi/kyou-nan-no-hi.html
 ```
 
 位置情報は https か localhost でのみ使えます。
