@@ -2614,7 +2614,7 @@ function syncCar(car, x, y, z, th, wheelRot, steer, roll, pitch, slope) {
 /* ---------- カメラ ---------- */
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 // 0: 通常（後ろから） / 1: 近め（車のすぐ後ろ） / 2: 運転席
-const CAMS = [{ name: '通常', d: 7.2, h: 2.9, look: 4.5, lh: 1.1 }, { name: '近め', d: 4.4, h: 1.75, look: 5, lh: .95, follow: .3 }, { name: '運転席', cockpit: true }];
+const CAMS = [{ name: '通常', d: 7.2, h: 2.9, look: 4.5, lh: 1.1 }, { name: '近め', d: 4.6, h: 2.55, look: 8, lh: .7, follow: .3, low: .08 }, { name: '運転席', cockpit: true }];
 function cycleCam() { settings.cam = ((+settings.cam || 0) + 1) % CAMS.length; saveSettings(); document.querySelectorAll('#segCam button').forEach(b => b.classList.toggle('on', b.dataset.v === String(settings.cam))); applyCamMode(); placeCamera(true); toast('視点：' + CAMS[settings.cam].name, 1200); }
 function applyCamMode() {
   if (!race) return; const ck = race.p.car.userData.cockpit, on = !!CAMS[settings.cam].cockpit;
@@ -2655,7 +2655,7 @@ function placeCamera(snap, dt = 1 / 60) {
   p.accSm = lerp(p.accSm || 0, clamp(((p.prevVf || 0) - (p.lastVfCam ?? (p.prevVf || 0))) / dt, -25, 25), 1 - Math.exp(-dt * 4)); p.lastVfCam = p.prevVf || 0;
   const pull = hood ? 0 : clamp(p.accSm * .05 + (p.boost > 0 ? 1.2 : 0), -.8, 2) * I;
   const portrait = camera.aspect < 1, back = hood ? C.d : C.d * (portrait ? 1.25 : 1) * (1 - .2 * f * I) + pull;
-  const py = p.vy != null ? p.vy : (p.y || 0), sl = p.vslope || 0, camH = hood ? C.h : C.h * (portrait ? 1.15 : 1) * (1 - .24 * f * I);
+  const py = p.vy != null ? p.vy : (p.y || 0), sl = p.vslope || 0, camH = hood ? C.h : C.h * (portrait ? 1.15 : 1) * (1 - (C.low ?? .24) * f * I);
   const want = new THREE.Vector3(p.x - dx * back, py - sl * back + (race.tf > .05 ? Math.min(camH, lerp(camH, TUN_HT - 2.6, race.tf)) : camH), p.z - dz * back);
   const look = new THREE.Vector3(p.x + fx * C.look, py + sl * C.look + C.lh, p.z + fz * C.look);
   if (snap) { camPos.copy(want); camLook.copy(look); }
