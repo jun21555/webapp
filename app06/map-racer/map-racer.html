@@ -298,6 +298,7 @@
     <div class="row"><label>周回数</label><div class="seg" id="segLaps"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button></div></div>
     <div class="row"><label>最高速度<small id="speedNote"></small></label><div class="seg" id="segSpeed"><button data-v="slow">遅め</button><button data-v="normal">普通</button><button data-v="fast">速め</button></div></div>
     <div class="row"><label>時間帯<small>夕方・夜は街灯や窓の明かり、車のライトが点きます</small></label><div class="seg" id="segTod"><button data-v="day">☀️ 昼</button><button data-v="evening">🌇 夕方</button><button data-v="night">🌙 夜</button></div></div>
+    <div class="row"><label>ドリフト後のブースト<small>オンだとドリフトを長く続けて離したときに加速（ミニターボ）</small></label><span class="sw"><input type="checkbox" id="boost"><i></i></span></div>
     <div class="row"><label>ドリフトの効き<small>弱めほど車体の向きが変わりにくく、滑る角度も浅くなる</small></label><div class="seg" id="segDrift"><button data-v="weak">弱め</button><button data-v="normal">ふつう</button><button data-v="strong">強め</button></div></div>
     <div class="row"><label>スピード感<small>カメラ・スピード線・振動・風の音の強さ。酔いやすい人は「ひかえめ」に</small></label><div class="seg" id="segFeel"><button data-v="low">ひかえめ</button><button data-v="normal">ふつう</button><button data-v="high">強め</button></div></div>
     <div class="row"><label>コース両側の赤白バリア<small>オフにしても見えない壁でコースからは出ません。自分で付けたガードレールは表示されます</small></label><span class="sw"><input type="checkbox" id="barrier"><i></i></span></div>
@@ -311,7 +312,7 @@
 
     <h2>あそびかた</h2>
     <ul class="help">
-      <li>「ドリフト」を押しながら曲がるとドリフト。長く続けるほど火花の色が 青→オレンジ→紫 に変わり、離すとブースト！</li>
+      <li>「ドリフト」を押しながら曲がるとドリフト。長く続けるほど火花の色が 青→オレンジ→紫 に変わり、離すとブースト！（ブーストは設定でオフにできます）</li>
       <li>ドリフト中にハンドルを逆に切ると角度が浅く、同じ向きに切ると深くなります。</li>
       <li>傾き操作は横向きでスマホをハンドルのように回します。iPhone では最初に「動作と方向」へのアクセスを許可してください。</li>
       <li>PC：←→ ハンドル / ↑ アクセル / ↓ ブレーキ / Space ドリフト / C カメラ / Esc ポーズ</li>
@@ -563,7 +564,7 @@ async function loadScenery(id) {
 }
 const validScen = d => d && Array.isArray(d.b) && Array.isArray(d.h) && Array.isArray(d.g) && Array.isArray(d.w);
 const mb = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1e3)) + 'KB';
-const settings = Object.assign({ driftStr: 'normal', tod: 'day', barrier: true, feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
+const settings = Object.assign({ boost: true, driftStr: 'normal', tod: 'day', barrier: true, feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 const fmt = t => { if (!isFinite(t) || t == null) return '--:--.--'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
 let toastT;
@@ -2424,7 +2425,7 @@ function updatePlayer(p, inp, dt) {
     // ドリフト終了：長さに応じてミニターボ
     const t = p.driftT; let b = 0;
     if (t > 3) b = 1.6; else if (t > 1.8) b = 1.05; else if (t > .8) b = .6;
-    if (b && !inp.brake) { p.boost = b; p.boostMax = b; Snd.whoosh(); flash(t > 3 ? 'ULTRA BOOST!' : t > 1.8 ? 'SUPER BOOST!' : 'BOOST!', 700, true); }
+    if (b && !inp.brake && settings.boost !== false) { p.boost = b; p.boostMax = b; Snd.whoosh(); flash(t > 3 ? 'ULTRA BOOST!' : t > 1.8 ? 'SUPER BOOST!' : 'BOOST!', 700, true); }
     if (p.driftT > .4) { const pts = Math.round(p.driftT * p.driftT * 60 + p.driftT * speed * 4); p.driftScore += pts; }
     p.drifting = false;
   }
@@ -2675,7 +2676,7 @@ function updateHUD() {
   if (race.cpus.length) { const pos = 1 + race.cpus.filter(c => c.total > p.total).length; $('#hPos').innerHTML = pos + '<small>/' + (race.cpus.length + 1) + '</small>'; race.pos = pos; }
   const bb = $('#boostBar i');
   if (p.boost > 0) bb.style.width = (p.boost / p.boostMax * 100) + '%';
-  else if (p.drifting) bb.style.width = Math.min(100, p.driftT / 3 * 100) + '%'; else bb.style.width = '0';
+  else if (p.drifting && settings.boost !== false) bb.style.width = Math.min(100, p.driftT / 3 * 100) + '%'; else bb.style.width = '0';
   const d = $('#drift');
   if (p.drifting && p.driftT > .25) {
     d.classList.add('show'); const t = p.driftT;
@@ -2754,7 +2755,7 @@ function effects(p, dt) {
   // ドリフトの火花（色で溜まり具合）
   const t = p.driftT, col = t > 3 ? '#e66bff' : t > 1.8 ? '#ff9f1a' : '#3ad1ff';
   FX.sparks.forEach((s, i) => {
-    s.visible = p.drifting && t > .8;
+    s.visible = p.drifting && t > .8 && settings.boost !== false;
     if (s.visible) { const w = wheelsPos[i]; s.position.set(w[0] + (Math.random() - .5) * .3, (p.vy || 0) + .3, w[1] + (Math.random() - .5) * .3); const k = .9 + Math.random() * .8; s.scale.set(k, k, k); s.material.color.set(col); }
   });
   FX.flame.visible = p.boost > 0;
@@ -2978,6 +2979,7 @@ seg('#segRiv', 'rivals');
 seg('#segElev', 'elev', v => +v);
 seg('#segFeel', 'feel');
 seg('#segDrift', 'driftStr');
+$('#boost').checked = settings.boost !== false; $('#boost').onchange = e => { settings.boost = e.target.checked; saveSettings(); };
 seg('#segTod', 'tod');
 seg('#segRoadW', 'roadW');
 $('#barrier').checked = settings.barrier !== false; $('#barrier').onchange = e => { settings.barrier = e.target.checked; saveSettings(); };
