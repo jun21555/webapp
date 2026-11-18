@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="何の日">
+<meta name="theme-color" content="#fff6ee">
+<title>今日は何の日</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --bg:#fff6ee; --ink:#3a2a2a; --dim:#8a7470; --line:#f0e1d6; --card:#fff;
+    --acc:#ff5e62; --acc2:#ff9a52; --red:#e8384f; --blue:#2f7be0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+  html{background:var(--bg)}
+  body{
+    min-height:100dvh;color:var(--ink);background:var(--bg);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans CJK JP",sans-serif;
+    padding:0 calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 28px) calc(env(safe-area-inset-left) + 16px);
+  }
+  main{max-width:520px;margin:0 auto}
+  button{font-family:inherit;color:inherit}
+
+  /* ヘッダー */
+  header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;
+    margin:0 calc(-16px - env(safe-area-inset-right)) 0 calc(-16px - env(safe-area-inset-left));
+    padding:calc(env(safe-area-inset-top) + 6px) calc(env(safe-area-inset-right) + 12px) 6px calc(env(safe-area-inset-left) + 12px);
+    background:rgba(255,246,238,.86);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+  header h1{flex:1;text-align:center;font-size:17px;font-weight:800;letter-spacing:.02em}
+  .round{width:44px;height:44px;flex:0 0 44px;border-radius:50%;border:none;padding:0;cursor:pointer;
+    background:#fff;color:var(--ink);display:grid;place-items:center;text-decoration:none;
+    box-shadow:0 2px 8px rgba(120,60,40,.12);transition:transform .12s}
+  .round:active{transform:scale(.88)}
+  .round svg{width:22px;height:22px}
+
+  /* 日付カード */
+  .date-card{margin-top:8px;border-radius:24px;padding:14px 8px 16px;color:#fff;position:relative;overflow:hidden;
+    background:linear-gradient(135deg,#ffb35c 0%,#ff7a5c 50%,#ff5e62 100%);box-shadow:0 10px 26px rgba(255,94,98,.28)}
+  .date-card.sun{background:linear-gradient(135deg,#ff8a7a 0%,#f2546b 55%,#d93a5a 100%)}
+  .date-card.sat{background:linear-gradient(135deg,#7cc4ff 0%,#4b8df0 55%,#3b6fe0 100%);box-shadow:0 10px 26px rgba(59,111,224,.28)}
+  .date-card::after{content:"";position:absolute;right:-40px;top:-40px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.12)}
+  .date-row{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+  .nav{width:48px;height:48px;border:none;background:rgba(255,255,255,.2);border-radius:50%;color:#fff;font-size:26px;
+    cursor:pointer;display:grid;place-items:center;transition:transform .12s,background .12s;flex:0 0 48px}
+  .nav:active{transform:scale(.88);background:rgba(255,255,255,.35)}
+  .date-main{position:relative;flex:1;text-align:center;min-width:0}
+  #md{font-size:52px;font-weight:800;line-height:1.05;letter-spacing:-.5px;font-variant-numeric:tabular-nums;text-shadow:0 2px 10px rgba(0,0,0,.12)}
+  #md small{font-size:24px;font-weight:700;margin:0 2px}
+  #wd{font-size:16px;font-weight:700;opacity:.95;margin-top:2px}
+  #picker{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px;border:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+  .meta{position:relative;z-index:1;text-align:center;font-size:12.5px;opacity:.95;margin-top:8px;font-variant-numeric:tabular-nums}
+  .chips{position:relative;z-index:1;display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin-top:10px;min-height:0}
+  .chip{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:700;padding:5px 11px;border-radius:999px;
+    background:rgba(255,255,255,.95);color:var(--red);border:none}
+  button.chip{min-height:34px;cursor:pointer}
+  button.chip:active{transform:scale(.94)}
+
+  /* 今日の主役 */
+  .hero{margin-top:14px;background:var(--card);border-radius:22px;padding:16px 16px 14px;box-shadow:0 4px 18px rgba(120,60,40,.08);position:relative}
+  .hero .lab{font-size:13px;font-weight:700;color:var(--acc)}
+  #heroTitle{font-size:24px;font-weight:800;line-height:1.3;margin-top:4px;word-break:break-word}
+  #heroTitle a{color:inherit;text-decoration:none}
+  #heroDesc{font-size:14px;color:var(--dim);line-height:1.6;margin-top:6px}
+  .hero-actions{display:flex;gap:8px;margin-top:12px}
+  .pill{flex:1;min-height:44px;border:none;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:6px;transition:transform .12s}
+  .pill:active{transform:scale(.95)}
+  .pill.main{background:linear-gradient(135deg,#ff9a52,#ff5e62);color:#fff}
+  .pill.sub{background:#fff1e8;color:var(--acc)}
+
+  /* タブ */
+  .tabs{position:sticky;top:calc(env(safe-area-inset-top) + 56px);z-index:10;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;
+    margin-top:16px;padding:4px;border-radius:16px;background:#f5e6da}
+  .tab{min-height:44px;border:none;border-radius:12px;background:transparent;font-size:13.5px;font-weight:700;color:var(--dim);cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.15}
+  .tab small{font-size:10.5px;font-weight:600;opacity:.8;font-variant-numeric:tabular-nums}
+  .tab[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 2px 6px rgba(120,60,40,.12)}
+
+  /* リスト */
+  #list{margin-top:12px;min-height:240px}
+  .item{display:flex;gap:12px;background:var(--card);border-radius:16px;padding:12px 14px;margin-bottom:8px;
+    text-decoration:none;color:inherit;box-shadow:0 1px 4px rgba(120,60,40,.06);transition:transform .12s,background .12s;
+    animation:fade .3s ease both}
+  a.item:active{transform:scale(.98);background:#fff8f2}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .yr{flex:0 0 62px;text-align:center;font-variant-numeric:tabular-nums;padding-top:1px}
+  .yr b{display:block;font-size:16px;font-weight:800;color:var(--acc)}
+  .yr b.s{font-size:12px;line-height:1.3}
+  .yr span{display:block;font-size:10.5px;color:var(--dim);margin-top:2px}
+  .body{flex:1;min-width:0;font-size:14.5px;line-height:1.6;word-break:break-word}
+  .body .ttl{font-weight:800;font-size:15.5px;line-height:1.45}
+  .body .desc{font-size:13px;color:var(--dim);margin-top:3px;line-height:1.55}
+  .body .sub{font-size:13.5px;margin-top:4px;padding-left:10px;border-left:3px solid var(--line)}
+  .cty{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:8px;background:#fff1e8;color:var(--acc);margin-right:6px;vertical-align:2px}
+  .cty.jp{background:#ffe3e6;color:var(--red)}
+  .dot{flex:0 0 10px;width:10px;height:10px;border-radius:50%;margin-top:7px;background:linear-gradient(135deg,#ff9a52,#ff5e62)}
+
+  .msg{text-align:center;color:var(--dim);font-size:14px;line-height:1.7;padding:40px 10px}
+  .msg button{margin-top:12px;min-height:44px;padding:0 20px;border:none;border-radius:14px;background:var(--acc);color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+  .skel{height:64px;border-radius:16px;margin-bottom:8px;background:linear-gradient(90deg,#fbeee4 0%,#fff7f1 50%,#fbeee4 100%);background-size:200% 100%;animation:sh 1.2s infinite linear}
+  @keyframes sh{to{background-position:-200% 0}}
+  .more{display:block;width:100%;min-height:44px;border:none;border-radius:14px;background:#fff1e8;color:var(--acc);font-weight:700;font-size:14px;cursor:pointer;margin-top:4px}
+  footer{margin-top:22px;text-align:center;font-size:11.5px;color:var(--dim);line-height:1.7}
+  footer a{color:var(--dim)}
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 24px);transform:translate(-50%,20px);opacity:0;pointer-events:none;
+    background:rgba(40,28,28,.9);color:#fff;font-size:14px;padding:10px 18px;border-radius:999px;transition:.25s;z-index:50}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<header>
+  <a class="round" href="../index.html" aria-label="ホームへ戻る">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg>
+  </a>
+  <h1>今日は何の日</h1>
+  <button class="round" id="share" type="button" aria-label="シェア">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7.5 7.5 4.5-4.5 4.5 4.5"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>
+  </button>
+</header>
+
+<main>
+  <section class="date-card" id="dateCard">
+    <div class="date-row">
+      <button class="nav" id="prev" type="button" aria-label="前の日">‹</button>
+      <div class="date-main">
+        <div id="md">--<small>月</small>--<small>日</small></div>
+        <div id="wd">&nbsp;</div>
+        <input type="date" id="picker" aria-label="日付を選ぶ">
+      </div>
+      <button class="nav" id="next" type="button" aria-label="次の日">›</button>
+    </div>
+    <div class="meta" id="meta">&nbsp;</div>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section class="hero" id="hero">
+    <div class="lab" id="heroLab">今日は…</div>
+    <div id="heroTitle">読み込み中…</div>
+    <div id="heroDesc"></div>
+    <div class="hero-actions">
+      <button class="pill sub" id="shuffle" type="button">🎲 ほかの記念日</button>
+      <button class="pill main" id="heroOpen" type="button">くわしく見る</button>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-k="days" aria-selected="true">記念日<small id="c-days">-</small></button>
+    <button class="tab" role="tab" data-k="events" aria-selected="false">できごと<small id="c-events">-</small></button>
+    <button class="tab" role="tab" data-k="births" aria-selected="false">誕生日<small id="c-births">-</small></button>
+    <button class="tab" role="tab" data-k="deaths" aria-selected="false">忌日<small id="c-deaths">-</small></button>
+  </nav>
+
+  <section id="list" aria-live="polite"></section>
+
+  <footer id="foot">
+    データ出典: <a id="srcLink" href="https://ja.wikipedia.org/" target="_blank" rel="noopener">ウィキペディア日本語版</a>（CC BY-SA 4.0）<br>
+    ‹ › ボタンか左右スワイプで日付を移動できます
+  </footer>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const WD = ['日','月','火','水','木','金','土'];
+const SECTIONS = { days:'記念日', events:'できごと', births:'誕生日', deaths:'忌日' };
+const CACHE_DAYS = 3;
+const PAGE = 40;
+
+let cur = startOfDay(new Date());
+let tab = 'days';
+let data = null;          // { days:[], events:[], births:[], deaths:[] }
+let heroIdx = 0;
+let shown = PAGE;
+let reqId = 0;
+
+function startOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('on'),1800); }
+
+/* ---------- 日本の祝日（2007年以降のルールで計算） ---------- */
+function nthMonday(y,m,n){ const first=new Date(y,m,1).getDay(); return 1 + ((8-first)%7) + (n-1)*7; }
+function baseHolidays(y){
+  const h = {};
+  const add = (m,d,name) => { h[`${m+1}-${d}`] = name; };
+  add(0,1,'元日'); add(0,nthMonday(y,0,2),'成人の日'); add(1,11,'建国記念の日');
+  if (y >= 2020) add(1,23,'天皇誕生日'); else if (y >= 1989 && y <= 2018) add(11,23,'天皇誕生日');
+  add(2,Math.floor(20.8431+0.242194*(y-1980)-Math.floor((y-1980)/4)),'春分の日');
+  add(3,29,'昭和の日'); add(4,3,'憲法記念日'); add(4,4,'みどりの日'); add(4,5,'こどもの日');
+  if (y === 2020) add(6,23,'海の日'); else if (y === 2021) add(6,22,'海の日'); else add(6,nthMonday(y,6,3),'海の日');
+  if (y === 2020) add(7,10,'山の日'); else if (y === 2021) add(7,8,'山の日'); else if (y >= 2016) add(7,11,'山の日');
+  add(8,nthMonday(y,8,3),'敬老の日');
+  add(8,Math.floor(23.2488+0.242194*(y-1980)-Math.floor((y-1980)/4)),'秋分の日');
+  const sp = y>=2020 ? 'スポーツの日' : '体育の日';
+  if (y === 2020) add(6,24,sp); else if (y === 2021) add(6,23,sp); else add(9,nthMonday(y,9,2),sp);
+  add(10,3,'文化の日'); add(10,23,'勤労感謝の日');
+  return h;
+}
+function holidayName(date){
+  const y = date.getFullYear(), h = baseHolidays(y);
+  const key = d => `${d.getMonth()+1}-${d.getDate()}`;
+  if (h[key(date)]) return h[key(date)];
+  // 振替休日：日曜の祝日から続く祝日の翌平日
+  let p = new Date(date); p.setDate(p.getDate()-1);
+  while (h[key(p)] && p.getFullYear()===y) { if (p.getDay()===0) return '振替休日'; p.setDate(p.getDate()-1); }
+  // 国民の休日：祝日にはさまれた平日
+  const a = new Date(date); a.setDate(a.getDate()-1);
+  const b = new Date(date); b.setDate(b.getDate()+1);
+  if (date.getDay()!==0 && h[key(a)] && h[key(b)]) return '国民の休日';
+  return '';
+}
+function wareki(d){
+  try { return new Intl.DateTimeFormat('ja-JP-u-ca-japanese',{era:'long',year:'numeric'}).format(d).replace(/^(\D+)1年$/,'$1元年'); }
+  catch(_) { return ''; }
+}
+
+/* ---------- 画面上部（日付） ---------- */
+function renderDate(){
+  const m = cur.getMonth()+1, d = cur.getDate(), w = cur.getDay();
+  $('md').innerHTML = `${m}<small>月</small>${d}<small>日</small>`;
+  const hol = holidayName(cur);
+  $('wd').textContent = WD[w] + '曜日' + (hol ? '・' + hol : '');
+  const y = cur.getFullYear();
+  const start = new Date(y,0,1), end = new Date(y,11,31);
+  const nth = Math.round((cur - start)/864e5) + 1;
+  const left = Math.round((end - cur)/864e5);
+  $('meta').textContent = `${y}年（${wareki(cur)}）・ 今年の${nth}日目・あと${left}日`;
+  const card = $('dateCard');
+  card.classList.toggle('sun', w===0 || !!hol);
+  card.classList.toggle('sat', w===6 && !hol);
+  const today = startOfDay(new Date());
+  const chips = [];
+  if (!sameDay(cur, today)) {
+    const diff = Math.round((cur - today)/864e5);
+    chips.push(`<span class="chip" style="background:rgba(255,255,255,.25);color:#fff">${diff>0? diff+'日後':(-diff)+'日前'}</span>`);
+    chips.push(`<button class="chip" id="goToday" type="button">↩ 今日へ</button>`);
+  }
+  $('chips').innerHTML = chips.join('');
+  const gt = $('goToday'); if (gt) gt.onclick = () => go(startOfDay(new Date()));
+  $('picker').value = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  $('heroLab').textContent = (sameDay(cur,today) ? '今日' : `${m}月${d}日`) + 'は…';
+  const page = `${m}月${d}日`;
+  $('srcLink').href = 'https://ja.wikipedia.org/wiki/' + encodeURIComponent(page);
+  $('srcLink').textContent = `ウィキペディア「${page}」`;
+  document.title = `${page}は何の日？`;
+}
+
+/* ---------- Wikipedia の取得と解析 ---------- */
+function wikiUrl(href){
+  if (!href) return '';
+  if (href.startsWith('//')) return 'https:' + href;
+  if (href.startsWith('/')) return 'https://ja.wikipedia.org' + href;
+  if (href.startsWith('./')) return 'https://ja.wikipedia.org/wiki/' + href.slice(2);
+  return href;
+}
+function clean(s){ return s.replace(/\[\s*(注|要出典|.{0,3}\d+)\s*\]/g,'').replace(/\s+/g,' ').replace(/\s*([、。）])/g,'$1').trim(); }
+
+function isH2Block(n){
+  return n.tagName === 'H2' || (n.classList && n.classList.contains('mw-heading2')) || (n.querySelector && n.querySelector(':scope > h2'));
+}
+function parseWiki(html){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  // 国旗アイコンを国名テキストに置き換え（「日本の旗」→ data-country）
+  doc.querySelectorAll('img').forEach(img => {
+    const alt = (img.getAttribute('alt') || '').trim();
+    const m = alt.match(/^(.+?)の(国旗|旗)$/);
+    const li = img.closest('li');
+    if (m && li && !li.dataset.country) li.dataset.country = m[1];
+  });
+  doc.querySelectorAll('sup.reference, .reference, .mw-editsection, style, script, .noprint, table, .thumb, figure, .gallery, .mw-empty-elt, link').forEach(e => e.remove());
+
+  const out = { days:[], events:[], births:[], deaths:[] };
+  doc.querySelectorAll('h2').forEach(h2 => {
+    const name = h2.textContent.replace(/\[.*?\]/g,'').trim();
+    let key = null;
+    if (/記念日|年中行事/.test(name)) key = 'days';
+    else if (/^できごと|^出来事/.test(name)) key = 'events';
+    else if (/^誕生日/.test(name)) key = 'births';
+    else if (/^忌日|^死去/.test(name)) key = 'deaths';
+    if (!key) return;
+    const start = h2.closest('.mw-heading') || h2;
+    for (let n = start.nextElementSibling; n && !isH2Block(n); n = n.nextElementSibling) {
+      const lis = n.tagName === 'UL' || n.tagName === 'OL' ? [...n.children].filter(c => c.tagName === 'LI')
+               : [...n.querySelectorAll('li')].filter(li => !li.parentElement.closest('li'));
+      lis.forEach(li => {
+        if (key === 'days') { const it = parseDay(li); if (it) out.days.push(it); }
+        else out[key].push(...parseYearItem(li));
+      });
+    }
+  });
+  return out;
+}
+function mainPart(li){
+  const c = li.cloneNode(true);
+  c.querySelectorAll('ul, ol, dl').forEach(e => e.remove());
+  return c;
+}
+function firstLink(el, skipYear){
+  for (const a of el.querySelectorAll('a[href]')) {
+    const t = a.textContent.trim(), h = a.getAttribute('href');
+    if (!h || h.startsWith('#') || /redlink=1/.test(h) || /action=edit/.test(h)) continue;
+    if (skipYear && /^(紀元前)?\d+年$|^[^\d]{1,4}\d+年$/.test(t)) continue;
+    return wikiUrl(h);
+  }
+  return '';
+}
+function parseDay(li){
+  const mp = mainPart(li);
+  const title = clean(mp.textContent);
+  if (!title) return null;
+  const subs = [...li.querySelectorAll(':scope dd, :scope > ul > li, :scope > ol > li, :scope > dl > dd')]
+    .map(e => clean(e.textContent)).filter(Boolean);
+  const desc = [...new Set(subs)].join(' ');
+  return { title, desc, country: li.dataset.country || '', url: firstLink(mp, false) };
+}
+const YEAR_RE = /^\s*((?:紀元前|前)?\s*\d{1,4}\s*年[^-–―]*?|生年不明|没年不明|不明|年不詳)\s+[-–―]\s+/;
+function yearOf(label){
+  const m = label.match(/(紀元前|前)?\s*(\d{1,4})\s*年/);
+  if (!m) return null;
+  return m[1] ? -parseInt(m[2],10) : parseInt(m[2],10);
+}
+function parseYearItem(li){
+  const mp = mainPart(li);
+  const txt = clean(mp.textContent);
+  const m = txt.match(YEAR_RE);
+  let label = '', body = txt;
+  if (m) { label = clean(m[1]); body = txt.slice(m[0].length).trim(); }
+  else {
+    const m2 = txt.match(/^((?:紀元前)?\d{1,4}年)\s*[（(]?/);
+    if (m2 && txt.length <= m2[0].length + 30 && li.querySelector(':scope > ul > li')) label = txt; // 年だけの見出し行
+  }
+  const subLis = [...li.querySelectorAll(':scope > ul > li, :scope > ol > li')];
+  const url = firstLink(mp, true);
+  if ((!body || body === label) && subLis.length) {
+    return subLis.map(s => ({ label, year: yearOf(label), text: clean(mainPart(s).textContent), url: firstLink(mainPart(s), true) || url }))
+      .filter(x => x.text);
+  }
+  if (!body) return [];
+  const extra = subLis.map(s => clean(s.textContent)).filter(Boolean);
+  return [{ label, year: yearOf(label), text: body, extra, url }];
+}
+
+async function load(date){
+  const id = ++reqId;
+  const m = date.getMonth()+1, d = date.getDate();
+  const key = `knh:${m}-${d}`;
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(key) || 'null'); } catch(_) {}
+  const fresh = cached && (Date.now() - cached.t) < CACHE_DAYS*864e5;
+  if (cached) { data = cached.data; afterLoad(); }
+  else { data = null; renderSkeleton(); }
+  if (fresh) return;
+  try {
+    const page = `${m}月${d}日`;
+    const url = 'https://ja.wikipedia.org/w/api.php?action=parse&format=json&formatversion=2&prop=text&redirects=1'
+      + '&disableeditsection=1&disablelimitreport=1&origin=*&page=' + encodeURIComponent(page);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    if (!j.parse || !j.parse.text) throw new Error('no page');
+    const parsed = parseWiki(j.parse.text);
+    if (!parsed.days.length && !parsed.events.length) throw new Error('empty');
+    try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), data: parsed })); } catch(_) {}
+    if (id !== reqId) return;
+    const changed = !cached;
+    data = parsed;
+    if (changed) afterLoad(); else { renderCounts(); renderList(false); }
+  } catch (e) {
+    if (id !== reqId) return;
+    if (!cached) renderError();
+  }
+}
+
+/* ---------- 表示 ---------- */
+function pickHeroOrder(){
+  // 日本の記念日を優先し、その中で順番を固定（日付ごとに同じものが最初に出る）
+  const days = data.days;
+  const jp = days.map((x,i)=>i).filter(i => days[i].country === '日本' || /日本/.test(days[i].title));
+  return jp.length ? jp.concat(days.map((x,i)=>i).filter(i=>!jp.includes(i))) : days.map((x,i)=>i);
+}
+let heroOrder = [];
+function renderHero(){
+  document.querySelector('.hero-actions').style.display = data && data.days.length ? '' : 'none';
+  if (!data || !data.days.length) {
+    $('heroTitle').textContent = data ? '記念日のデータがありません' : '読み込み中…';
+    $('heroDesc').textContent = '';
+    return;
+  }
+  const it = data.days[heroOrder[heroIdx % heroOrder.length]];
+  const t = it.title.replace(/\s*[（(][^（）()]*(国際デー|国際年|日本|World)[^（）()]*[）)]\s*$/,'');
+  $('heroTitle').innerHTML = esc(t);
+  $('heroDesc').textContent = it.desc || (it.country ? it.country + 'の記念日' : '');
+}
+function renderCounts(){
+  for (const k of Object.keys(SECTIONS)) $('c-'+k).textContent = data ? data[k].length + '件' : '-';
+}
+function afterLoad(){
+  heroOrder = pickHeroOrder(); heroIdx = 0; shown = PAGE;
+  renderHero(); renderCounts(); renderList(true);
+}
+function renderSkeleton(){
+  renderHero(); renderCounts();
+  $('list').innerHTML = '<div class="skel"></div>'.repeat(6);
+}
+function renderError(){
+  renderHero(); renderCounts();
+  $('heroTitle').textContent = '読み込めませんでした';
+  $('list').innerHTML = `<div class="msg">ウィキペディアに接続できませんでした。<br>通信状態を確かめてもう一度お試しください。<br><button type="button" id="retry">再読み込み</button></div>`;
+  $('retry').onclick = () => load(cur);
+}
+function yearsAgo(y){
+  if (y == null) return '';
+  const n = cur.getFullYear() - y;
+  if (n > 0) return n + '年前'; if (n === 0) return 'この年'; return (-n) + '年後';
+}
+function renderList(anim){
+  const box = $('list');
+  if (!data) return;
+  const items = data[tab];
+  if (!items.length) { box.innerHTML = `<div class="msg">この日の「${SECTIONS[tab]}」は見つかりませんでした。</div>`; return; }
+  const list = tab === 'days' ? items : items;
+  const html = list.slice(0, shown).map((it, i) => {
+    const tag = it.url ? `a class="item" href="${esc(it.url)}" target="_blank" rel="noopener"` : 'div class="item"';
+    const close = it.url ? 'a' : 'div';
+    const delay = anim && i < 12 ? ` style="animation-delay:${i*25}ms"` : ' style="animation:none"';
+    if (tab === 'days') {
+      const cty = it.country ? `<span class="cty${it.country==='日本'?' jp':''}">${esc(it.country)}</span>` : '';
+      return `<${tag}${delay}><span class="dot"></span><div class="body"><div class="ttl">${cty}${esc(it.title)}</div>${it.desc?`<div class="desc">${esc(it.desc)}</div>`:''}</div></${close}>`;
+    }
+    const yl = it.year != null ? (it.year < 0 ? '前' + (-it.year) : it.year) + '年' : (it.label || '—');
+    const extra = (it.extra||[]).map(e => `<div class="sub">${esc(e)}</div>`).join('');
+    return `<${tag}${delay}><div class="yr"><b${yl.length>6?' class="s"':''}>${esc(yl)}</b><span>${esc(yearsAgo(it.year))}</span></div><div class="body">${esc(it.text)}${extra}</div></${close}>`;
+  }).join('');
+  const more = list.length > shown ? `<button class="more" id="more" type="button">もっと見る（残り${list.length - shown}件）</button>` : '';
+  box.innerHTML = html + more;
+  const mb = $('more'); if (mb) mb.onclick = () => { shown += PAGE; renderList(false); };
+}
+
+/* ---------- 操作 ---------- */
+function go(d){
+  cur = startOfDay(d);
+  renderDate();
+  load(cur);
+}
+function shift(n){ const d = new Date(cur); d.setDate(d.getDate()+n); go(d); }
+$('prev').onclick = () => shift(-1);
+$('next').onclick = () => shift(1);
+$('picker').addEventListener('change', e => {
+  const v = e.target.value; if (!v) return;
+  const [y,m,d] = v.split('-').map(Number); go(new Date(y, m-1, d));
+});
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+  tab = b.dataset.k; shown = PAGE;
+  document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x === b));
+  renderList(true);
+  const tabsTop = document.querySelector('.tabs').getBoundingClientRect().top;
+  const list = $('list').getBoundingClientRect().top;
+  if (list < tabsTop + 60) window.scrollBy({ top: list - tabsTop - 60, behavior: 'smooth' });
+});
+$('shuffle').onclick = () => {
+  if (!data || data.days.length < 2) return;
+  heroIdx = (heroIdx + 1) % heroOrder.length; renderHero();
+};
+$('heroOpen').onclick = () => {
+  if (!data || !data.days.length) return;
+  const it = data.days[heroOrder[heroIdx % heroOrder.length]];
+  window.open(it.url || $('srcLink').href, '_blank', 'noopener');
+};
+$('share').onclick = async () => {
+  const m = cur.getMonth()+1, d = cur.getDate();
+  const it = data && data.days.length ? data.days[heroOrder[heroIdx % heroOrder.length]] : null;
+  const text = it ? `${m}月${d}日は「${$('heroTitle').textContent}」！` : `${m}月${d}日は何の日？`;
+  const url = location.href.split('#')[0];
+  try {
+    if (navigator.share) await navigator.share({ title:'今日は何の日', text, url });
+    else { await navigator.clipboard.writeText(text + ' ' + url); toast('コピーしました'); }
+  } catch(_) {}
+};
+// 左右スワイプで日付移動
+let sx = 0, sy = 0, st = 0;
+document.querySelector('main').addEventListener('touchstart', e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, { passive:true });
+document.querySelector('main').addEventListener('touchend', e => {
+  const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+  if (Date.now() - st < 600 && Math.abs(dx) > 70 && Math.abs(dy) < 45) shift(dx < 0 ? 1 : -1);
+}, { passive:true });
+// 日付が変わったら（アプリを開きっぱなしの時）今日に追従
+let lastToday = startOfDay(new Date());
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const t = startOfDay(new Date());
+  if (!sameDay(t, lastToday)) { const wasToday = sameDay(cur, lastToday); lastToday = t; if (wasToday) go(t); }
+});
+
+go(cur);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
