@@ -9,6 +9,7 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [app07 ランチャー](app07/index.html) | app07 のアプリをホーム画面風に並べたランチャー |
 | [ふせチャレ](app07/phone-down/phone-down.html) | スマホを伏せて置いている時間が長いほど高スコア。デトックスの森に生きものが集まるスマホ依存対策アプリ |
 | [app06 ランチャー](app06/index.html) | app06 のアプリをホーム画面風に並べたランチャー |
+| [かぞくカレンダー](app06/family-calendar/family-calendar.html) | 家族みんなで予定を共有するカレンダー。Firebase（ログイン＋Firestore）でリアルタイムに同期。メンバーごとの色分け・絞り込み・招待コード。設定前はデモモードで動く |
 | [今日は何の日](app06/kyou-nan-no-hi/kyou-nan-no-hi.html) | 今日（または選んだ日）の記念日・できごと・誕生日・忌日をウィキペディア日本語版から表示。祝日・和暦・「◯年前」・シェア・左右スワイプで日付移動 |
 | [そら模様](app06/weather/weather.html) | 現在地の天気・気温・湿度・降水確率・気圧・花粉・黄砂・PM2.5 を表示 |
 | [ゲレンデ積雪](app06/snow/snow.html) | 地域からスキー場を選び、推定積雪・新雪・7日間の降雪予報と近くのアメダス積雪を表示。お気に入り3件まで登録 |
@@ -19,6 +20,35 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [カップ麺タイマー](app06/cup-noodle-timer/cup-noodle-timer.html) | 3分・5分をワンタップで計測し、できあがりをプッシュ通知とアラーム音で知らせる |
 | [ゆで卵タイマー](app06/boiled-egg-timer/boiled-egg-timer.html) | ゆで時間ごとの卵の断面（とろとろ〜固ゆで）を見ながら時間をセットし、ゆで上がりをプッシュ通知とアラーム音で知らせる |
 | [ピンボール](app06/pinball.html) / [コップの水](app06/cup.html) / [Gメーター](app06/gmeter.html) / [現在地](app06/location.html) / [マップ](app06/map.html) / [サウンド](app06/visualizer.html) | app06 のその他のアプリ |
+
+### かぞくカレンダー（app06/family-calendar）
+
+- 月カレンダーで家族の予定を表示。日付をタップするとその日の予定一覧、右下の ＋ で追加、予定をタップで編集・削除。左右スワイプで月を移動、月の名前をタップで今日へ
+- 「だれの予定？」でメンバーを選ぶと、その人の色で表示。上のチップでメンバーごとに絞り込み
+- 招待コード（6文字）を家族に送ると、同じカレンダーに参加できる
+- データは Firebase の Cloud Firestore に保存し、だれかが追加すると全員の画面がすぐ更新される。電波がないときも直前のデータを表示でき、つながったら自動で送信
+- `firebase-config.js` が空のあいだは**デモモード**（データはその端末の localStorage だけ）
+
+ファイル構成:
+
+| ファイル | 役割 |
+| --- | --- |
+| `family-calendar.html` | 画面のHTMLとCSS |
+| `app.js` | 画面の動き（ログイン → はじめの設定 → カレンダー） |
+| `store.js` | データの読み書き（Firestore 版とデモ版）。データ構造の説明もここ |
+| `firebase-config.js` | Firebase の設定値を貼り付けるファイル |
+| `firestore.rules` | Firestore のセキュリティルール（家族のメンバーだけが読み書きできる） |
+
+#### Firebase の設定手順
+
+1. [Firebase コンソール](https://console.firebase.google.com/) でプロジェクトを作る（Google アナリティクスはオフでOK）
+2. **Authentication** →「始める」→「ログイン方法」で **Google** と **メール / パスワード** を有効にする
+3. Authentication →「設定」→「承認済みドメイン」に `jun21555.github.io` を追加する
+4. **Firestore Database** →「データベースを作成」→ ロケーションは `asia-northeast1`（東京）→ 本番環境モードで作成
+5. Firestore の「ルール」タブに `firestore.rules` の中身を貼り付けて「公開」
+6. プロジェクトの設定（⚙︎）→「マイアプリ」でウェブアプリ（</>）を登録し、表示された `firebaseConfig` の値を `firebase-config.js` に貼り付けて push する
+
+iPhone のホーム画面から開いたアプリで Google ログインがうまくいかないときは、メール / パスワードでログインしてください。
 
 ### 今日は何の日（app06/kyou-nan-no-hi）
 
@@ -141,6 +171,7 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 python3 -m http.server 8000
 # → http://localhost:8000/app06/weather/weather.html
 # → http://localhost:8000/app06/kyou-nan-no-hi/kyou-nan-no-hi.html
+# → http://localhost:8000/app06/family-calendar/family-calendar.html
 ```
 
 位置情報は https か localhost でのみ使えます。
