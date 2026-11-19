@@ -212,6 +212,23 @@
   body.tilt #cbDrift{left:calc(env(safe-area-inset-left) + 14px);right:auto;bottom:calc(env(safe-area-inset-bottom) + 16px);width:96px;height:92px}
   body.tilt.auto #cbBrake{left:auto;right:calc(env(safe-area-inset-right) + 14px);bottom:calc(env(safe-area-inset-bottom) + 16px);width:96px;height:96px}
   body:not(.tilt) #wheel{display:none}
+  /* ドリフトのスライダー（縦長。下が0%・上が100%） */
+  .cb .dfill,.cb .dthumb,.cb #dPct{display:none}
+  body.dslider #cbDrift{justify-content:flex-end;padding-bottom:8px;overflow:hidden;height:184px!important;width:84px!important;border-radius:20px}
+  body.dslider #cbDrift.on{transform:none}
+  body.dslider #cbDrift .dfill{display:block;position:absolute;left:0;right:0;bottom:0;height:calc(var(--v,0) * 100%);background:linear-gradient(to top,rgba(58,209,255,.55),rgba(255,159,26,.6) 60%,rgba(230,107,255,.7))}
+  body.dslider #cbDrift .dthumb{display:block;position:absolute;left:6px;right:6px;height:8px;border-radius:4px;background:#fff;box-shadow:0 0 8px rgba(0,0,0,.5);bottom:calc(8px + var(--v,0) * (100% - 24px))}
+  body.dslider #cbDrift #dPct{display:block;position:absolute;top:10px;left:0;right:0;text-align:center;font:900 17px/1 sans-serif}
+  body.dslider #cbDrift .ic{font-size:22px;position:relative}
+  body.dslider #cbDrift .dl{position:relative;font-size:12px}
+  /* スライダーのときの並び（オートアクセル：右端にスライダー、その左にブレーキ） */
+  body.dslider #cbDrift{right:calc(env(safe-area-inset-right) + 112px)}
+  body.dslider #cbBrake{right:calc(env(safe-area-inset-right) + 14px);bottom:calc(env(safe-area-inset-bottom) + 146px);width:86px;height:56px}
+  body.dslider.auto #cbDrift{right:calc(env(safe-area-inset-right) + 14px)}
+  body.dslider.auto #cbBrake{right:calc(env(safe-area-inset-right) + 110px);bottom:calc(env(safe-area-inset-bottom) + 16px);width:80px;height:80px}
+  body.dslider.tilt #cbDrift{left:calc(env(safe-area-inset-left) + 14px);right:auto}
+  body.dslider.tilt #cbBrake{left:calc(env(safe-area-inset-left) + 110px);right:auto;bottom:calc(env(safe-area-inset-bottom) + 16px);width:84px;height:84px}
+  body.dslider.tilt.auto #cbBrake{left:auto;right:calc(env(safe-area-inset-right) + 14px);bottom:calc(env(safe-area-inset-bottom) + 16px);width:96px;height:96px}
   @media (orientation:portrait){
     #cbL,#cbR{width:74px;height:74px}
     #cbR{left:calc(env(safe-area-inset-left) + 96px)}
@@ -220,6 +237,15 @@
     #cbBrake{right:calc(env(safe-area-inset-right) + 98px);bottom:calc(env(safe-area-inset-bottom) + 102px);width:78px;height:52px}
     body.auto #cbDrift{width:92px;height:92px}
     body.auto #cbBrake{right:calc(env(safe-area-inset-right) + 114px);width:70px;height:70px}
+    body.dslider #cbDrift{right:calc(env(safe-area-inset-right) + 98px);width:76px!important;height:170px!important}
+    body.dslider #speedo{bottom:calc(env(safe-area-inset-bottom) + 192px)}
+    body.dslider #wheel{bottom:calc(env(safe-area-inset-bottom) + 262px)}
+    body.dslider #cbBrake{right:calc(env(safe-area-inset-right) + 14px);bottom:calc(env(safe-area-inset-bottom) + 128px);width:76px;height:52px}
+    body.dslider.auto #cbDrift{right:calc(env(safe-area-inset-right) + 14px)}
+    body.dslider.auto #cbBrake{right:calc(env(safe-area-inset-right) + 100px);bottom:calc(env(safe-area-inset-bottom) + 16px);width:70px;height:70px}
+    body.dslider.tilt #cbDrift{left:calc(env(safe-area-inset-left) + 14px);right:auto}
+    body.dslider.tilt #cbBrake{left:calc(env(safe-area-inset-left) + 100px);right:auto;width:74px;height:74px}
+    body.dslider.tilt.auto #cbBrake{left:auto;right:calc(env(safe-area-inset-right) + 14px);width:88px;height:88px}
     #speedo{bottom:calc(env(safe-area-inset-bottom) + 130px)}
     #wheel{bottom:calc(env(safe-area-inset-bottom) + 206px)}
     #msg{font-size:52px}
@@ -299,7 +325,8 @@
     <div class="row"><label>最高速度<small id="speedNote"></small></label><div class="seg" id="segSpeed"><button data-v="slow">遅め</button><button data-v="normal">普通</button><button data-v="fast">速め</button></div></div>
     <div class="row"><label>時間帯<small>夕方・夜は街灯や窓の明かり、車のライトが点きます</small></label><div class="seg" id="segTod"><button data-v="day">☀️ 昼</button><button data-v="evening">🌇 夕方</button><button data-v="night">🌙 夜</button></div></div>
     <div class="row"><label>ドリフト後のブースト<small>オンだとドリフトを長く続けて離したときに加速（ミニターボ）</small></label><span class="sw"><input type="checkbox" id="boost"><i></i></span></div>
-    <div class="row"><label>ドリフトの効き<small>弱めほど車体の向きが変わりにくく、滑る角度も浅くなる</small></label><div class="seg" id="segDrift"><button data-v="weak">弱め</button><button data-v="normal">ふつう</button><button data-v="strong">強め</button></div></div>
+    <div class="row"><label>ドリフト操作<small>スライダー：指を上げるほど効きが強くなる（0〜100%を無段階）。ボタン：押している間ドリフト</small></label><div class="seg" id="segDctl"><button data-v="slider">スライダー</button><button data-v="button">ボタン</button></div></div>
+    <div class="row"><label>ドリフトの効き<small>ボタン・キーボード操作のときの効き。弱めほど車体の向きが変わりにくく、滑る角度も浅くなる</small></label><div class="seg" id="segDrift"><button data-v="weak">弱め</button><button data-v="normal">ふつう</button><button data-v="strong">強め</button></div></div>
     <div class="row"><label>視点<small>レース中は右上の📷ボタンでも切り替えられます</small></label><div class="seg" id="segCam"><button data-v="0">通常</button><button data-v="1">近め</button><button data-v="2">運転席</button></div></div>
     <div class="row"><label>スピード感<small>カメラ・スピード線・振動・風の音の強さ。酔いやすい人は「ひかえめ」に</small></label><div class="seg" id="segFeel"><button data-v="low">ひかえめ</button><button data-v="normal">ふつう</button><button data-v="high">強め</button></div></div>
     <div class="row"><label>コース両側の赤白バリア<small>オフにしても見えない壁でコースからは出ません。自分で付けたガードレールは表示されます</small></label><span class="sw"><input type="checkbox" id="barrier"><i></i></span></div>
@@ -315,6 +342,7 @@
     <ul class="help">
       <li>「ドリフト」を押しながら曲がるとドリフト。長く続けるほど火花の色が 青→オレンジ→紫 に変わり、離すとブースト！（ブーストは設定でオフにできます）</li>
       <li>ドリフト中にハンドルを逆に切ると角度が浅く、同じ向きに切ると深くなります。</li>
+      <li>ドリフトはスライダー操作（設定で変更可）：指を下から上へ動かすほど効きが強くなります（0〜100%）。指を離すと0%に戻り、ドリフト終了。</li>
       <li>傾き操作は横向きでスマホをハンドルのように回します。iPhone では最初に「動作と方向」へのアクセスを許可してください。</li>
       <li>PC：←→ ハンドル / ↑ アクセル / ↓ ブレーキ / Space ドリフト / C カメラ / Esc ポーズ</li>
     </ul>
@@ -381,7 +409,7 @@
   <div class="cb" id="cbL" data-k="L"><span class="ic">◀</span></div>
   <div class="cb" id="cbR" data-k="R"><span class="ic">▶</span></div>
   <div class="cb" id="cbBrake" data-k="B">ブレーキ</div>
-  <div class="cb" id="cbDrift" data-k="D"><span class="ic">💨</span>ドリフト</div>
+  <div class="cb" id="cbDrift" data-k="D"><i class="dfill"></i><i class="dthumb"></i><span class="ic">💨</span><span class="dl">ドリフト</span><b id="dPct">0%</b></div>
   <div class="cb" id="cbGas" data-k="G"><span class="ic">▲</span>アクセル</div>
 </div>
 
@@ -565,7 +593,7 @@ async function loadScenery(id) {
 }
 const validScen = d => d && Array.isArray(d.b) && Array.isArray(d.h) && Array.isArray(d.g) && Array.isArray(d.w);
 const mb = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1e3)) + 'KB';
-const settings = Object.assign({ boost: true, driftStr: 'normal', tod: 'day', barrier: true, feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
+const settings = Object.assign({ dctl: 'slider', boost: true, driftStr: 'normal', tod: 'day', barrier: true, feel: 'normal', roadW: 'normal', car: 'shiden', carColor: '', sigInfer: true, signals: true, speed: 'normal', elev: 1, ctrl: 'touch', auto: true, laps: 3, rivals: 'normal', sens: 24, invert: false, sound: true, quality: 'low', cam: 0 }, store.get('settings', {}));
 const saveSettings = () => store.set('settings', settings);
 const fmt = t => { if (!isFinite(t) || t == null) return '--:--.--'; const m = Math.floor(t / 60), s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
 let toastT;
@@ -601,7 +629,14 @@ const shoulderW = W => W >= 13 ? 5 : 3.4;
 const FEEL = { low: .45, normal: 1, high: 1.6 };
 // ドリフトの効き：振り出し・回り込み・横滑りの強さ（強め＝以前の効き）
 const DRIFT_STR = { weak: { flick: .15, yaw: .66, grip: 3.3 }, normal: { flick: .7, yaw: .9, grip: 1.4 }, strong: { flick: .9, yaw: 1, grip: 1 } };
-const dstr = () => DRIFT_STR[settings.driftStr] || DRIFT_STR.normal;
+// スライダー操作：0%〜100% を無段階に。0%付近はほぼグリップ走行、約33%＝弱め、約66%＝ふつう、100%＝強め
+const DRIFT_CURVE = [[0, { flick: 0, yaw: .5, grip: 4.6 }], [.33, DRIFT_STR.weak], [.66, DRIFT_STR.normal], [1, DRIFT_STR.strong]];
+function driftAt(a) {
+  a = clamp(a, 0, 1); let i = 0; while (i < DRIFT_CURVE.length - 2 && a > DRIFT_CURVE[i + 1][0]) i++;
+  const [a0, p0] = DRIFT_CURVE[i], [a1, p1] = DRIFT_CURVE[i + 1], t = (a - a0) / (a1 - a0);
+  return { flick: lerp(p0.flick, p1.flick, t), yaw: lerp(p0.yaw, p1.yaw, t), grip: lerp(p0.grip, p1.grip, t) };
+}
+const dstr = inp => inp && inp.dAmt != null ? driftAt(inp.dAmt) : (DRIFT_STR[settings.driftStr] || DRIFT_STR.normal);
 const feel = () => FEEL[settings.feel] ?? 1;
 // ベスト記録は速度ごとに別々（速めは以前の記録をそのまま使う）
 const bestKey = (c, laps, dir = 'fwd') => (isOneway(c) ? 'best.' + c.id + '.ow.' + dir : 'best.' + c.id + '.' + laps) + (settings.speed === 'fast' ? '' : '.' + settings.speed);
@@ -2195,9 +2230,19 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.code] = false; });
 const touchK = {}; const pointers = new Map();
 const ctl = $('#controls');
+const sliderOn = () => settings.dctl !== 'button';
+const dBar = $('#cbDrift');
+// ドリフトのスライダーに触れた指か（少しはみ出しても反応）
+function onSlider(x, y) { if (!sliderOn() || dBar.offsetParent === null) return false; const r = dBar.getBoundingClientRect(), pad = 16; return x >= r.left - pad && x <= r.right + pad && y >= r.top - pad && y <= r.bottom + pad; }
+function setSliderUI(a) { dBar.style.setProperty('--v', a); $('#dPct').textContent = Math.round(a * 100) + '%'; }
 function refreshTouch() {
   for (const k of 'LRBDG') touchK[k] = false;
+  touchK.Damt = 0;
   for (const p of pointers.values()) {
+    if (p.slider) {   // スライダーを触った指は、上下に動かしている間ずっとスライダー操作（離すと0%に戻る）
+      const r = dBar.getBoundingClientRect(), a = clamp((r.bottom - 8 - p.y) / (r.height - 16), 0, 1);
+      touchK.Damt = Math.max(touchK.Damt, a); touchK.D = true; continue;
+    }
     // 指の位置にいちばん近いボタン（少し外れても反応するよう余白付き）
     let best = null, bd = 1e9;
     for (const el of ctl.querySelectorAll('.cb')) {
@@ -2208,9 +2253,10 @@ function refreshTouch() {
     if (best) touchK[best.dataset.k] = true;
   }
   for (const el of ctl.querySelectorAll('.cb')) el.classList.toggle('on', !!touchK[el.dataset.k]);
+  if (sliderOn()) setSliderUI(touchK.Damt);
 }
-ctl.addEventListener('pointerdown', e => { e.preventDefault(); Snd.init(); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); try { ctl.setPointerCapture(e.pointerId); } catch (_) {} refreshTouch(); });
-ctl.addEventListener('pointermove', e => { if (!pointers.has(e.pointerId)) return; pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); refreshTouch(); });
+ctl.addEventListener('pointerdown', e => { e.preventDefault(); Snd.init(); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, slider: onSlider(e.clientX, e.clientY) }); try { ctl.setPointerCapture(e.pointerId); } catch (_) {} refreshTouch(); });
+ctl.addEventListener('pointermove', e => { if (!pointers.has(e.pointerId)) return; const q = pointers.get(e.pointerId); q.x = e.clientX; q.y = e.clientY; refreshTouch(); });
 const endP = e => { pointers.delete(e.pointerId); refreshTouch(); };
 ctl.addEventListener('pointerup', endP); ctl.addEventListener('pointercancel', endP); ctl.addEventListener('lostpointercapture', endP);
 ctl.addEventListener('contextmenu', e => e.preventDefault());
@@ -2262,12 +2308,15 @@ function readInput(dt) {
   digSteer += clamp(target - digSteer, -rate * dt, rate * dt);
   let steer = digSteer;
   if (settings.ctrl === 'tilt' && tilt.has && target === 0) steer = tiltSteer();
-  const drift = !!(keys.Space || keys.ShiftLeft || keys.ShiftRight || touchK.D);
+  const keyDrift = !!(keys.Space || keys.ShiftLeft || keys.ShiftRight);
+  // スライダー：指の高さが効き（0〜1）。キーボードのドリフトは設定の3段階を使う
+  const dAmt = !keyDrift && sliderOn() && touchK.Damt > 0 ? touchK.Damt : null;
+  const drift = keyDrift || (dAmt != null ? dAmt >= .03 : !!touchK.D);
   const brake = !!(keys.ArrowDown || keys.KeyS || touchK.B);
   let gas = (keys.ArrowUp || keys.KeyW || touchK.G) ? 1 : 0;
   if (settings.auto && !brake) gas = 1;
   if (drift && !brake) gas = 1;
-  return { steer, gas, brake, drift };
+  return { steer, gas, brake, drift, dAmt };
 }
 
 function saveElev(c, elev) {
@@ -2443,6 +2492,7 @@ function startRace(course, dir = 'fwd', ready = null) {
   }
   document.body.classList.toggle('tilt', settings.ctrl === 'tilt');
   document.body.classList.toggle('auto', !!settings.auto);
+  document.body.classList.toggle('dslider', sliderOn()); setSliderUI(0);
   $('#hPos').hidden = !cpus.length;
   $('#hBest').textContent = 'BEST ' + fmt(race.best ? (T.closed ? race.best.lap : race.best.time) : null);
   const portrait = innerHeight > innerWidth;
@@ -2488,7 +2538,7 @@ function updatePlayer(p, inp, dt) {
   let yawT = vf * Math.tan(dmax * st) / L;
   // ドリフト開始・終了
   if (!p.drifting && inp.drift && Math.abs(st) > .25 && vf > 11 * Math.min(1, k + .15)) {
-    p.drifting = true; p.driftDir = Math.sign(st); p.driftT = 0; p.w += p.driftDir * dstr().flick; p.vx *= .985; p.vz *= .985;
+    p.drifting = true; p.driftDir = Math.sign(st); p.driftT = 0; p.w += p.driftDir * dstr(inp).flick; p.vx *= .985; p.vz *= .985;
   }
   if (p.drifting && (!inp.drift || vf < 7 || inp.brake)) {
     // ドリフト終了：長さに応じてミニターボ
@@ -2500,7 +2550,7 @@ function updatePlayer(p, inp, dt) {
   }
   if (p.drifting) {
     const k = p.driftDir * st; // 1 = 深く / -1 = カウンター
-    yawT = p.driftDir * (1.05 + .62 * k) * clamp(vf / 18, .45, 1) * 1.28 * (.85 + .15 * CS.drift) * dstr().yaw;
+    yawT = p.driftDir * (1.05 + .62 * k) * clamp(vf / 18, .45, 1) * 1.28 * (.85 + .15 * CS.drift) * dstr(inp).yaw;
     p.driftT += dt;
   } else {
     const latMax = (onRoad ? 13.5 : 8) * CS.grip;
@@ -2515,7 +2565,7 @@ function updatePlayer(p, inp, dt) {
   let slip = 0;
   if (speed > 1.5 && vf > 0) {
     let phi = Math.atan2(p.vx, p.vz); const dlt = wrapAng(p.th - phi); slip = dlt;
-    const g = p.drifting ? 2.5 * dstr().grip / CS.drift : (onRoad ? 10 : 4.5) * CS.grip;
+    const g = p.drifting ? 2.5 * dstr(inp).grip / CS.drift : (onRoad ? 10 : 4.5) * CS.grip;
     phi += dlt * (1 - Math.exp(-g * dt));
     const scrub = (p.drifting ? .3 / CS.drift : .8) * Math.abs(Math.sin(dlt)) * speed * dt;
     const ns = Math.max(0, speed - scrub);
@@ -3081,6 +3131,7 @@ seg('#segRiv', 'rivals');
 seg('#segElev', 'elev', v => +v);
 seg('#segFeel', 'feel');
 seg('#segDrift', 'driftStr');
+seg('#segDctl', 'dctl');
 seg('#segCam', 'cam', v => +v);
 $('#boost').checked = settings.boost !== false; $('#boost').onchange = e => { settings.boost = e.target.checked; saveSettings(); };
 seg('#segTod', 'tod');

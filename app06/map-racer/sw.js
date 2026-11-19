@@ -1,5 +1,5 @@
 // マップレーサー Service Worker: アプリ本体とライブラリをキャッシュしてオフラインでも起動できるようにする
-const CACHE = 'map-racer-v26';
+const CACHE = 'map-racer-v27';
 const SHELL = ['map-racer.html', 'manifest.webmanifest', 'favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
   'lib/three.module.min.js', 'lib/leaflet.js', 'lib/leaflet.css'];
 
