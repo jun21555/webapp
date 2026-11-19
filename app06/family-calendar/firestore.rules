@@ -1,0 +1,65 @@
+// ===============================================================
+//  かぞくカレンダー Firestore セキュリティルール
+// ---------------------------------------------------------------
+//  Firebase コンソール → Firestore Database →「ルール」タブに
+//  この内容をまるごと貼り付けて「公開」してください。
+//
+//  Notes でいうと ACL ＋ 読者フィールド の役目です。
+//  「その家族の members に自分の文書がある人だけ」が、
+//  家族の情報と予定を読み書きできます。
+// ===============================================================
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    // families/{fid}/members/{自分のuid} があれば、その家族のメンバー
+    function isMember(fid) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/families/$(fid)/members/$(request.auth.uid));
+    }
+
+    // ---- ユーザーごとの文書：本人だけ ----
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ---- 招待コード ----
+    match /invites/{code} {
+      // コードを知っている人が1件だけ読める（一覧は取れない）
+      allow get: if signedIn();
+      // 家族を作った本人だけが、その家族のコードを登録できる
+      allow create: if signedIn()
+        && getAfter(/databases/$(database)/documents/families/$(request.resource.data.familyId)).data.createdBy == request.auth.uid;
+      allow delete: if isMember(resource.data.familyId);
+    }
+
+    // ---- 家族 ----
+    match /families/{fid} {
+      allow read, update: if isMember(fid);
+      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+
+      // メンバー
+      match /members/{uid} {
+        allow read: if isMember(fid);
+        // 自分のぶんだけ追加できる。条件は「家族を作った本人」か「正しい招待コードを持っている」こと
+        allow create: if signedIn() && request.auth.uid == uid && (
+          getAfter(/databases/$(database)/documents/families/$(fid)).data.createdBy == request.auth.uid
+          || get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.familyId == fid
+        );
+        allow update, delete: if signedIn() && request.auth.uid == uid;
+      }
+
+      // 予定：家族のメンバーなら誰でも読み書きできる
+      match /events/{eid} {
+        allow read, delete: if isMember(fid);
+        allow create, update: if isMember(fid)
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 100
+          && request.resource.data.date is string;
+      }
+    }
+  }
+}

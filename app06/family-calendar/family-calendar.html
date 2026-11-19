@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="かぞく予定">
+<meta name="theme-color" content="#fff8f2">
+<title>かぞくカレンダー</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --bg:#fff8f2; --card:#fff; --ink:#2b2522; --dim:#8a7f78; --line:#efe6de;
+    --accent:#ff7a59; --accent-ink:#fff; --sun:#e5484d; --sat:#3a7bd5; --today:#ffe7dd;
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+  body{
+    min-height:100dvh;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  button,input,textarea,select{font:inherit;color:inherit}
+  input,textarea,select{font-size:16px} /* iOS の自動ズームを防ぐ */
+  .hidden{display:none !important}
+  .screen{max-width:520px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
+
+  /* ---- ヘッダー ---- */
+  .top{display:flex;align-items:center;gap:6px;padding:8px 10px 4px;position:sticky;top:0;z-index:5;
+    background:var(--bg);padding-top:calc(env(safe-area-inset-top) + 8px);margin-top:calc(-1 * env(safe-area-inset-top))}
+  .top h1{flex:1;margin:0;font-size:19px;font-weight:700;text-align:center;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+  .round{width:44px;height:44px;flex:0 0 44px;border-radius:50%;border:none;padding:0;cursor:pointer;
+    background:#fff;box-shadow:0 1px 4px rgba(80,50,30,.12);display:flex;align-items:center;justify-content:center;
+    color:var(--ink);text-decoration:none;transition:transform .12s}
+  .round:active{transform:scale(.88)}
+  .round svg{width:22px;height:22px}
+  .round.ghost{background:transparent;box-shadow:none}
+  .spacer{width:44px;flex:0 0 44px}
+
+  /* ---- ボタン・入力 ---- */
+  .btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:50px;border-radius:14px;border:none;
+    font-size:16px;font-weight:700;cursor:pointer;background:var(--accent);color:var(--accent-ink);transition:transform .12s,opacity .12s}
+  .btn:active{transform:scale(.97);opacity:.85}
+  .btn.sub{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line)}
+  .btn.danger{background:#fff;color:var(--sun);box-shadow:inset 0 0 0 1.5px #f6d3d3}
+  .btn:disabled{opacity:.5}
+  .link{background:none;border:none;color:var(--accent);font-weight:700;font-size:15px;min-height:44px;cursor:pointer;padding:0 6px}
+  label.field{display:block;margin:0 0 14px}
+  label.field>span{display:block;font-size:13px;font-weight:700;color:var(--dim);margin:0 0 6px}
+  .input{width:100%;min-height:48px;border-radius:12px;border:1.5px solid var(--line);background:#fff;padding:10px 14px;outline:none}
+  .input:focus{border-color:var(--accent)}
+  textarea.input{min-height:80px;resize:vertical}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1;min-width:0}
+
+  .colors{display:flex;flex-wrap:wrap;gap:8px}
+  .colors button{width:44px;height:44px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1.5px var(--line);cursor:pointer;padding:0}
+  .colors button[aria-pressed="true"]{box-shadow:0 0 0 3px var(--ink)}
+
+  /* ---- ログイン・はじめの設定 ---- */
+  .welcome{flex:1;display:flex;flex-direction:column;justify-content:center;padding:20px 24px 32px;gap:14px}
+  .welcome .logo{width:96px;height:96px;border-radius:22px;margin:0 auto 4px;box-shadow:0 8px 24px rgba(255,122,89,.3)}
+  .welcome h2{margin:0;text-align:center;font-size:26px}
+  .welcome p.lead{margin:0 0 12px;text-align:center;color:var(--dim);font-size:15px;line-height:1.6}
+  .or{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:13px;margin:4px 0}
+  .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+  .err{color:var(--sun);font-size:14px;min-height:20px;text-align:center;margin:0}
+  .note{font-size:13px;color:var(--dim);line-height:1.6;background:#fff;border-radius:12px;padding:10px 14px}
+  .tabs{display:flex;background:#f3ebe4;border-radius:12px;padding:4px;margin:0 0 18px}
+  .tabs button{flex:1;min-height:44px;border:none;background:none;border-radius:9px;font-weight:700;color:var(--dim);cursor:pointer}
+  .tabs button[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+  /* ---- デモの帯 ---- */
+  .demo-bar{margin:0 12px 6px;padding:8px 12px;border-radius:12px;background:#fff3c4;color:#6b5400;font-size:12.5px;line-height:1.5}
+
+  /* ---- メンバーの絞り込み ---- */
+  .filter{display:flex;gap:8px;overflow-x:auto;padding:4px 12px 10px;scrollbar-width:none}
+  .filter::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;display:flex;align-items:center;gap:6px;min-height:36px;padding:0 14px 0 6px;border-radius:999px;border:none;
+    background:#fff;box-shadow:inset 0 0 0 1.5px var(--line);font-size:14px;font-weight:600;cursor:pointer;position:relative}
+  .chip::after{content:"";position:absolute;inset:-4px 0}  /* タップ領域を 44px に広げる */
+  .chip.all{padding:0 14px}
+  .chip[aria-pressed="true"]{background:var(--ink);color:#fff;box-shadow:none}
+  .avatar{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+    color:#fff;font-size:12px;font-weight:800;flex:0 0 auto}
+
+  /* ---- 月カレンダー ---- */
+  .cal{margin:0 10px;background:var(--card);border-radius:var(--radius);padding:8px 6px 6px;box-shadow:0 2px 10px rgba(80,50,30,.06)}
+  .wk,.days{display:grid;grid-template-columns:repeat(7,1fr)}
+  .wk div{text-align:center;font-size:11.5px;font-weight:700;color:var(--dim);padding:2px 0 6px}
+  .wk div:first-child{color:var(--sun)} .wk div:last-child{color:var(--sat)}
+  .day{min-height:52px;border:none;background:none;padding:4px 0 2px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;border-radius:12px}
+  .day .n{width:28px;height:28px;line-height:28px;border-radius:50%;font-size:14.5px;font-weight:600;font-variant-numeric:tabular-nums}
+  .day.sun .n{color:var(--sun)} .day.sat .n{color:var(--sat)}
+  .day.out{opacity:.32}
+  .day.today .n{background:var(--today);color:var(--accent);font-weight:800}
+  .day.sel .n{background:var(--accent);color:#fff}
+  .day .dots{display:flex;gap:2.5px;height:6px}
+  .day .dots i{width:6px;height:6px;border-radius:50%}
+
+  /* ---- 選んだ日の予定 ---- */
+  .agenda{padding:16px 12px calc(env(safe-area-inset-bottom) + 100px)}
+  .agenda h3{margin:0 4px 10px;font-size:16px;display:flex;align-items:baseline;gap:8px}
+  .agenda h3 small{color:var(--dim);font-weight:600;font-size:13px}
+  .ev{display:flex;gap:12px;width:100%;text-align:left;border:none;background:var(--card);border-radius:16px;padding:12px 14px;margin:0 0 10px;
+    box-shadow:0 1px 6px rgba(80,50,30,.06);cursor:pointer;position:relative;overflow:hidden}
+  .ev:active{transform:scale(.985)}
+  .ev::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c,#ccc)}
+  .ev .time{flex:0 0 52px;font-size:13px;font-weight:700;line-height:1.4;font-variant-numeric:tabular-nums}
+  .ev .time small{display:block;color:var(--dim);font-weight:600}
+  .ev .body{flex:1;min-width:0}
+  .ev .title{font-size:16px;font-weight:700;margin:0 0 4px;word-break:break-word}
+  .ev .memo{font-size:13px;color:var(--dim);margin:0 0 6px;white-space:pre-wrap;word-break:break-word}
+  .ev .who{display:flex;gap:4px;flex-wrap:wrap}
+  .ev .who .avatar{width:22px;height:22px;font-size:11px}
+  .empty{text-align:center;color:var(--dim);font-size:14px;padding:26px 0;line-height:1.8}
+
+  .fab{position:fixed;right:calc(env(safe-area-inset-right) + 18px);bottom:calc(env(safe-area-inset-bottom) + 20px);z-index:6;
+    width:60px;height:60px;border-radius:50%;border:none;background:var(--accent);color:#fff;cursor:pointer;
+    box-shadow:0 8px 22px rgba(255,122,89,.45);display:flex;align-items:center;justify-content:center;transition:transform .12s}
+  .fab:active{transform:scale(.9)}
+  .fab svg{width:28px;height:28px}
+
+  /* ---- 下から出るシート ---- */
+  .sheet-bg{position:fixed;inset:0;z-index:20;background:rgba(30,20,15,.38);opacity:0;pointer-events:none;transition:opacity .2s}
+  .sheet-bg.on{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-width:520px;margin:0 auto;max-height:92dvh;overflow-y:auto;
+    background:var(--bg);border-radius:22px 22px 0 0;padding:6px 18px calc(env(safe-area-inset-bottom) + 20px);
+    transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);overscroll-behavior:contain}
+  .sheet.on{transform:none}
+  .sheet .grab{width:40px;height:5px;border-radius:3px;background:#ddd2c8;margin:4px auto 6px}
+  .sheet header{display:flex;align-items:center;margin:0 -6px 10px}
+  .sheet header h2{flex:1;margin:0;text-align:center;font-size:17px}
+  .switch{display:flex;align-items:center;justify-content:space-between;min-height:48px;margin:0 0 14px;background:#fff;
+    border-radius:12px;border:1.5px solid var(--line);padding:0 14px;font-weight:600}
+  .switch input{width:24px;height:24px;accent-color:var(--accent)}
+  .pick{display:flex;flex-wrap:wrap;gap:8px}
+  .pick .chip{min-height:40px}
+  .stack{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+
+  .code{font-size:32px;font-weight:800;letter-spacing:6px;text-align:center;background:#fff;border-radius:14px;padding:14px 0;
+    border:2px dashed var(--line);font-variant-numeric:tabular-nums;margin:0 0 10px;user-select:all;-webkit-user-select:all}
+  .members{list-style:none;margin:0 0 6px;padding:0;background:#fff;border-radius:14px}
+  .members li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line);font-weight:600}
+  .members li:first-child{border-top:none}
+  .members li small{margin-left:auto;color:var(--dim);font-weight:600}
+  .sec{font-size:13px;font-weight:700;color:var(--dim);margin:20px 4px 8px}
+
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 96px);transform:translate(-50%,20px);opacity:0;pointer-events:none;
+    background:rgba(40,28,22,.92);color:#fff;font-size:14px;padding:10px 18px;border-radius:999px;transition:.25s;z-index:50;max-width:90vw;text-align:center}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  .loading{flex:1;display:flex;align-items:center;justify-content:center;color:var(--dim)}
+</style>
+</head>
+<body>
+
+<!-- ホームへ戻るボタン（どの画面でも左上に出る） の見た目は共通 -->
+<template id="homeBtn">
+  <a class="round home" href="../index.html" aria-label="ホームへ戻る">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg>
+  </a>
+</template>
+
+<!-- 読み込み中 -->
+<section class="screen" id="loadingScreen">
+  <div class="top"><span data-home></span><h1></h1><span class="spacer"></span></div>
+  <div class="loading">読み込み中…</div>
+</section>
+
+<!-- ログイン -->
+<section class="screen hidden" id="loginScreen">
+  <div class="top"><span data-home></span><h1></h1><span class="spacer"></span></div>
+  <div class="welcome">
+    <img class="logo" src="icon-192.png" alt="">
+    <h2>かぞくカレンダー</h2>
+    <p class="lead">家族みんなの予定を、ひとつのカレンダーで。</p>
+    <p class="note hidden" id="demoNote">いまは<b>デモモード</b>です。予定はこの端末の中だけに保存されます。<br>
+      <code>firebase-config.js</code> に Firebase の設定を入れると、家族で共有できるようになります。</p>
+    <button class="btn" id="googleBtn" type="button">
+      <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#fff" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z"/></svg>
+      <span>Google でログイン</span>
+    </button>
+    <div class="or">または</div>
+    <form id="emailForm">
+      <label class="field"><span>メールアドレス</span><input class="input" id="email" type="email" autocomplete="email" required></label>
+      <label class="field"><span>パスワード（6文字以上）</span><input class="input" id="password" type="password" autocomplete="current-password" minlength="6" required></label>
+      <div class="row">
+        <button class="btn sub" type="submit" data-mode="signin">ログイン</button>
+        <button class="btn sub" type="submit" data-mode="signup">新しく登録</button>
+      </div>
+    </form>
+    <p class="err" id="loginErr"></p>
+  </div>
+</section>
+
+<!-- はじめの設定（家族を作る／参加する） -->
+<section class="screen hidden" id="setupScreen">
+  <div class="top"><span data-home></span><h1>はじめの設定</h1><button class="round ghost" id="setupLogout" type="button" aria-label="ログアウト">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5"/><path d="M5 12h11"/></svg></button></div>
+  <div class="welcome" style="justify-content:flex-start">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" aria-selected="true" data-tab="create">家族を作る</button>
+      <button type="button" role="tab" aria-selected="false" data-tab="join">招待コードで参加</button>
+    </div>
+    <form id="setupForm">
+      <label class="field" data-for="create"><span>家族の名前</span><input class="input" id="familyName" placeholder="例：山田家" maxlength="30"></label>
+      <label class="field hidden" data-for="join"><span>招待コード（6文字）</span>
+        <input class="input" id="inviteCode" placeholder="例：AB12CD" maxlength="6" autocapitalize="characters" autocomplete="off" style="letter-spacing:3px;text-transform:uppercase"></label>
+      <label class="field"><span>あなたの呼び名</span><input class="input" id="myName" placeholder="例：パパ" maxlength="12" required></label>
+      <div class="field"><span style="display:block;font-size:13px;font-weight:700;color:var(--dim);margin:0 0 6px">あなたの色</span><div class="colors" id="setupColors"></div></div>
+      <button class="btn" type="submit" id="setupSubmit" style="margin-top:8px">家族を作ってはじめる</button>
+    </form>
+    <p class="err" id="setupErr"></p>
+    <p class="note" data-for="join">招待コードは、すでに使っている家族の「設定（⚙︎）」に表示されています。</p>
+  </div>
+</section>
+
+<!-- メイン（カレンダー） -->
+<section class="screen hidden" id="mainScreen">
+  <div class="top">
+    <span data-home></span>
+    <button class="round ghost" id="prevMonth" type="button" aria-label="前の月">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h1 id="monthTitle"></h1>
+    <button class="round ghost" id="nextMonth" type="button" aria-label="次の月">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+    <button class="round" id="settingsBtn" type="button" aria-label="設定">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </div>
+  <div class="demo-bar hidden" id="demoBar">デモモード：予定はこの端末だけに保存されます。家族と共有するには Firebase を設定してください。</div>
+  <div class="filter" id="filter"></div>
+  <div class="cal" id="cal">
+    <div class="wk"><div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div></div>
+    <div class="days" id="days"></div>
+  </div>
+  <section class="agenda">
+    <h3 id="agendaTitle"></h3>
+    <div id="agendaList"></div>
+  </section>
+  <button class="fab" id="addBtn" type="button" aria-label="予定を追加">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</section>
+
+<!-- 予定の編集シート -->
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="eventSheet" role="dialog" aria-modal="true" aria-labelledby="eventSheetTitle">
+  <div class="grab"></div>
+  <header>
+    <button class="link" type="button" data-close>キャンセル</button>
+    <h2 id="eventSheetTitle">予定を追加</h2>
+    <button class="link" type="submit" form="eventForm">保存</button>
+  </header>
+  <form id="eventForm">
+    <label class="field"><span>タイトル</span><input class="input" id="evTitle" maxlength="100" required placeholder="例：保育園の面談"></label>
+    <label class="field"><span>日付</span><input class="input" id="evDate" type="date" required></label>
+    <label class="switch">終日<input type="checkbox" id="evAllDay"></label>
+    <div class="row" id="evTimes">
+      <label class="field"><span>開始</span><input class="input" id="evStart" type="time"></label>
+      <label class="field"><span>終了</span><input class="input" id="evEnd" type="time"></label>
+    </div>
+    <div class="field"><span style="display:block;font-size:13px;font-weight:700;color:var(--dim);margin:0 0 6px">だれの予定？</span><div class="pick" id="evMembers"></div></div>
+    <label class="field"><span>メモ</span><textarea class="input" id="evNote" maxlength="500" placeholder="持ち物・送迎の担当など"></textarea></label>
+    <div class="stack">
+      <button class="btn" type="submit">保存する</button>
+      <button class="btn danger hidden" type="button" id="evDelete">この予定を削除</button>
+    </div>
+  </form>
+</div>
+
+<!-- 設定シート -->
+<div class="sheet" id="settingsSheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <div class="grab"></div>
+  <header>
+    <span class="spacer"></span>
+    <h2 id="settingsTitle">設定</h2>
+    <button class="link" type="button" data-close>閉じる</button>
+  </header>
+  <div class="sec">家族</div>
+  <div class="note" style="font-size:16px;font-weight:700;color:var(--ink)" id="setFamilyName"></div>
+  <div class="sec">招待コード（家族に教えてください）</div>
+  <div class="code" id="setCode"></div>
+  <button class="btn sub" type="button" id="shareCode">招待コードを送る</button>
+  <div class="sec">メンバー</div>
+  <ul class="members" id="setMembers"></ul>
+  <div class="sec">わたし</div>
+  <label class="field"><span>呼び名</span><input class="input" id="setMyName" maxlength="12"></label>
+  <div class="colors" id="setColors"></div>
+  <div class="stack">
+    <button class="btn" type="button" id="saveMe">わたしの設定を保存</button>
+    <button class="btn sub" type="button" id="logout">ログアウト</button>
+    <button class="btn danger hidden" type="button" id="resetDemo">デモのデータを消す</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
