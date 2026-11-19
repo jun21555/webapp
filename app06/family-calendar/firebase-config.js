@@ -12,10 +12,11 @@
 //    データを守るのは Firestore のセキュリティルール（firestore.rules）の役目です。
 // ===============================================================
 export const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyDPJ1PjCxLXYii8eliInDrD8bZ3zNwiK7Y",
+  authDomain: "terabe-family-shopping.firebaseapp.com",
+  projectId: "terabe-family-shopping",
+  storageBucket: "terabe-family-shopping.firebasestorage.app",
+  messagingSenderId: "348087156148",
+  appId: "1:348087156148:web:dddd7fb6f3e998b55506e1",
+  measurementId: "G-3LQN1FGH9Z",
 };

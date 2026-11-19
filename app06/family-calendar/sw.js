@@ -1,7 +1,7 @@
 // かぞくカレンダー Service Worker
 // アプリの画面（HTML・JS・アイコン）をキャッシュして、電波がなくても起動できるようにします。
 // 予定データは Firebase（Firestore）が自分でオフライン保存するので、ここでは扱いません。
-const CACHE = 'family-calendar-v1';
+const CACHE = 'family-calendar-v2';
 const SHELL = [
   'family-calendar.html', 'app.js', 'store.js', 'firebase-config.js',
   'manifest.webmanifest', 'favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'
