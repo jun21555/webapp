@@ -1,5 +1,5 @@
 // 今日は何の日 Service Worker: アプリ本体をキャッシュ（Wikipedia のデータはアプリ側で localStorage に保存）
-const CACHE = 'kyou-nan-no-hi-v1';
+const CACHE = 'kyou-nan-no-hi-v2';
 const SHELL = ['kyou-nan-no-hi.html', 'manifest.webmanifest', 'favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
