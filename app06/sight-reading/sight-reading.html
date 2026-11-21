@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="初見">
+<meta name="theme-color" content="#f7f3ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1a17" media="(prefers-color-scheme: dark)">
+<title>初見トレーナー</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+@font-face{font-family:"MusicSub";src:url(data:font/woff2;base64,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) format("woff2");}
+:root{
+  --paper:#f7f3ea; --card:#fffdf8; --ink:#23201b; --muted:#7a7266; --line:#d9d1c2;
+  --accent:#b4532a; --good:#2f7d4f; --bad:#c23b2e;
+  --key-w:44px;
+}
+@media (prefers-color-scheme:dark){
+  :root{--paper:#1b1a17; --card:#24221e; --ink:#ece6da; --muted:#a39a8b; --line:#3d3931;
+    --accent:#e08a5e; --good:#62c08a; --bad:#ef6f62;}
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+body{min-height:100vh;min-height:100dvh;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI",sans-serif;
+  padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 24px) calc(env(safe-area-inset-left) + 12px)}
+.wrap{max-width:880px;margin:0 auto}
+button{font:inherit;color:inherit}
+.top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.round{width:44px;height:44px;flex:none;border-radius:22px;border:1px solid var(--line);background:var(--card);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;text-decoration:none;cursor:pointer;transition:transform .12s}
+.round:active{transform:scale(.9)}
+.round svg{width:22px;height:22px}
+.top h1{font-size:19px;margin:0;flex:1;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+details.settings{margin-bottom:10px;padding:0}
+details.settings summary{list-style:none;cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;padding:0 14px;font-size:14px}
+details.settings summary::-webkit-details-marker{display:none}
+details.settings summary .sum{color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+details.settings summary .chev{transition:transform .2s;color:var(--muted)}
+details[open].settings summary .chev{transform:rotate(180deg)}
+.setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px;padding:0 12px 12px}
+.field .t{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:0;background:transparent;font-size:14px;min-height:44px;padding:0 4px;cursor:pointer;white-space:nowrap}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--ink);color:var(--card);font-weight:700}
+.toggles{display:flex;flex-wrap:wrap;gap:0 16px;font-size:14px;align-items:center;grid-column:1/-1}
+.toggles label{display:flex;gap:6px;align-items:center;cursor:pointer;min-height:44px}
+.toggles input{accent-color:var(--accent);width:20px;height:20px}
+.btn-s{border:1px solid var(--line);background:transparent;border-radius:10px;padding:0 12px;min-height:44px;font-size:13px;cursor:pointer}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px}
+.stat .k{font-size:11px;color:var(--muted)}
+.stat .v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+@media (max-width:560px){.stats{grid-template-columns:repeat(3,1fr)}.stat:nth-child(n+4){display:none}}
+.stage{padding:6px 6px 10px}
+#staff{width:100%;height:auto;display:block}
+#staff .ln{stroke:var(--ink);stroke-width:1.2}
+#staff .clef{font-family:"MusicSub";fill:var(--ink)}
+#staff .acc{font-family:"MusicSub"}
+.timer{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin:2px 6px 0}
+.timer i{display:block;height:100%;width:0;background:var(--accent)}
+.feedback{min-height:24px;text-align:center;font-size:15px;margin:8px 4px 2px;font-weight:600}
+.feedback.good{color:var(--good)} .feedback.bad{color:var(--bad)}
+.controls{display:flex;gap:8px;justify-content:center;margin:6px 0 2px}
+.btn{border:0;background:var(--accent);color:#fff;border-radius:12px;min-height:48px;padding:0 28px;font-size:16px;font-weight:700;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.btn:active{transform:scale(.97)}
+.shake{animation:shake .28s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.kbwrap{margin:12px -6px 0;overflow-x:auto;padding:0 6px 6px;-webkit-overflow-scrolling:touch}
+.kb{position:relative;display:flex;height:160px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation;margin:0 auto;width:max-content}
+.wk{width:var(--key-w);height:100%;background:#fdfcf9;border:1px solid #8f877a;border-radius:0 0 7px 7px;margin-right:-1px;position:relative;cursor:pointer;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:6px;font-size:11px;color:#6b6356}
+.wk .nm{font-weight:700;color:#3a342c;font-size:13px}
+.wk .oc{font-size:10px;color:#a0978a}
+.bk{position:absolute;top:0;width:calc(var(--key-w)*.62);height:60%;background:#24211d;border-radius:0 0 5px 5px;z-index:2;cursor:pointer;border:1px solid #000}
+.wk.down{background:#ece6da}.bk.down{background:#4a443c}
+.wk.good,.bk.good{background:var(--good)!important}
+.wk.bad,.bk.bad{background:var(--bad)!important}
+.wk.show,.bk.show{box-shadow:inset 0 -46px 0 rgba(47,125,79,.6)}
+.hide-names .wk .nm{visibility:hidden}
+.hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6}
+.hint kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;font-family:inherit;font-size:11px}
+@media (hover:none){.hint .pc{display:none}}
+.lower{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+@media (max-width:680px){.lower{grid-template-columns:1fr}}
+.lower h2{font-size:15px;margin:0 0 8px}
+.weak{list-style:none;margin:0;padding:0;font-size:13px}
+.weak li{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.weak li:last-child{border-bottom:0}
+.weak .bar{display:inline-block;height:6px;border-radius:3px;background:var(--bad);vertical-align:middle;margin-left:6px}
+.tips{font-size:13px;line-height:1.75;margin:0;padding-left:18px}
+.tips li{margin-bottom:4px}
+.muted{color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="round" href="../index.html" aria-label="ホームへ戻る">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></svg>
+    </a>
+    <h1>初見トレーナー</h1>
+  </div>
+
+  <details class="card settings" id="settings">
+    <summary><span>⚙︎ 設定</span><span class="sum" id="sum"></span><span class="chev">▾</span></summary>
+    <div class="setgrid">
+      <div class="field"><span class="t">譜表</span>
+        <div class="seg" data-key="clef"><button data-v="treble">ト音</button><button data-v="bass">ヘ音</button><button data-v="grand">大譜表</button></div></div>
+      <div class="field"><span class="t">レベル</span>
+        <div class="seg" data-key="level"><button data-v="0">初級</button><button data-v="1">中級</button><button data-v="2">上級♯♭</button></div></div>
+      <div class="field"><span class="t">モード</span>
+        <div class="seg" data-key="mode"><button data-v="single">1音ずつ</button><button data-v="seq">先読み8音</button></div></div>
+      <div class="field"><span class="t">1音の制限時間</span>
+        <div class="seg" data-key="limit"><button data-v="0">なし</button><button data-v="3000">3秒</button><button data-v="2000">2秒</button><button data-v="1200">1.2秒</button></div></div>
+      <div class="field"><span class="t">鍵盤</span>
+        <div class="seg" data-key="kbd"><button data-v="oct">1オクターブ</button><button data-v="full">全音域</button></div></div>
+      <div class="toggles">
+        <label><input type="checkbox" id="optNames"> 鍵盤に音名</label>
+        <label><input type="checkbox" id="optSound" checked> 音を鳴らす</label>
+        <button class="btn-s" id="midiBtn" type="button">MIDI接続</button>
+        <span class="muted" id="midiStatus"></span>
+      </div>
+    </div>
+  </details>
+
+  <div class="stats">
+    <div class="stat"><div class="k">正解</div><div class="v" id="sCorrect">0</div></div>
+    <div class="stat"><div class="k">正答率</div><div class="v" id="sRate">–</div></div>
+    <div class="stat"><div class="k">平均反応</div><div class="v" id="sTime">–</div></div>
+    <div class="stat"><div class="k">連続正解</div><div class="v" id="sStreak">0</div></div>
+    <div class="stat"><div class="k">ベスト連続</div><div class="v" id="sBest">0</div></div>
+  </div>
+
+  <div class="card stage">
+    <svg id="staff" viewBox="0 0 400 170" aria-label="五線譜"></svg>
+    <div class="timer"><i id="timerBar"></i></div>
+    <div class="feedback" id="feedback"></div>
+    <div class="controls">
+      <button class="btn" id="startBtn" type="button">スタート</button>
+      <button class="btn ghost" id="skipBtn" type="button">答え</button>
+    </div>
+    <div class="kbwrap" id="kbwrap"><div class="kb" id="kb"></div></div>
+    <div class="hint"><span id="kbHint"></span><span class="pc"> PCキーボード：<kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><kbd>F</kbd><kbd>G</kbd><kbd>H</kbd><kbd>J</kbd>＝ドレミファソラシ、<kbd>W</kbd><kbd>E</kbd><kbd>T</kbd><kbd>Y</kbd><kbd>U</kbd>＝黒鍵、<kbd>Space</kbd>＝スタート。</span></div>
+  </div>
+
+  <div class="lower">
+    <div class="card">
+      <h2>苦手な音 <span class="muted">（ミス率と反応時間から）</span></h2>
+      <ul class="weak" id="weak"></ul>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:8px"><button class="btn-s" id="resetBtn" type="button">記録をリセット</button><span class="muted" id="resetMsg"></span></div>
+    </div>
+    <div class="card">
+      <h2>上達のコツ</h2>
+      <ul class="tips">
+        <li><b>音名を「考えず」鍵盤の位置で反応</b>できるまで。平均反応1秒以内が目標。</li>
+        <li>基準音（ト音のソ、ヘ音のファ、真ん中のド）からの<b>距離（音程）</b>で読む。</li>
+        <li>「先読み8音」は今の音を弾きながら<b>次の音を見る</b>練習。初見の核心です。</li>
+        <li>慣れたら制限時間をつけて、<b>止まらず進む</b>癖を。</li>
+        <li>アプリの後に、易しい曲を1日1曲・止まらず通す初見を。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const STEP_PC=[0,2,4,5,7,9,11];
+const JP=['ド','レ','ミ','ファ','ソ','ラ','シ'];
+const EN=['C','D','E','F','G','A','B'];
+const CLEF={treble:{bottomD:30,name:'ト音'},bass:{bottomD:18,name:'ヘ音'}};
+const RANGES={treble:[[29,39],[26,42],[25,44]],bass:[[17,27],[14,30],[13,31]]};
+const SHARP_OK=[1,1,0,1,1,1,0], FLAT_OK=[0,1,1,0,1,1,1];
+const LABELS={clef:{treble:'ト音',bass:'ヘ音',grand:'大譜表'},level:{0:'初級',1:'中級',2:'上級'},mode:{single:'1音ずつ',seq:'先読み'},limit:{0:'',3000:'3秒',2000:'2秒',1200:'1.2秒'},kbd:{oct:'1オクターブ',full:'全音域'}};
+
+const midiOf=n=>12*(n.oct+1)+STEP_PC[n.step]+n.acc;
+const dia=n=>n.oct*7+n.step;
+const fromDia=(d,acc)=>({step:((d%7)+7)%7,oct:Math.floor(d/7),acc:acc||0});
+const accStr=a=>a>0?'♯':a<0?'♭':'';
+const jpName=n=>JP[n.step]+accStr(n.acc);
+const codeName=n=>EN[n.step]+accStr(n.acc)+n.oct;
+const keyOf=(n,clef)=>clef+':'+codeName(n);
+const pcOf=m=>((m%12)+12)%12;
+
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
+             set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const narrow=()=>window.innerWidth<620;
+const S=Object.assign({clef:'treble',level:'0',mode:'single',limit:'0',kbd:narrow()?'oct':'full',names:true,sound:true},store.get('sr_settings',{}));
+let noteStats=store.get('sr_stats',{});
+
+let running=false, items=[], idx=0, shownAt=0, missedThis=0, timerRAF=0, locked=false, lineStart=0;
+const sess={correct:0,miss:0,time:0,streak:0,best:0};
+
+// ---------- settings UI ----------
+const settingsEl=document.getElementById('settings');
+if(!narrow()) settingsEl.open=true;
+document.querySelectorAll('.seg').forEach(seg=>{
+  const k=seg.dataset.key;
+  seg.querySelectorAll('button').forEach(b=>{
+    b.classList.toggle('on',b.dataset.v===S[k]);
+    b.onclick=()=>{S[k]=b.dataset.v;seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));saveS();rebuild();};
+  });
+});
+const optNames=document.getElementById('optNames'),optSound=document.getElementById('optSound');
+optNames.checked=S.names;optSound.checked=S.sound;
+optNames.onchange=()=>{S.names=optNames.checked;saveS();applyNames()};
+optSound.onchange=()=>{S.sound=optSound.checked;saveS()};
+function saveS(){store.set('sr_settings',S);updateSummary()}
+function applyNames(){document.getElementById('kb').classList.toggle('hide-names',!S.names)}
+function updateSummary(){
+  document.getElementById('sum').textContent=['clef','level','mode','limit','kbd'].map(k=>LABELS[k][S[k]]).filter(Boolean).join('・');
+  document.getElementById('kbHint').textContent=S.kbd==='oct'?'1オクターブ鍵盤ではオクターブを問わず判定します。':'全音域鍵盤では高さ（オクターブ）まで正確に判定します。';
+}
+
+// ---------- note pool ----------
+function clefsFor(){return S.clef==='grand'?['treble','bass']:[S.clef]}
+function pool(){
+  const lv=+S.level, out=[];
+  for(const c of clefsFor()){
+    const [lo,hi]=RANGES[c][lv];
+    for(let d=lo;d<=hi;d++){
+      const base=fromDia(d,0);
+      out.push({n:base,clef:c});
+      if(lv===2){
+        if(SHARP_OK[base.step]) out.push({n:fromDia(d,1),clef:c,acc:true});
+        if(FLAT_OK[base.step]) out.push({n:fromDia(d,-1),clef:c,acc:true});
+      }
+    }
+  }
+  return out;
+}
+function weightOf(it){
+  const s=noteStats[keyOf(it.n,it.clef)];
+  let w=it.acc?0.55:1;
+  if(s&&s.n){const mr=s.miss/s.n, at=s.ok?s.time/s.ok:2500; w*=1+mr*4+Math.max(0,(at-1200)/800);}
+  else w*=1.3;
+  return w;
+}
+let lastKey='';
+function pickWeighted(){
+  const p=pool().filter(it=>keyOf(it.n,it.clef)!==lastKey);
+  const ws=p.map(weightOf), tot=ws.reduce((a,b)=>a+b,0);
+  let r=Math.random()*tot;
+  for(let i=0;i<p.length;i++){r-=ws[i];if(r<=0){lastKey=keyOf(p[i].n,p[i].clef);return p[i]}}
+  return p[p.length-1];
+}
+function makeSequence(){
+  const lv=+S.level, out=[], clefs=clefsFor();
+  let clef=clefs[Math.floor(Math.random()*clefs.length)];
+  let [lo,hi]=RANGES[clef][lv], d=lo+Math.floor(Math.random()*(hi-lo+1));
+  const moves=[-1,1,-1,1,-2,2,-2,2,-3,3,-4,4,0];
+  for(let i=0;i<8;i++){
+    if(i===4&&clefs.length>1&&Math.random()<.6){clef=clefs[Math.floor(Math.random()*2)];[lo,hi]=RANGES[clef][lv];d=lo+Math.floor(Math.random()*(hi-lo+1));}
+    else if(i>0){let m=moves[Math.floor(Math.random()*moves.length)];if(lv===0&&Math.abs(m)>3)m=m/2|0;d+=m;if(d<lo)d=lo+(lo-d);if(d>hi)d=hi-(d-hi);d=Math.max(lo,Math.min(hi,d));}
+    let acc=0;const st=fromDia(d).step;
+    if(lv===2&&Math.random()<.3){acc=Math.random()<.5?1:-1;if(acc>0&&!SHARP_OK[st])acc=FLAT_OK[st]?-1:0;if(acc<0&&!FLAT_OK[st])acc=SHARP_OK[st]?1:0;}
+    out.push({n:fromDia(d,acc),clef,acc:!!acc,state:'todo'});
+  }
+  return out;
+}
+
+// ---------- staff rendering ----------
+const svg=document.getElementById('staff');
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs,text){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;return e}
+function layout(){
+  const W=narrow()?(S.mode==='seq'?440:340):640;
+  return S.clef==='grand'?{W,h:250,yB:{treble:95,bass:195}}:{W,h:160,yB:{treble:100,bass:100}};
+}
+function yOf(d,clef,L){return L.yB[clef]-(d-CLEF[clef].bottomD)*5}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+function render(){
+  const L=layout(), W=L.W, R=W-8;
+  svg.setAttribute('viewBox',`0 0 ${W} ${L.h}`);
+  svg.innerHTML='';
+  const ink=css('--ink');
+  const staves=S.clef==='grand'?['treble','bass']:[S.clef];
+  for(const c of staves){
+    const yB=L.yB[c];
+    for(let i=0;i<5;i++) svg.appendChild(el('line',{class:'ln',x1:14,x2:R,y1:yB-i*10,y2:yB-i*10}));
+    svg.appendChild(el('line',{class:'ln',x1:R,x2:R,y1:yB-40,y2:yB}));
+    svg.appendChild(el('text',{class:'clef',x:22,y:yB-10,'font-size':40},c==='treble'?'\u{1D11E}':'\u{1D122}'));
+  }
+  if(S.clef==='grand'){
+    const t=L.yB.treble-40,b=L.yB.bass,m=(t+b)/2;
+    svg.appendChild(el('line',{class:'ln',x1:14,x2:14,y1:t,y2:b}));
+    svg.appendChild(el('path',{d:`M10 ${t} Q2 ${t+(b-t)/4} 8 ${m-2} L4 ${m} L8 ${m+2} Q2 ${b-(b-t)/4} 10 ${b}`,fill:'none',stroke:ink,'stroke-width':2}));
+  }
+  if(!items.length) return;
+  if(S.mode==='single'){
+    drawNote(items[0],(70+R)/2+10,L,running?(items[0].reveal?'reveal':'cur'):'idle');
+  } else {
+    const start=88, step=(R-start-10)/8.5;
+    const xs=items.map((_,i)=>start+step*(i+.5)+(i>=4?step*.5:0));
+    const bx=(xs[3]+xs[4])/2+step*.08;
+    items.forEach((it,i)=>{
+      drawNote(it,xs[i],L,i===idx&&running?(it.reveal?'reveal':'cur'):(it.state==='done'?'done':it.state==='missed'?'missed':'todo'));
+    });
+    for(const c of staves){const yB=L.yB[c];svg.appendChild(el('line',{class:'ln',x1:bx,x2:bx,y1:yB-40,y2:yB}));}
+    if(S.clef==='grand') svg.appendChild(el('line',{class:'ln',x1:bx,x2:bx,y1:L.yB.treble,y2:L.yB.bass-40}));
+  }
+}
+function drawNote(it,x,L,state){
+  const d=dia(it.n), c=it.clef, y=yOf(d,c,L), bD=CLEF[c].bottomD, tD=bD+8;
+  const col={cur:css('--accent'),reveal:css('--good'),done:css('--good'),missed:css('--bad'),todo:css('--ink'),idle:css('--muted')}[state];
+  const g=el('g',{});
+  g.setAttribute('opacity',state==='done'||state==='missed'?0.45:1);
+  for(let l=bD-2;l>=d;l-=2) g.appendChild(el('line',{x1:x-13,x2:x+13,y1:yOf(l,c,L),y2:yOf(l,c,L),stroke:css('--ink'),'stroke-width':1.2}));
+  for(let l=tD+2;l<=d;l+=2) g.appendChild(el('line',{x1:x-13,x2:x+13,y1:yOf(l,c,L),y2:yOf(l,c,L),stroke:css('--ink'),'stroke-width':1.2}));
+  if(it.n.acc) g.appendChild(el('text',{class:'acc',x:x-27,y:y+(it.n.acc>0?0:5),'font-size':58,fill:col},it.n.acc>0?'♯':'♭'));
+  g.appendChild(el('ellipse',{cx:x,cy:y,rx:6.8,ry:4.9,fill:col,transform:`rotate(-20 ${x} ${y})`}));
+  const up=d<bD+4;
+  if(up) g.appendChild(el('line',{x1:x+6.1,x2:x+6.1,y1:y-1,y2:y-34,stroke:col,'stroke-width':1.5}));
+  else g.appendChild(el('line',{x1:x-6.1,x2:x-6.1,y1:y+1,y2:y+34,stroke:col,'stroke-width':1.5}));
+  if(state==='cur'&&S.mode==='seq') g.appendChild(el('path',{d:`M${x-6} 4 L${x+6} 4 L${x} 12 Z`,fill:col}));
+  if(state==='reveal'){
+    const ty=up? y+24 : y-26;
+    g.appendChild(el('text',{x:x,y:Math.max(14,Math.min(L.h-4,ty)),'text-anchor':'middle','font-size':14,'font-weight':700,fill:col,'font-family':'-apple-system,"Hiragino Sans",sans-serif'},jpName(it.n)));
+  }
+  svg.appendChild(g);
+}
+
+// ---------- keyboard ----------
+const kb=document.getElementById('kb'), kbwrap=document.getElementById('kbwrap');
+let keyEls={};
+function keyEl(m){return S.kbd==='oct'?keyEls[60+pcOf(m)]:keyEls[m]}
+function buildKeyboard(){
+  let lo,hi;
+  if(S.kbd==='oct'){lo=60;hi=71}
+  else{
+    lo=Infinity;hi=-Infinity;
+    pool().forEach(it=>{const m=midiOf(it.n);lo=Math.min(lo,m);hi=Math.max(hi,m)});
+    lo=lo-pcOf(lo); hi=hi+(11-pcOf(hi));
+    if(hi-lo<23) hi=lo+23;
+  }
+  kb.innerHTML='';keyEls={};
+  const whites=(hi-lo+1)*7/12, avail=(kbwrap.clientWidth||360)-12;
+  const kw=S.kbd==='oct'?Math.max(44,Math.min(78,Math.floor(avail/whites))):Math.max(40,Math.min(46,Math.floor(avail/whites)));
+  document.documentElement.style.setProperty('--key-w',kw+'px');
+  let wi=0;
+  for(let m=lo;m<=hi;m++){
+    const si=STEP_PC.indexOf(pcOf(m));
+    const k=document.createElement('div');k.dataset.m=m;
+    if(si>=0){
+      k.className='wk';
+      const oct=Math.floor(m/12)-1;
+      k.innerHTML=`<span class="nm">${JP[si]}</span>`+(si===0&&S.kbd==='full'?`<span class="oc">C${oct}</span>`:'<span class="oc">&nbsp;</span>');
+      wi++;
+    } else {
+      k.className='bk';
+      k.style.left=`calc(var(--key-w)*${wi} - ${wi}px - var(--key-w)*.31)`;
+    }
+    kb.appendChild(k);keyEls[m]=k;
+  }
+  applyNames();
+  requestAnimationFrame(()=>{kbwrap.scrollLeft=(kb.scrollWidth-kbwrap.clientWidth)/2});
+}
+kb.addEventListener('pointerdown',e=>{
+  const k=e.target.closest('.wk,.bk');if(!k)return;e.preventDefault();
+  press(+k.dataset.m,S.kbd==='full');
+});
+kb.addEventListener('contextmenu',e=>e.preventDefault());
+const PCMAP={a:0,w:1,s:2,e:3,d:4,f:5,t:6,g:7,y:8,h:9,u:10,j:11,k:12};
+document.addEventListener('keydown',e=>{
+  if(e.repeat||e.metaKey||e.ctrlKey||e.altKey)return;
+  if(e.key===' '||e.key==='Enter'){if(e.target.tagName!=='BUTTON'&&e.target.tagName!=='SUMMARY'){e.preventDefault();toggleRun()}return}
+  const off=PCMAP[e.key.toLowerCase()]; if(off==null)return;
+  const t=current(); let base=60;
+  if(t){const tm=midiOf(t.n);base=tm-pcOf(tm);}
+  press(base+off,false);
+});
+
+// ---------- audio ----------
+let actx=null;
+function unlockAudio(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume()}catch(e){}}
+function tone(m){
+  if(!S.sound)return;
+  try{
+    unlockAudio();
+    const f=440*Math.pow(2,(m-69)/12), t=actx.currentTime;
+    const g=actx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.32,t+.008);g.gain.exponentialRampToValueAtTime(.0008,t+1.4);
+    const lp=actx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=Math.min(9000,f*7);
+    [[1,'triangle',.7],[2,'sine',.22],[3,'sine',.08]].forEach(([h,type,a])=>{
+      const o=actx.createOscillator(),og=actx.createGain();o.type=type;o.frequency.value=f*h;og.gain.value=a;o.connect(og).connect(lp);o.start(t);o.stop(t+1.5);
+    });
+    lp.connect(g).connect(actx.destination);
+  }catch(e){}
+}
+function flash(m,cls,ms){const k=keyEl(m);if(!k)return;k.classList.add(cls);setTimeout(()=>k.classList.remove(cls),ms||260)}
+function showKey(m){const k=keyEl(m);if(k){k.classList.add('show');setTimeout(()=>k.classList.remove('show'),900)}}
+
+// ---------- game ----------
+const fb=document.getElementById('feedback');
+function say(t,cls){fb.textContent=t;fb.className='feedback'+(cls?' '+cls:'')}
+function current(){return running?items[S.mode==='single'?0:idx]:null}
+function setStartLabel(){document.getElementById('startBtn').textContent=running?'ストップ':'スタート'}
+function rebuild(){
+  stopTimer();running=false;locked=false;setStartLabel();
+  buildKeyboard();
+  items=S.mode==='single'?[pickWeighted()]:makeSequence();idx=0;
+  render();say('「スタート」を押して始めましょう');
+}
+function toggleRun(){
+  unlockAudio();
+  if(running){running=false;stopTimer();setStartLabel();render();say('一時停止中');return}
+  running=true;setStartLabel();
+  if(narrow()) settingsEl.open=false;
+  say(S.mode==='seq'?'左から順に。弾きながら次の音を見る！':'音符の鍵盤を押してください');
+  lineStart=performance.now();
+  showCurrent();
+}
+function showCurrent(){missedThis=0;locked=false;shownAt=performance.now();const c=current();if(c)c.reveal=false;render();startTimer()}
+function advance(){
+  if(S.mode==='single'){items=[pickWeighted()];showCurrent();return}
+  idx++;
+  if(idx>=items.length){
+    const secs=((performance.now()-lineStart)/1000).toFixed(1);
+    const miss=items.filter(i=>i.state==='missed').length;
+    say(`1行 ${secs} 秒・ミス ${miss}　→ 次の行`, miss?'':'good');
+    items=makeSequence();idx=0;lineStart=performance.now();
+  }
+  showCurrent();
+}
+function press(m,exactOct){
+  tone(m);
+  const t=current();
+  if(!t||locked){flash(m,'down',150);return}
+  const tm=midiOf(t.n);
+  const ok=exactOct?m===tm:pcOf(m-tm)===0;
+  if(ok){
+    const rt=performance.now()-shownAt;
+    flash(m,'good');
+    record(t,rt,missedThis>0,false);
+    sess.correct++;if(!missedThis){sess.streak++;sess.best=Math.max(sess.best,sess.streak)}
+    sess.time+=rt;
+    if(S.mode==='seq') t.state=missedThis?'missed':'done';
+    if(S.mode==='single')say(`${jpName(t.n)}（${codeName(t.n)}）　${(rt/1000).toFixed(2)} 秒`,'good');
+    else if(idx<items.length-1)say(`${jpName(t.n)} ✓`,'good');
+    updateStats();stopTimer();
+    advance();
+  } else {
+    flash(m,'bad');
+    missedThis++;sess.miss++;sess.streak=0;
+    svg.classList.remove('shake');void svg.getBoundingClientRect();svg.classList.add('shake');
+    if(missedThis>=2){t.reveal=true;render();say(`正解は ${jpName(t.n)}（${codeName(t.n)}）`,'bad');showKey(tm)}
+    else say('ちがいます。もう一度','bad');
+    updateStats();
+  }
+}
+function reveal(){
+  const t=current();if(!t||locked)return;
+  locked=true;stopTimer();
+  t.reveal=true;render();showKey(midiOf(t.n));tone(midiOf(t.n));
+  record(t,0,true,true);sess.miss++;sess.streak=0;updateStats();
+  say(`正解は ${jpName(t.n)}（${codeName(t.n)}）`,'bad');
+  if(S.mode==='seq')t.state='missed';
+  setTimeout(()=>{if(running)advance()},1000);
+}
+document.getElementById('startBtn').onclick=toggleRun;
+document.getElementById('skipBtn').onclick=()=>{if(running)reveal()};
+
+const bar=document.getElementById('timerBar');
+function startTimer(){
+  stopTimer();const lim=+S.limit;if(!lim||!running){bar.style.width='0';return}
+  const tick=()=>{const e=performance.now()-shownAt, r=Math.min(1,e/lim);
+    bar.style.width=(100-r*100)+'%';bar.style.background=r>.75?css('--bad'):css('--accent');
+    if(r>=1){timerRAF=0;reveal();return}timerRAF=requestAnimationFrame(tick)};
+  timerRAF=requestAnimationFrame(tick);
+}
+function stopTimer(){if(timerRAF)cancelAnimationFrame(timerRAF);timerRAF=0;bar.style.width='0'}
+
+// ---------- stats ----------
+function record(t,rt,missed,timeout){
+  const k=keyOf(t.n,t.clef);const s=noteStats[k]||(noteStats[k]={n:0,miss:0,ok:0,time:0});
+  s.n++;if(missed)s.miss++;
+  if(!timeout&&!missed){s.ok++;s.time+=Math.min(rt,6000)}
+  store.set('sr_stats',noteStats);renderWeak();
+}
+function updateStats(){
+  const tot=sess.correct+sess.miss;
+  document.getElementById('sCorrect').textContent=sess.correct;
+  document.getElementById('sRate').textContent=tot?Math.round(sess.correct/tot*100)+'%':'–';
+  document.getElementById('sTime').textContent=sess.correct?(sess.time/sess.correct/1000).toFixed(2)+'s':'–';
+  document.getElementById('sStreak').textContent=sess.streak;
+  document.getElementById('sBest').textContent=sess.best;
+}
+function renderWeak(){
+  const ul=document.getElementById('weak');
+  const rows=Object.entries(noteStats).filter(([,s])=>s.n>=2).map(([k,s])=>{
+    const mr=s.miss/s.n, at=s.ok?s.time/s.ok:4000;return {k,s,mr,at,score:mr*2+at/1000}});
+  rows.sort((a,b)=>b.score-a.score);
+  if(!rows.length){ul.innerHTML='<li class="muted">まだデータがありません。数十問解くと表示されます。</li>';return}
+  ul.innerHTML=rows.slice(0,6).map(r=>{
+    const [clef,code]=r.k.split(':');
+    const m=code.match(/^([A-G])([♯♭]?)(-?\d+)$/);const nm=m?JP[EN.indexOf(m[1])]+m[2]:code;
+    return `<li><span>${CLEF[clef].name}　<b>${nm}</b> <span class="muted">${code}</span></span><span class="muted">ミス ${Math.round(r.mr*100)}%・${r.s.ok?(r.at/1000).toFixed(1)+'秒':'–'}<span class="bar" style="width:${Math.round(8+Math.min(r.score,5)*12)}px"></span></span></li>`}).join('');
+}
+let resetArm=false;
+document.getElementById('resetBtn').onclick=()=>{
+  const msg=document.getElementById('resetMsg');
+  if(!resetArm){resetArm=true;msg.textContent='もう一度押すとリセット';setTimeout(()=>{resetArm=false;msg.textContent=''},3000);return}
+  noteStats={};store.set('sr_stats',noteStats);renderWeak();resetArm=false;msg.textContent='リセットしました';
+};
+
+// ---------- MIDI ----------
+document.getElementById('midiBtn').onclick=async()=>{
+  const st=document.getElementById('midiStatus');
+  if(!navigator.requestMIDIAccess){st.textContent='このブラウザはMIDI非対応（PCのChrome/Edgeで使えます）';return}
+  try{
+    const acc=await navigator.requestMIDIAccess();
+    const hook=()=>{let n=0;acc.inputs.forEach(inp=>{n++;inp.onmidimessage=ev=>{const [s,note,vel]=ev.data;if((s&0xf0)===0x90&&vel>0)press(note,true)}});
+      st.textContent=n?`MIDI接続中（${n}台）`:'MIDI機器が見つかりません';};
+    hook();acc.onstatechange=hook;
+  }catch(e){st.textContent='MIDIを使えませんでした'}
+};
+
+let lastW=window.innerWidth;
+window.addEventListener('resize',()=>{clearTimeout(window.__rz);window.__rz=setTimeout(()=>{if(window.innerWidth===lastW)return;lastW=window.innerWidth;buildKeyboard();render();},200)});
+updateSummary();rebuild();renderWeak();updateStats();
+
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+})();
+</script>
+</body>
+</html>
