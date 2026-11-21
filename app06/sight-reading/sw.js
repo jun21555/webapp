@@ -1,5 +1,5 @@
 // 初見トレーナー Service Worker: ネット優先、オフライン時はキャッシュから起動
-const CACHE = 'sight-reading-v1';
+const CACHE = 'sight-reading-v2';
 const SHELL = ['sight-reading.html', 'manifest.webmanifest', 'favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 
 self.addEventListener('install', e => {

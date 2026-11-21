@@ -87,6 +87,16 @@ details[open].settings summary .chev{transform:rotate(180deg)}
 .hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6}
 .hint kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;font-family:inherit;font-size:11px}
 @media (hover:none){.hint .pc{display:none}}
+.prog{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);padding:2px 6px 0;min-height:20px}
+.prog b{color:var(--ink);font-size:15px}
+.pbar{flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--good);transition:width .2s}
+.result{margin:8px 2px 4px;padding:12px 10px;border-radius:12px;background:var(--paper);text-align:center}
+.result h3{margin:0 0 10px;font-size:17px}
+.rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.rgrid div{font-size:11px;color:var(--muted)}
+.rgrid b{display:block;font-size:18px;color:var(--ink);margin-top:2px;font-variant-numeric:tabular-nums}
+.result p{margin:10px 0 0;font-size:13px;color:var(--muted)}
 .lower{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 @media (max-width:680px){.lower{grid-template-columns:1fr}}
 .lower h2{font-size:15px;margin:0 0 8px}
@@ -119,6 +129,8 @@ details[open].settings summary .chev{transform:rotate(180deg)}
         <div class="seg" data-key="mode"><button data-v="single">1音ずつ</button><button data-v="seq">先読み8音</button></div></div>
       <div class="field"><span class="t">1音の制限時間</span>
         <div class="seg" data-key="limit"><button data-v="0">なし</button><button data-v="3000">3秒</button><button data-v="2000">2秒</button><button data-v="1200">1.2秒</button></div></div>
+      <div class="field"><span class="t">問題数</span>
+        <div class="seg" data-key="count"><button data-v="10">10</button><button data-v="20">20</button><button data-v="30">30</button><button data-v="50">50</button><button data-v="0">∞</button></div></div>
       <div class="field"><span class="t">鍵盤</span>
         <div class="seg" data-key="kbd"><button data-v="oct">1オクターブ</button><button data-v="full">全音域</button></div></div>
       <div class="toggles">
@@ -139,9 +151,11 @@ details[open].settings summary .chev{transform:rotate(180deg)}
   </div>
 
   <div class="card stage">
+    <div class="prog" id="prog"></div>
     <svg id="staff" viewBox="0 0 400 170" aria-label="五線譜"></svg>
     <div class="timer"><i id="timerBar"></i></div>
     <div class="feedback" id="feedback"></div>
+    <div class="result" id="result" hidden></div>
     <div class="controls">
       <button class="btn" id="startBtn" type="button">スタート</button>
       <button class="btn ghost" id="skipBtn" type="button">答え</button>
@@ -178,7 +192,7 @@ const EN=['C','D','E','F','G','A','B'];
 const CLEF={treble:{bottomD:30,name:'ト音'},bass:{bottomD:18,name:'ヘ音'}};
 const RANGES={treble:[[29,39],[26,42],[25,44]],bass:[[17,27],[14,30],[13,31]]};
 const SHARP_OK=[1,1,0,1,1,1,0], FLAT_OK=[0,1,1,0,1,1,1];
-const LABELS={clef:{treble:'ト音',bass:'ヘ音',grand:'大譜表'},level:{0:'初級',1:'中級',2:'上級'},mode:{single:'1音ずつ',seq:'先読み'},limit:{0:'',3000:'3秒',2000:'2秒',1200:'1.2秒'},kbd:{oct:'1オクターブ',full:'全音域'}};
+const LABELS={clef:{treble:'ト音',bass:'ヘ音',grand:'大譜表'},level:{0:'初級',1:'中級',2:'上級'},mode:{single:'1音ずつ',seq:'先読み'},limit:{0:'',3000:'3秒',2000:'2秒',1200:'1.2秒'},kbd:{oct:'1オクターブ',full:'全音域'},count:{10:'10問',20:'20問',30:'30問',50:'50問',0:'∞'}};
 
 const midiOf=n=>12*(n.oct+1)+STEP_PC[n.step]+n.acc;
 const dia=n=>n.oct*7+n.step;
@@ -192,11 +206,11 @@ const pcOf=m=>((m%12)+12)%12;
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
              set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const narrow=()=>window.innerWidth<620;
-const S=Object.assign({clef:'treble',level:'0',mode:'single',limit:'0',kbd:narrow()?'oct':'full',names:true,sound:true},store.get('sr_settings',{}));
+const S=Object.assign({clef:'treble',level:'0',mode:'single',limit:'0',count:'20',kbd:narrow()?'oct':'full',names:true,sound:true},store.get('sr_settings',{}));
 let noteStats=store.get('sr_stats',{});
 
 let running=false, items=[], idx=0, shownAt=0, missedThis=0, timerRAF=0, locked=false, lineStart=0;
-const sess={correct:0,miss:0,time:0,streak:0,best:0};
+const sess={correct:0,first:0,miss:0,time:0,streak:0,best:0};
 
 // ---------- settings UI ----------
 const settingsEl=document.getElementById('settings');
@@ -215,7 +229,7 @@ optSound.onchange=()=>{S.sound=optSound.checked;saveS()};
 function saveS(){store.set('sr_settings',S);updateSummary()}
 function applyNames(){document.getElementById('kb').classList.toggle('hide-names',!S.names)}
 function updateSummary(){
-  document.getElementById('sum').textContent=['clef','level','mode','limit','kbd'].map(k=>LABELS[k][S[k]]).filter(Boolean).join('・');
+  document.getElementById('sum').textContent=['clef','level','count','mode','limit','kbd'].map(k=>LABELS[k][S[k]]).filter(Boolean).join('・');
   document.getElementById('kbHint').textContent=S.kbd==='oct'?'1オクターブ鍵盤ではオクターブを問わず判定します。':'全音域鍵盤では高さ（オクターブ）まで正確に判定します。';
 }
 
@@ -251,12 +265,13 @@ function pickWeighted(){
   for(let i=0;i<p.length;i++){r-=ws[i];if(r<=0){lastKey=keyOf(p[i].n,p[i].clef);return p[i]}}
   return p[p.length-1];
 }
-function makeSequence(){
+function makeSequence(len){
+  len=len||8;
   const lv=+S.level, out=[], clefs=clefsFor();
   let clef=clefs[Math.floor(Math.random()*clefs.length)];
   let [lo,hi]=RANGES[clef][lv], d=lo+Math.floor(Math.random()*(hi-lo+1));
   const moves=[-1,1,-1,1,-2,2,-2,2,-3,3,-4,4,0];
-  for(let i=0;i<8;i++){
+  for(let i=0;i<len;i++){
     if(i===4&&clefs.length>1&&Math.random()<.6){clef=clefs[Math.floor(Math.random()*2)];[lo,hi]=RANGES[clef][lv];d=lo+Math.floor(Math.random()*(hi-lo+1));}
     else if(i>0){let m=moves[Math.floor(Math.random()*moves.length)];if(lv===0&&Math.abs(m)>3)m=m/2|0;d+=m;if(d<lo)d=lo+(lo-d);if(d>hi)d=hi-(d-hi);d=Math.max(lo,Math.min(hi,d));}
     let acc=0;const st=fromDia(d).step;
@@ -303,8 +318,10 @@ function render(){
     items.forEach((it,i)=>{
       drawNote(it,xs[i],L,i===idx&&running?(it.reveal?'reveal':'cur'):(it.state==='done'?'done':it.state==='missed'?'missed':'todo'));
     });
-    for(const c of staves){const yB=L.yB[c];svg.appendChild(el('line',{class:'ln',x1:bx,x2:bx,y1:yB-40,y2:yB}));}
-    if(S.clef==='grand') svg.appendChild(el('line',{class:'ln',x1:bx,x2:bx,y1:L.yB.treble,y2:L.yB.bass-40}));
+    if(items.length>4){
+      for(const c of staves){const yB=L.yB[c];svg.appendChild(el('line',{class:'ln',x1:bx,x2:bx,y1:yB-40,y2:yB}));}
+      if(S.clef==='grand') svg.appendChild(el('line',{class:'ln',x1:bx,x2:bx,y1:L.yB.treble,y2:L.yB.bass-40}));
+    }
   }
 }
 function drawNote(it,x,L,state){
@@ -400,23 +417,53 @@ function showKey(m){const k=keyEl(m);if(k){k.classList.add('show');setTimeout(()
 const fb=document.getElementById('feedback');
 function say(t,cls){fb.textContent=t;fb.className='feedback'+(cls?' '+cls:'')}
 function current(){return running?items[S.mode==='single'?0:idx]:null}
-function setStartLabel(){document.getElementById('startBtn').textContent=running?'ストップ':'スタート'}
+let phase='idle', done=0, activeMs=0, resumeAt=0;
+const total=()=>+S.count;
+const resultEl=document.getElementById('result');
+function setStartLabel(){document.getElementById('startBtn').textContent={running:'ストップ',paused:'再開',finished:'もう一度'}[phase]||'スタート'}
+function updateProg(){
+  const p=document.getElementById('prog'), t=total();
+  if(phase==='idle'){p.innerHTML=`<span>${t?t+'問':'問題数：無制限'}</span>`;return}
+  const n=phase==='finished'?done:done+1;
+  p.innerHTML=t?`<span>問題 <b>${Math.min(n,t)}</b> / ${t}</span><span class="pbar"><i style="width:${done/t*100}%"></i></span>`:`<span>問題 <b>${n}</b></span>`;
+}
+function newItems(){
+  if(S.mode==='single') return [pickWeighted()];
+  const t=total();
+  return makeSequence(t?Math.min(8,t-done):8);
+}
+function resetSess(){Object.assign(sess,{correct:0,first:0,miss:0,time:0,streak:0,best:0});updateStats()}
 function rebuild(){
-  stopTimer();running=false;locked=false;setStartLabel();
+  stopTimer();running=false;locked=false;phase='idle';done=0;resultEl.hidden=true;
   buildKeyboard();
-  items=S.mode==='single'?[pickWeighted()]:makeSequence();idx=0;
-  render();say('「スタート」を押して始めましょう');
+  items=newItems();idx=0;
+  render();setStartLabel();updateProg();say('「スタート」を押して始めましょう');
 }
 function toggleRun(){
   unlockAudio();
-  if(running){running=false;stopTimer();setStartLabel();render();say('一時停止中');return}
-  running=true;setStartLabel();
+  if(phase==='running'){
+    running=false;phase='paused';activeMs+=performance.now()-resumeAt;stopTimer();
+    setStartLabel();render();say('一時停止中');return;
+  }
+  if(phase==='idle'||phase==='finished'){
+    const again=phase==='finished';
+    done=0;activeMs=0;resetSess();resultEl.hidden=true;
+    if(again){items=newItems();idx=0}
+    lineStart=performance.now();
+  }
+  phase='running';running=true;resumeAt=performance.now();
+  setStartLabel();updateProg();
   if(narrow()){settingsEl.open=false;requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'smooth'}));}
   say(S.mode==='seq'?'左から順に。弾きながら次の音を見る！':'音符の鍵盤を押してください');
-  lineStart=performance.now();
   showCurrent();
 }
 function showCurrent(){missedThis=0;locked=false;shownAt=performance.now();const c=current();if(c)c.reveal=false;render();startTimer()}
+// 1音が終わった（正解 or 答えを表示）ときに呼ぶ
+function complete(){
+  done++;updateProg();
+  if(total()&&done>=total()){finish();return}
+  advance();
+}
 function advance(){
   if(S.mode==='single'){items=[pickWeighted()];showCurrent();return}
   idx++;
@@ -424,9 +471,23 @@ function advance(){
     const secs=((performance.now()-lineStart)/1000).toFixed(1);
     const miss=items.filter(i=>i.state==='missed').length;
     say(`1行 ${secs} 秒・ミス ${miss}　→ 次の行`, miss?'':'good');
-    items=makeSequence();idx=0;lineStart=performance.now();
+    items=newItems();idx=0;lineStart=performance.now();
   }
   showCurrent();
+}
+function finish(){
+  running=false;phase='finished';stopTimer();activeMs+=performance.now()-resumeAt;
+  render();setStartLabel();updateProg();
+  const firstRate=done?sess.first/done:0;
+  const avg=sess.correct?sess.time/sess.correct/1000:0;
+  const comment=firstRate>=.95&&avg<1?'すばらしい！制限時間を短くするか、レベルを上げてみましょう。'
+    :firstRate>=.8?'いい調子です。「苦手な音」を確認して、もう一度。'
+    :'まずは制限時間なしで、正確さを優先しましょう。';
+  resultEl.innerHTML=`<h3>おつかれさま！ ${done}問 完了</h3>
+    <div class="rgrid"><div>一発正解<b>${sess.first}/${done}</b></div><div>平均反応<b>${sess.correct?avg.toFixed(2)+'秒':'–'}</b></div><div>ミス<b>${sess.miss}</b></div><div>かかった時間<b>${Math.round(activeMs/1000)}秒</b></div></div>
+    <p>${comment}</p>`;
+  resultEl.hidden=false;
+  say('');
 }
 function press(m,exactOct){
   tone(m);
@@ -438,13 +499,13 @@ function press(m,exactOct){
     const rt=performance.now()-shownAt;
     flash(m,'good');
     record(t,rt,missedThis>0,false);
-    sess.correct++;if(!missedThis){sess.streak++;sess.best=Math.max(sess.best,sess.streak)}
+    sess.correct++;if(!missedThis){sess.first++;sess.streak++;sess.best=Math.max(sess.best,sess.streak)}
     sess.time+=rt;
     if(S.mode==='seq') t.state=missedThis?'missed':'done';
     if(S.mode==='single')say(`${jpName(t.n)}（${codeName(t.n)}）　${(rt/1000).toFixed(2)} 秒`,'good');
     else if(idx<items.length-1)say(`${jpName(t.n)} ✓`,'good');
     updateStats();stopTimer();
-    advance();
+    complete();
   } else {
     flash(m,'bad');
     missedThis++;sess.miss++;sess.streak=0;
@@ -461,7 +522,7 @@ function reveal(){
   record(t,0,true,true);sess.miss++;sess.streak=0;updateStats();
   say(`正解は ${jpName(t.n)}（${codeName(t.n)}）`,'bad');
   if(S.mode==='seq')t.state='missed';
-  setTimeout(()=>{if(running)advance()},1000);
+  setTimeout(()=>{if(running&&current()===t)complete()},1000);
 }
 document.getElementById('startBtn').onclick=toggleRun;
 document.getElementById('skipBtn').onclick=()=>{if(running)reveal()};
