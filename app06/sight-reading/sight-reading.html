@@ -107,6 +107,63 @@ details[open].settings summary .chev{transform:rotate(180deg)}
 .tips{font-size:13px;line-height:1.75;margin:0;padding-left:18px}
 .tips li{margin-bottom:4px}
 .muted{color:var(--muted);font-size:12px}
+/* ---- テーマ（ごほうび） ---- */
+html[data-theme=night]{--paper:#0e1530;--card:#172041;--ink:#e9edff;--muted:#9aa3c7;--line:#2c3765;--accent:#7aa2ff;--good:#5fd3a0;--bad:#ff7a8a}
+html[data-theme=sakura]{--paper:#fdf0f3;--card:#fffafb;--ink:#3a2329;--muted:#9a7680;--line:#f0d3db;--accent:#d9577e;--good:#3f8f62;--bad:#c8333f}
+html[data-theme=matcha]{--paper:#edf2e4;--card:#fbfdf7;--ink:#1f2a1c;--muted:#6c7a63;--line:#d3dec6;--accent:#5b8a3a;--good:#2f7d4f;--bad:#c23b2e}
+html[data-theme=gold]{--paper:#17140e;--card:#241f17;--ink:#f6ebcf;--muted:#b5a57e;--line:#4a3f2a;--accent:#e3b341;--good:#8fd18a;--bad:#ff7b6b}
+html[data-theme=aurora]{--paper:#0b1a22;--card:#122a33;--ink:#e3fbff;--muted:#8fb8c2;--line:#23444f;--accent:#4fe0c0;--good:#9cf07a;--bad:#ff7a9c}
+html[data-theme=aurora] body{background:radial-gradient(120% 60% at 20% 0%,rgba(79,224,192,.28),transparent 60%),radial-gradient(90% 50% at 90% 10%,rgba(160,110,255,.25),transparent 60%),#0b1a22;background-attachment:fixed}
+/* ---- プレイヤーカード ---- */
+.player{width:100%;display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;text-align:left;cursor:pointer;min-height:64px}
+.player:active{transform:scale(.99)}
+.pl-lv{flex:none;width:48px;height:48px;border-radius:14px;background:var(--accent);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.pl-lv .lvtxt{font-size:10px;opacity:.85}.pl-lv .lvnum{font-size:20px;font-weight:800}
+.pl-main{flex:1;min-width:0}
+.pl-title{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xpbar{height:7px;border-radius:4px;background:var(--line);overflow:hidden;margin:5px 0 3px}
+.xpbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#f0b35a);width:0;transition:width .5s}
+.pl-sub{font-size:11px;color:var(--muted)}
+.pl-chips{flex:none;display:flex;flex-direction:column;gap:3px;font-size:13px;font-weight:700;text-align:right}
+/* ---- シート ---- */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet-bg[hidden]{display:none}
+.sheet{background:var(--card);color:var(--ink);width:100%;max-width:640px;max-height:86dvh;border-radius:20px 20px 0 0;display:flex;flex-direction:column;
+  padding:10px calc(env(safe-area-inset-right) + 14px) calc(env(safe-area-inset-bottom) + 14px) calc(env(safe-area-inset-left) + 14px);animation:up .25s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+.sheet-head{display:flex;align-items:center;gap:10px;padding-bottom:8px}
+.tabs{flex:1;display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tabs button{flex:1;border:0;background:transparent;min-height:44px;font-size:15px;cursor:pointer}
+.tabs button.on{background:var(--ink);color:var(--card);font-weight:700}
+.sheet-body{overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px}
+.sec{font-size:12px;color:var(--muted);margin:12px 2px 6px;font-weight:700}
+.bgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.badge{border:1px solid var(--line);border-radius:14px;padding:10px 6px;text-align:center;background:var(--paper)}
+.badge .ic{font-size:30px;line-height:1.2}
+.badge .nm{font-size:12px;font-weight:700;margin-top:4px}
+.badge .ds{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.35}
+.badge .pg{height:4px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}
+.badge .pg i{display:block;height:100%;background:var(--accent)}
+.badge.locked .ic{filter:grayscale(1);opacity:.35}
+.badge.got{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.rlist{display:flex;flex-direction:column;gap:8px}
+.rw{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:14px;padding:8px 10px;background:var(--paper)}
+.rw .ic{font-size:26px;width:36px;text-align:center}
+.rw .tx{flex:1;min-width:0}.rw .tx b{display:block;font-size:14px}.rw .tx span{font-size:11px;color:var(--muted)}
+.rw.locked .ic{filter:grayscale(1);opacity:.4}
+.rw button{min-width:76px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:13px;cursor:pointer}
+.rw button.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.rw button:disabled{opacity:.5;cursor:default}
+/* ---- トースト・紙吹雪 ---- */
+.toasts{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top) + 8px);z-index:60;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;padding:0 12px}
+.toast{background:var(--ink);color:var(--card);border-radius:14px;padding:10px 14px;font-size:14px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);display:flex;gap:8px;align-items:center;max-width:420px;animation:tin .3s ease-out}
+.toast .ic{font-size:22px}.toast small{display:block;font-weight:400;opacity:.8;font-size:12px}
+.toast.out{transition:opacity .4s,transform .4s;opacity:0;transform:translateY(-10px)}
+@keyframes tin{from{opacity:0;transform:translateY(-14px) scale(.96)}}
+#fxCanvas{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:55}
+.gain{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.gain span{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700}
+.gain span.xp{background:var(--accent);border-color:var(--accent);color:#fff}
 </style>
 </head>
 <body>
@@ -117,6 +174,12 @@ details[open].settings summary .chev{transform:rotate(180deg)}
     </a>
     <h1>初見トレーナー</h1>
   </div>
+
+  <button class="card player" id="playerBtn" type="button" aria-label="バッジとごほうびを見る">
+    <div class="pl-lv"><span class="lvtxt">Lv</span><span class="lvnum" id="plLv">1</span></div>
+    <div class="pl-main"><div class="pl-title" id="plTitle"></div><div class="xpbar"><i id="plXp"></i></div><div class="pl-sub" id="plSub"></div></div>
+    <div class="pl-chips"><span id="plFire"></span><span id="plBadge"></span></div>
+  </button>
 
   <details class="card settings" id="settings">
     <summary><span>⚙︎ 設定</span><span class="sum" id="sum"></span><span class="chev">▾</span></summary>
@@ -168,7 +231,7 @@ details[open].settings summary .chev{transform:rotate(180deg)}
     <div class="card">
       <h2>苦手な音 <span class="muted">（ミス率と反応時間から）</span></h2>
       <ul class="weak" id="weak"></ul>
-      <div style="margin-top:8px;display:flex;align-items:center;gap:8px"><button class="btn-s" id="resetBtn" type="button">記録をリセット</button><span class="muted" id="resetMsg"></span></div>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:8px"><button class="btn-s" id="resetBtn" type="button">苦手データをリセット</button><span class="muted" id="resetMsg"></span></div>
     </div>
     <div class="card">
       <h2>上達のコツ</h2>
@@ -183,6 +246,17 @@ details[open].settings summary .chev{transform:rotate(180deg)}
   </div>
 </div>
 
+<div class="sheet-bg" id="sheetBg" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="バッジとごほうび">
+    <div class="sheet-head">
+      <div class="tabs"><button type="button" data-tab="badges" class="on">🏅 バッジ</button><button type="button" data-tab="rewards">🎁 ごほうび</button></div>
+      <button class="round" id="sheetClose" type="button" aria-label="閉じる">✕</button>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
+</div>
+<div class="toasts" id="toasts"></div>
+<canvas id="fxCanvas"></canvas>
 <script>
 (function(){
 "use strict";
@@ -206,7 +280,7 @@ const pcOf=m=>((m%12)+12)%12;
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
              set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const narrow=()=>window.innerWidth<620;
-const S=Object.assign({clef:'treble',level:'0',mode:'single',limit:'0',count:'20',kbd:narrow()?'oct':'full',names:true,sound:true},store.get('sr_settings',{}));
+const S=Object.assign({clef:'treble',level:'0',mode:'single',limit:'0',count:'20',kbd:narrow()?'oct':'full',names:true,sound:true,theme:'theme-default',voice:'sound-piano',fx:[]},store.get('sr_settings',{}));
 let noteStats=store.get('sr_stats',{});
 
 let running=false, items=[], idx=0, shownAt=0, missedThis=0, timerRAF=0, locked=false, lineStart=0;
@@ -326,7 +400,8 @@ function render(){
 }
 function drawNote(it,x,L,state){
   const d=dia(it.n), c=it.clef, y=yOf(d,c,L), bD=CLEF[c].bottomD, tD=bD+8;
-  const col={cur:css('--accent'),reveal:css('--good'),done:css('--good'),missed:css('--bad'),todo:css('--ink'),idle:css('--muted')}[state];
+  let col={cur:css('--accent'),reveal:css('--good'),done:css('--good'),missed:css('--bad'),todo:css('--ink'),idle:css('--muted')}[state];
+  if(fxOn('fx-rainbow')&&(state==='cur'||state==='todo'||state==='idle')) col=`hsl(${pcOf(midiOf(it.n))*30},75%,${state==='todo'?55:48}%)`;
   const g=el('g',{});
   g.setAttribute('opacity',state==='done'||state==='missed'?0.45:1);
   for(let l=bD-2;l>=d;l-=2) g.appendChild(el('line',{x1:x-13,x2:x+13,y1:yOf(l,c,L),y2:yOf(l,c,L),stroke:css('--ink'),'stroke-width':1.2}));
@@ -397,17 +472,30 @@ document.addEventListener('keydown',e=>{
 // ---------- audio ----------
 let actx=null;
 function unlockAudio(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume()}catch(e){}}
-function tone(m){
+// 音色: [波形, 倍音比, 音量, 減衰秒]
+const VOICES={
+  'sound-piano':{p:[['triangle',1,.7,1.4],['sine',2,.22,1.0],['sine',3,.08,.7]],lp:7},
+  'sound-musicbox':{p:[['sine',2,.55,.9],['sine',4,.18,.5],['sine',5.4,.07,.25]],lp:12},
+  'sound-epiano':{p:[['sine',1,.6,1.6],['sine',2,.12,.8],['sine',7,.05,.15]],lp:9,fm:1.2},
+  'sound-harpsi':{p:[['sawtooth',1,.32,.9],['square',2,.1,.5]],lp:14,hp:true}
+};
+function tone(m,when){
   if(!S.sound)return;
   try{
     unlockAudio();
-    const f=440*Math.pow(2,(m-69)/12), t=actx.currentTime;
-    const g=actx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.32,t+.008);g.gain.exponentialRampToValueAtTime(.0008,t+1.4);
-    const lp=actx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=Math.min(9000,f*7);
-    [[1,'triangle',.7],[2,'sine',.22],[3,'sine',.08]].forEach(([h,type,a])=>{
-      const o=actx.createOscillator(),og=actx.createGain();o.type=type;o.frequency.value=f*h;og.gain.value=a;o.connect(og).connect(lp);o.start(t);o.stop(t+1.5);
+    const v=VOICES[S.voice]||VOICES['sound-piano'];
+    const f=440*Math.pow(2,(m-69)/12), t=actx.currentTime+(when||0);
+    const out=actx.createGain();out.gain.value=.9;
+    const lp=actx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=Math.min(12000,f*v.lp);
+    let node=lp;
+    if(v.hp){const hp=actx.createBiquadFilter();hp.type='highpass';hp.frequency.value=f*.8;lp.connect(hp);node=hp}
+    node.connect(out).connect(actx.destination);
+    v.p.forEach(([type,h,a,dec])=>{
+      const o=actx.createOscillator(),g=actx.createGain();o.type=type;o.frequency.value=f*h;
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(a*.45,t+.006);g.gain.exponentialRampToValueAtTime(.0005,t+dec);
+      if(v.fm&&h===1){const mo=actx.createOscillator(),mg=actx.createGain();mo.frequency.value=f;mg.gain.setValueAtTime(f*v.fm,t);mg.gain.exponentialRampToValueAtTime(1,t+.6);mo.connect(mg).connect(o.frequency);mo.start(t);mo.stop(t+dec+.1)}
+      o.connect(g).connect(lp);o.start(t);o.stop(t+dec+.1);
     });
-    lp.connect(g).connect(actx.destination);
   }catch(e){}
 }
 function flash(m,cls,ms){const k=keyEl(m);if(!k)return;k.classList.add(cls);setTimeout(()=>k.classList.remove(cls),ms||260)}
@@ -447,7 +535,7 @@ function toggleRun(){
   }
   if(phase==='idle'||phase==='finished'){
     const again=phase==='finished';
-    done=0;activeMs=0;resetSess();resultEl.hidden=true;
+    done=0;activeMs=0;resetSess();resultEl.hidden=true;roundXP=0;roundNew=[];
     if(again){items=newItems();idx=0}
     lineStart=performance.now();
   }
@@ -485,7 +573,7 @@ function finish(){
     :'まずは制限時間なしで、正確さを優先しましょう。';
   resultEl.innerHTML=`<h3>おつかれさま！ ${done}問 完了</h3>
     <div class="rgrid"><div>一発正解<b>${sess.first}/${done}</b></div><div>平均反応<b>${sess.correct?avg.toFixed(2)+'秒':'–'}</b></div><div>ミス<b>${sess.miss}</b></div><div>かかった時間<b>${Math.round(activeMs/1000)}秒</b></div></div>
-    <p>${comment}</p>`;
+    <p>${comment}</p>${onRoundEnd(firstRate,avg)}`;
   resultEl.hidden=false;
   say('');
 }
@@ -500,6 +588,7 @@ function press(m,exactOct){
     flash(m,'good');
     record(t,rt,missedThis>0,false);
     sess.correct++;if(!missedThis){sess.first++;sess.streak++;sess.best=Math.max(sess.best,sess.streak)}
+    onCorrect(!missedThis);
     sess.time+=rt;
     if(S.mode==='seq') t.state=missedThis?'missed':'done';
     if(S.mode==='single')say(`${jpName(t.n)}（${codeName(t.n)}）　${(rt/1000).toFixed(2)} 秒`,'good');
@@ -584,7 +673,204 @@ document.getElementById('midiBtn').onclick=async()=>{
 
 let lastW=window.innerWidth;
 window.addEventListener('resize',()=>{clearTimeout(window.__rz);window.__rz=setTimeout(()=>{if(window.innerWidth===lastW)return;lastW=window.innerWidth;buildKeyboard();render();},200)});
-updateSummary();rebuild();renderWeak();updateStats();
+// ================= レベル・バッジ・ごほうび =================
+const todayStr=(o)=>{const d=new Date();if(o)d.setDate(d.getDate()+o);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+function seedProg(){let c=0;for(const k in noteStats)c+=noteStats[k].ok||0;return {xp:c,correct:c,first:c}}
+const P=Object.assign({xp:0,correct:0,first:0,days:[],dayStreak:0,bestDayStreak:0,lastDay:'',rounds:0,perfect:0,bestAvg:0,bestCombo:0,feats:{},badges:{}},store.get('sr_prog',null)||seedProg());
+function saveP(){store.set('sr_prog',P)}
+let roundXP=0, roundNew=[];
+const lvXP=L=>25*L*(L-1);              // そのレベルに到達するのに必要な累計XP
+function levelOf(xp){let L=1;while(xp>=lvXP(L+1))L++;return L}
+const TITLES=[[1,'譜読み見習い'],[3,'ドレミの旅人'],[5,'五線の探検家'],[8,'初見チャレンジャー'],[12,'譜読みの職人'],[16,'初見マスター'],[20,'伝説の初見王']];
+const titleOf=L=>TITLES.filter(t=>L>=t[0]).pop()[1];
+const curDayStreak=()=>(P.lastDay===todayStr()||P.lastDay===todayStr(-1))?P.dayStreak:0;
+
+const spdBadge=(id,icon,name,sec)=>({id,icon,name,cat:'speed',desc:`10問以上・一発正解80%以上で平均${sec.toFixed(1)}秒以内`,ok:()=>P.bestAvg>0&&P.bestAvg<=sec,prog:()=>P.bestAvg?`ベスト ${P.bestAvg.toFixed(2)}秒`:'未計測',ratio:()=>P.bestAvg?Math.min(1,sec/P.bestAvg):0});
+const numBadge=(id,icon,name,cat,desc,v,g)=>({id,icon,name,cat,desc,ok:()=>v()>=g,prog:()=>`${Math.min(v(),g)}/${g}`,ratio:()=>Math.min(1,v()/g)});
+const featBadge=(id,icon,name,desc,key)=>({id,icon,name,cat:'feat',desc,ok:()=>!!P.feats[key],prog:()=>P.feats[key]?'達成':'未達成',ratio:()=>P.feats[key]?1:0});
+const BADGES=[
+  numBadge('c10','🎵','はじめの一歩','count','通算10音正解',()=>P.correct,10),
+  numBadge('c100','🎶','100音クリア','count','通算100音正解',()=>P.correct,100),
+  numBadge('c500','🎼','500音クリア','count','通算500音正解',()=>P.correct,500),
+  numBadge('c1000','🏵️','1000音の壁','count','通算1000音正解',()=>P.correct,1000),
+  numBadge('c3000','💎','3000音の達人','count','通算3000音正解',()=>P.correct,3000),
+  numBadge('c10000','👑','1万音の王','count','通算10000音正解',()=>P.correct,10000),
+  spdBadge('t20','🐢','2秒の壁',2.0), spdBadge('t15','🐇','1.5秒の壁',1.5), spdBadge('t10','⚡','1秒の壁',1.0), spdBadge('t07','🚀','光速リーダー',0.7),
+  numBadge('d3','🌱','3日練習','days','練習した日が通算3日',()=>P.days.length,3),
+  numBadge('d7','🌿','7日練習','days','練習した日が通算7日',()=>P.days.length,7),
+  numBadge('d30','🌳','30日練習','days','練習した日が通算30日',()=>P.days.length,30),
+  numBadge('d100','🏔️','100日練習','days','練習した日が通算100日',()=>P.days.length,100),
+  numBadge('s3','🔥','3日連続','days','3日続けて練習',()=>P.bestDayStreak,3),
+  numBadge('s7','☄️','1週間連続','days','7日続けて練習',()=>P.bestDayStreak,7),
+  numBadge('s30','🌋','30日連続','days','30日続けて練習',()=>P.bestDayStreak,30),
+  numBadge('k10','✨','10連続正解','combo','一発正解を10回連続',()=>P.bestCombo,10),
+  numBadge('k30','💫','30連続正解','combo','一発正解を30回連続',()=>P.bestCombo,30),
+  numBadge('k100','🌟','100連続正解','combo','一発正解を100回連続',()=>P.bestCombo,100),
+  numBadge('p1','💯','パーフェクト','combo','10問以上を全問一発正解',()=>P.perfect,1),
+  numBadge('p10','🏆','パーフェクト10回','combo','パーフェクトを10回',()=>P.perfect,10),
+  featBadge('f_bass','🎻','ヘ音デビュー','ヘ音記号で1回完走','bass'),
+  featBadge('f_grand','🎹','両手の譜面','大譜表で1回完走','grand'),
+  featBadge('f_adv','♯','臨時記号ハンター','上級（♯♭）で1回完走','adv'),
+  featBadge('f_seq','👀','先読みの目','先読みモードで1回完走','seq'),
+  featBadge('f_fast','⏱️','1.2秒の緊張感','制限1.2秒・一発正解80%以上で完走','fast'),
+];
+const BADGE_CATS=[['count','🎵 正解数'],['speed','⚡ 反応の速さ'],['days','📅 取り組み日数'],['combo','✨ 連続・パーフェクト'],['feat','🗺️ チャレンジ']];
+const REWARDS=[
+  {id:'theme-default',cat:'theme',icon:'📜',name:'クラシック',lv:1},
+  {id:'sound-piano',cat:'sound',icon:'🎹',name:'ピアノ',lv:1},
+  {id:'sound-musicbox',cat:'sound',icon:'🎁',name:'オルゴール',lv:2},
+  {id:'theme-night',cat:'theme',icon:'🌙',name:'夜空',lv:3},
+  {id:'fx-rainbow',cat:'fx',icon:'🌈',name:'レインボー音符',desc:'音の高さごとに音符に色がつく',lv:5},
+  {id:'theme-sakura',cat:'theme',icon:'🌸',name:'桜',lv:6},
+  {id:'sound-epiano',cat:'sound',icon:'🎛️',name:'エレピ',lv:8},
+  {id:'theme-matcha',cat:'theme',icon:'🍵',name:'抹茶',lv:10},
+  {id:'sound-harpsi',cat:'sound',icon:'🏰',name:'チェンバロ',lv:12},
+  {id:'theme-gold',cat:'theme',icon:'🏆',name:'ゴールド',lv:15},
+  {id:'theme-aurora',cat:'theme',icon:'🌌',name:'オーロラ',badge:'s7'},
+  {id:'fx-fanfare',cat:'fx',icon:'🎺',name:'完走ファンファーレ',desc:'完走するとファンファーレが鳴る',badge:'p1'},
+  {id:'fx-confetti',cat:'fx',icon:'🎊',name:'毎回紙吹雪',desc:'完走のたびに紙吹雪',badge:'k30'},
+];
+const REWARD_CATS=[['theme','🎨 テーマ'],['sound','🔊 音色'],['fx','✨ 演出']];
+const unlocked=r=>r.lv?levelOf(P.xp)>=r.lv:!!P.badges[r.badge];
+const condText=r=>r.lv?`Lv.${r.lv}で解放`:`バッジ「${BADGES.find(b=>b.id===r.badge).name}」で解放`;
+function fxOn(id){return Array.isArray(S.fx)&&S.fx.includes(id)&&unlocked(REWARDS.find(r=>r.id===id))}
+function applyTheme(){
+  const r=REWARDS.find(x=>x.id===S.theme);
+  const th=r&&unlocked(r)&&S.theme!=='theme-default'?S.theme.replace('theme-',''):'';
+  if(th)document.documentElement.dataset.theme=th;else delete document.documentElement.dataset.theme;
+}
+
+function addXP(n,why){
+  const before=levelOf(P.xp);P.xp+=n;roundXP+=n;
+  const after=levelOf(P.xp);
+  if(after>before){
+    toast('⬆️',`レベルアップ！ Lv.${after}`,titleOf(after)!==titleOf(before)?`称号「${titleOf(after)}」`:'');
+    REWARDS.filter(r=>r.lv&&r.lv>before&&r.lv<=after).forEach(r=>toast('🎁',`ごほうび解放：${r.icon} ${r.name}`,'プレイヤーカードから使えます'));
+    confetti();
+  }
+}
+function checkBadges(quiet){
+  let n=0;
+  for(const b of BADGES){
+    if(P.badges[b.id]||!b.ok())continue;
+    P.badges[b.id]=todayStr();n++;
+    if(quiet)continue;
+    roundNew.push(b);
+    toast(b.icon,`バッジ獲得！「${b.name}」`,b.desc);
+    REWARDS.filter(r=>r.badge===b.id).forEach(r=>toast('🎁',`ごほうび解放：${r.icon} ${r.name}`,'プレイヤーカードから使えます'));
+    confetti();
+  }
+  return n;
+}
+function onCorrect(first){
+  const today=todayStr();
+  if(P.lastDay!==today){
+    P.dayStreak=P.lastDay===todayStr(-1)?P.dayStreak+1:1;
+    P.bestDayStreak=Math.max(P.bestDayStreak,P.dayStreak);
+    if(!P.days.includes(today))P.days.push(today);
+    P.lastDay=today;
+    toast('📅',`今日の練習スタート！ +15 XP`,P.dayStreak>1?`🔥 ${P.dayStreak}日連続`:'毎日続けると連続日数が伸びます');
+    addXP(15);
+  }
+  P.correct++;if(first)P.first++;
+  P.bestCombo=Math.max(P.bestCombo,sess.streak);
+  addXP(first?2:1);
+  checkBadges();saveP();renderPlayer();
+}
+function onRoundEnd(firstRate,avg){
+  P.rounds++;let bonus=10;
+  const perfect=done>=10&&sess.first===done;
+  if(perfect){P.perfect++;bonus+=20}
+  if(done>=10&&firstRate>=.8&&avg>0&&(!P.bestAvg||avg<P.bestAvg))P.bestAvg=+avg.toFixed(3);
+  if(S.clef==='bass')P.feats.bass=1;
+  if(S.clef==='grand')P.feats.grand=1;
+  if(S.level==='2')P.feats.adv=1;
+  if(S.mode==='seq')P.feats.seq=1;
+  if(S.limit==='1200'&&firstRate>=.8)P.feats.fast=1;
+  addXP(bonus);
+  checkBadges();saveP();renderPlayer();
+  if(perfect||fxOn('fx-confetti'))confetti();
+  if(fxOn('fx-fanfare'))[60,64,67,72].forEach((m,i)=>tone(m,i*.12));
+  const chips=[`<span class="xp">+${roundXP} XP</span>`];
+  if(perfect)chips.push('<span>💯 パーフェクト！</span>');
+  roundNew.forEach(b=>chips.push(`<span>${b.icon} ${b.name}</span>`));
+  return `<div class="gain">${chips.join('')}</div>`;
+}
+function renderPlayer(){
+  const L=levelOf(P.xp), cur=P.xp-lvXP(L), need=lvXP(L+1)-lvXP(L);
+  document.getElementById('plLv').textContent=L;
+  document.getElementById('plTitle').textContent=titleOf(L);
+  document.getElementById('plXp').style.width=(cur/need*100)+'%';
+  document.getElementById('plSub').textContent=`${P.xp} XP・次のレベルまで ${need-cur} XP`;
+  document.getElementById('plFire').textContent=`🔥${curDayStreak()}日`;
+  document.getElementById('plBadge').textContent=`🏅${Object.keys(P.badges).length}/${BADGES.length}`;
+}
+
+// ---- シート ----
+const sheetBg=document.getElementById('sheetBg'), sheetBody=document.getElementById('sheetBody');
+let sheetTab='badges';
+function openSheet(){if(phase==='running')toggleRun();sheetBg.hidden=false;renderSheet()}
+function closeSheet(){sheetBg.hidden=true}
+document.getElementById('playerBtn').onclick=openSheet;
+document.getElementById('sheetClose').onclick=closeSheet;
+sheetBg.addEventListener('click',e=>{if(e.target===sheetBg)closeSheet()});
+sheetBg.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{sheetTab=b.dataset.tab;sheetBg.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));renderSheet();sheetBody.scrollTop=0});
+function renderSheet(){
+  const L=levelOf(P.xp);
+  if(sheetTab==='badges'){
+    sheetBody.innerHTML=`<div class="muted" style="margin:4px 2px">獲得 ${Object.keys(P.badges).length} / ${BADGES.length}　・　通算 ${P.correct}音正解・練習 ${P.days.length}日・最長 ${P.bestDayStreak}日連続</div>`+
+    BADGE_CATS.map(([c,label])=>`<div class="sec">${label}</div><div class="bgrid">`+BADGES.filter(b=>b.cat===c).map(b=>{
+      const got=!!P.badges[b.id];
+      return `<div class="badge ${got?'got':'locked'}"><div class="ic">${b.icon}</div><div class="nm">${b.name}</div><div class="ds">${b.desc}</div>`+
+        (got?`<div class="ds">${P.badges[b.id].replace(/-/g,'/')} 獲得</div>`:`<div class="pg"><i style="width:${b.ratio()*100}%"></i></div><div class="ds">${b.prog()}</div>`)+`</div>`}).join('')+'</div>').join('');
+  } else {
+    sheetBody.innerHTML=`<div class="muted" style="margin:4px 2px">レベルを上げたり、バッジを集めると解放されます（いま Lv.${L}）</div>`+
+    REWARD_CATS.map(([c,label])=>`<div class="sec">${label}</div><div class="rlist">`+REWARDS.filter(r=>r.cat===c).map(r=>{
+      const u=unlocked(r);
+      const on=c==='theme'?S.theme===r.id:c==='sound'?S.voice===r.id:fxOn(r.id);
+      const btn=!u?`<button type="button" disabled>🔒</button>`:`<button type="button" class="${on?'on':''}" data-r="${r.id}">${c==='fx'?(on?'ON':'OFF'):(on?'使用中':'使う')}</button>`;
+      return `<div class="rw ${u?'':'locked'}"><div class="ic">${r.icon}</div><div class="tx"><b>${r.name}</b><span>${u?(r.desc||'解放済み'):condText(r)}</span></div>${btn}</div>`}).join('')+'</div>').join('');
+    sheetBody.querySelectorAll('button[data-r]').forEach(b=>b.onclick=()=>{
+      const r=REWARDS.find(x=>x.id===b.dataset.r);
+      if(r.cat==='theme'){S.theme=r.id;applyTheme()}
+      else if(r.cat==='sound'){S.voice=r.id;const was=S.sound;S.sound=true;tone(67);S.sound=was}
+      else{S.fx=Array.isArray(S.fx)?S.fx:[];S.fx=S.fx.includes(r.id)?S.fx.filter(x=>x!==r.id):S.fx.concat(r.id)}
+      saveS();render();renderSheet();
+    });
+  }
+}
+
+// ---- トースト ----
+const toastsEl=document.getElementById('toasts');
+function toast(icon,title,sub){
+  const t=document.createElement('div');t.className='toast';
+  t.innerHTML=`<span class="ic">${icon}</span><div>${title}${sub?`<small>${sub}</small>`:''}</div>`;
+  toastsEl.appendChild(t);
+  while(toastsEl.children.length>3)toastsEl.firstChild.remove();
+  setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),450)},3200);
+}
+// ---- 紙吹雪 ----
+const fxc=document.getElementById('fxCanvas');let parts=[],fxRAF=0;
+function confetti(){
+  const dpr=window.devicePixelRatio||1;fxc.width=innerWidth*dpr;fxc.height=innerHeight*dpr;
+  const cols=['#e07a45','#f0b35a','#5fd3a0','#7aa2ff','#d9577e','#b48cff'];
+  for(let i=0;i<90;i++)parts.push({x:innerWidth*(.2+Math.random()*.6),y:innerHeight*.25,vx:(Math.random()-.5)*9,vy:-Math.random()*9-3,r:Math.random()*6.28,vr:(Math.random()-.5)*.3,c:cols[i%cols.length],w:6+Math.random()*5,h:3+Math.random()*4,life:0});
+  if(!fxRAF)fxRAF=requestAnimationFrame(stepFx);
+}
+function stepFx(){
+  const ctx=fxc.getContext('2d'),dpr=window.devicePixelRatio||1;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,innerWidth,innerHeight);
+  parts=parts.filter(p=>p.life<140&&p.y<innerHeight+20);
+  for(const p of parts){p.life++;p.vy+=.25;p.vx*=.99;p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.globalAlpha=Math.max(0,1-p.life/140);ctx.fillStyle=p.c;ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);ctx.restore();}
+  fxRAF=parts.length?requestAnimationFrame(stepFx):0;
+  if(!fxRAF)ctx.clearRect(0,0,innerWidth,innerHeight);
+}
+
+applyTheme();
+const retro=checkBadges(true);saveP();
+updateSummary();rebuild();renderWeak();updateStats();renderPlayer();
+if(retro)toast('🏅',`これまでの記録からバッジを${retro}個獲得しました`,'プレイヤーカードをタップして確認');
 
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 })();
