@@ -411,7 +411,7 @@ function toggleRun(){
   unlockAudio();
   if(running){running=false;stopTimer();setStartLabel();render();say('一時停止中');return}
   running=true;setStartLabel();
-  if(narrow()) settingsEl.open=false;
+  if(narrow()){settingsEl.open=false;requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'smooth'}));}
   say(S.mode==='seq'?'左から順に。弾きながら次の音を見る！':'音符の鍵盤を押してください');
   lineStart=performance.now();
   showCurrent();
