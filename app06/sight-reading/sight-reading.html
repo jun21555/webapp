@@ -91,8 +91,15 @@ details[open].settings summary .chev{transform:rotate(180deg)}
 .prog b{color:var(--ink);font-size:15px}
 .pbar{flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden}
 .pbar i{display:block;height:100%;background:var(--good);transition:width .2s}
-.result{margin:8px 2px 4px;padding:12px 10px;border-radius:12px;background:var(--paper);text-align:center}
-.result h3{margin:0 0 10px;font-size:17px}
+.result-bg{position:fixed;inset:0;z-index:52;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;
+  padding:calc(env(safe-area-inset-top) + 16px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px)}
+.result-bg[hidden]{display:none}
+.result{width:100%;max-width:420px;max-height:100%;overflow-y:auto;padding:18px 14px 14px;border-radius:20px;background:var(--card);color:var(--ink);text-align:center;box-shadow:0 16px 50px rgba(0,0,0,.35);animation:pop .3s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.85);opacity:0}}
+.result .rbtns{display:flex;gap:8px;justify-content:center;margin-top:14px}
+.result .rbtns .btn{flex:1;max-width:180px}
+.ver{text-align:center;margin-top:14px}
+.result h3{margin:0 0 12px;font-size:19px}
 .rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .rgrid div{font-size:11px;color:var(--muted)}
 .rgrid b{display:block;font-size:18px;color:var(--ink);margin-top:2px;font-variant-numeric:tabular-nums}
@@ -218,7 +225,6 @@ html[data-theme=aurora] body{background:radial-gradient(120% 60% at 20% 0%,rgba(
     <svg id="staff" viewBox="0 0 400 170" aria-label="五線譜"></svg>
     <div class="timer"><i id="timerBar"></i></div>
     <div class="feedback" id="feedback"></div>
-    <div class="result" id="result" hidden></div>
     <div class="controls">
       <button class="btn" id="startBtn" type="button">スタート</button>
       <button class="btn ghost" id="skipBtn" type="button">答え</button>
@@ -244,6 +250,7 @@ html[data-theme=aurora] body{background:radial-gradient(120% 60% at 20% 0%,rgba(
       </ul>
     </div>
   </div>
+  <div class="muted ver">初見トレーナー v5</div>
 </div>
 
 <div class="sheet-bg" id="sheetBg" hidden>
@@ -255,6 +262,7 @@ html[data-theme=aurora] body{background:radial-gradient(120% 60% at 20% 0%,rgba(
     <div class="sheet-body" id="sheetBody"></div>
   </div>
 </div>
+<div class="result-bg" id="resultBg" hidden><div class="result" id="result" role="dialog" aria-modal="true" aria-label="結果"></div></div>
 <div class="toasts" id="toasts"></div>
 <canvas id="fxCanvas"></canvas>
 <script>
@@ -280,6 +288,17 @@ const pcOf=m=>((m%12)+12)%12;
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
              set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const narrow=()=>window.innerWidth<620;
+const APP_VERSION='v5';
+function reportErr(e){
+  try{console.error(e);
+    const box=document.getElementById('toasts');const t=document.createElement('div');t.className='toast';
+    t.innerHTML='<span class="ic">⚠️</span><div>エラーが起きました<small></small></div>';
+    t.querySelector('small').textContent=(e&&(e.message||e.reason&&e.reason.message)||String(e)).slice(0,120)+'（'+APP_VERSION+'）';
+    box.appendChild(t);setTimeout(()=>t.remove(),8000);
+  }catch(_){}
+}
+window.addEventListener('error',ev=>reportErr(ev.error||ev.message));
+window.addEventListener('unhandledrejection',ev=>reportErr(ev.reason));
 const S=Object.assign({clef:'treble',level:'0',mode:'single',limit:'0',count:'20',kbd:narrow()?'oct':'full',names:true,sound:true,theme:'theme-default',voice:'sound-piano',fx:[]},store.get('sr_settings',{}));
 let noteStats=store.get('sr_stats',{});
 
@@ -513,7 +532,7 @@ function say(t,cls){fb.textContent=t;fb.className='feedback'+(cls?' '+cls:'')}
 function current(){return running?items[S.mode==='single'?0:idx]:null}
 let phase='idle', done=0, activeMs=0, resumeAt=0, revealTimer=0, pendingComplete=false;
 const total=()=>+S.count;
-const resultEl=document.getElementById('result');
+const resultEl=document.getElementById('result'), resultBg=document.getElementById('resultBg');
 function setStartLabel(){document.getElementById('startBtn').textContent={running:'ストップ',paused:'再開',finished:'もう一度'}[phase]||'スタート'}
 function updateProg(){
   const p=document.getElementById('prog'), t=total();
@@ -529,7 +548,7 @@ function newItems(){
 function resetSess(){Object.assign(sess,{correct:0,first:0,miss:0,time:0,streak:0,best:0});updateStats()}
 function rebuild(){
   if(revealTimer)clearTimeout(revealTimer);revealTimer=0;pendingComplete=false;
-  stopTimer();running=false;locked=false;phase='idle';done=0;resultEl.hidden=true;
+  stopTimer();running=false;locked=false;phase='idle';done=0;resultBg.hidden=true;
   buildKeyboard();
   items=newItems();idx=0;
   render();setStartLabel();updateProg();say('「スタート」を押して始めましょう');
@@ -543,7 +562,7 @@ function toggleRun(){
   }
   if(phase==='idle'||phase==='finished'){
     const again=phase==='finished';
-    done=0;activeMs=0;resetSess();resultEl.hidden=true;roundXP=0;roundNew=[];pendingComplete=false;
+    done=0;activeMs=0;resetSess();resultBg.hidden=true;roundXP=0;roundNew=[];pendingComplete=false;
     if(again){items=newItems();idx=0}
     lineStart=performance.now();
   }
@@ -596,15 +615,19 @@ function finish(){
   render();setStartLabel();updateProg();
   const firstRate=done?sess.first/done:0;
   const avg=sess.correct?sess.time/sess.correct/1000:0;
+  let gain='';
+  try{gain=onRoundEnd(firstRate,avg)}catch(e){reportErr(e)}   // ごほうび処理で問題が起きても結果は必ず出す
   const comment=firstRate>=.95&&avg<1?'すばらしい！制限時間を短くするか、レベルを上げてみましょう。'
     :firstRate>=.8?'いい調子です。「苦手な音」を確認して、もう一度。'
     :'まずは制限時間なしで、正確さを優先しましょう。';
   resultEl.innerHTML=`<h3>おつかれさま！ ${done}問 完了</h3>
     <div class="rgrid"><div>一発正解<b>${sess.first}/${done}</b></div><div>平均反応<b>${sess.correct?avg.toFixed(2)+'秒':'–'}</b></div><div>ミス<b>${sess.miss}</b></div><div>かかった時間<b>${Math.round(activeMs/1000)}秒</b></div></div>
-    <p>${comment}</p>${onRoundEnd(firstRate,avg)}`;
-  resultEl.hidden=false;
-  say('');clearRound();
-  requestAnimationFrame(()=>resultEl.scrollIntoView({block:'nearest',behavior:'smooth'}));
+    <p>${comment}</p>${gain}
+    <div class="rbtns"><button class="btn" type="button" id="resAgain">もう一度</button><button class="btn ghost" type="button" id="resClose">閉じる</button></div>`;
+  resultBg.hidden=false;
+  document.getElementById('resAgain').onclick=()=>{resultBg.hidden=true;if(phase==='finished')toggleRun()};
+  document.getElementById('resClose').onclick=()=>{resultBg.hidden=true};
+  say('おつかれさま！「もう一度」で次の回へ','good');clearRound();
 }
 function press(m,exactOct){
   tone(m);
@@ -617,7 +640,7 @@ function press(m,exactOct){
     flash(m,'good');
     record(t,rt,missedThis>0,false);
     sess.correct++;if(!missedThis){sess.first++;sess.streak++;sess.best=Math.max(sess.best,sess.streak)}
-    onCorrect(!missedThis);
+    try{onCorrect(!missedThis)}catch(e){reportErr(e)}   // ごほうび処理で問題が起きても次へ進む
     sess.time+=rt;
     if(S.mode==='seq') t.state=missedThis?'missed':'done';
     if(S.mode==='single')say(`${jpName(t.n)}（${codeName(t.n)}）　${(rt/1000).toFixed(2)} 秒`,'good');
