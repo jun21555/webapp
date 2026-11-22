@@ -293,7 +293,13 @@ document.querySelectorAll('.seg').forEach(seg=>{
   const k=seg.dataset.key;
   seg.querySelectorAll('button').forEach(b=>{
     b.classList.toggle('on',b.dataset.v===S[k]);
-    b.onclick=()=>{S[k]=b.dataset.v;seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));saveS();rebuild();};
+    b.onclick=()=>{
+      if(S[k]===b.dataset.v)return;               // 選択中の設定を押し直しただけなら何もしない
+      const wasMid=(phase==='running'||phase==='paused')&&done>0;
+      S[k]=b.dataset.v;seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));saveS();
+      clearRound();rebuild();
+      if(wasMid)say('設定を変えたので、最初からやり直しになります','bad');
+    };
   });
 });
 const optNames=document.getElementById('optNames'),optSound=document.getElementById('optSound');
@@ -505,7 +511,7 @@ function showKey(m){const k=keyEl(m);if(k){k.classList.add('show');setTimeout(()
 const fb=document.getElementById('feedback');
 function say(t,cls){fb.textContent=t;fb.className='feedback'+(cls?' '+cls:'')}
 function current(){return running?items[S.mode==='single'?0:idx]:null}
-let phase='idle', done=0, activeMs=0, resumeAt=0;
+let phase='idle', done=0, activeMs=0, resumeAt=0, revealTimer=0, pendingComplete=false;
 const total=()=>+S.count;
 const resultEl=document.getElementById('result');
 function setStartLabel(){document.getElementById('startBtn').textContent={running:'ストップ',paused:'再開',finished:'もう一度'}[phase]||'スタート'}
@@ -522,6 +528,7 @@ function newItems(){
 }
 function resetSess(){Object.assign(sess,{correct:0,first:0,miss:0,time:0,streak:0,best:0});updateStats()}
 function rebuild(){
+  if(revealTimer)clearTimeout(revealTimer);revealTimer=0;pendingComplete=false;
   stopTimer();running=false;locked=false;phase='idle';done=0;resultEl.hidden=true;
   buildKeyboard();
   items=newItems();idx=0;
@@ -531,11 +538,12 @@ function toggleRun(){
   unlockAudio();
   if(phase==='running'){
     running=false;phase='paused';activeMs+=performance.now()-resumeAt;stopTimer();
-    setStartLabel();render();say('一時停止中');return;
+    if(revealTimer){clearTimeout(revealTimer);revealTimer=0;pendingComplete=true}
+    saveRound();setStartLabel();render();say('一時停止中');return;
   }
   if(phase==='idle'||phase==='finished'){
     const again=phase==='finished';
-    done=0;activeMs=0;resetSess();resultEl.hidden=true;roundXP=0;roundNew=[];
+    done=0;activeMs=0;resetSess();resultEl.hidden=true;roundXP=0;roundNew=[];pendingComplete=false;
     if(again){items=newItems();idx=0}
     lineStart=performance.now();
   }
@@ -543,15 +551,35 @@ function toggleRun(){
   setStartLabel();updateProg();
   if(narrow()){settingsEl.open=false;requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'smooth'}));}
   say(S.mode==='seq'?'左から順に。弾きながら次の音を見る！':'音符の鍵盤を押してください');
-  showCurrent();
+  if(pendingComplete){pendingComplete=false;complete()}  // 答えを見た直後に止めた音は、再開時に次へ
+  else showCurrent();
 }
 function showCurrent(){missedThis=0;locked=false;shownAt=performance.now();const c=current();if(c)c.reveal=false;render();startTimer()}
 // 1音が終わった（正解 or 答えを表示）ときに呼ぶ
 function complete(){
   done++;updateProg();
   if(total()&&done>=total()){finish();return}
+  saveRound();
   advance();
 }
+// ---- 途中経過の保存（アプリ切り替えなどでページが読み込み直されても続きから） ----
+const roundSig=()=>['clef','level','mode','limit','count','kbd'].map(k=>S[k]).join('|');
+function saveRound(){
+  if(!total()||done<=0||phase==='finished'||phase==='idle'){return}
+  const act=activeMs+(phase==='running'?performance.now()-resumeAt:0);
+  store.set('sr_round',{sig:roundSig(),done,sess:Object.assign({},sess),activeMs:act,roundXP,at:Date.now()});
+}
+function clearRound(){try{localStorage.removeItem('sr_round')}catch(e){}}
+function restoreRound(){
+  const r=store.get('sr_round',null);
+  if(!r||r.sig!==roundSig()||!(r.done>0)||r.done>=total()||Date.now()-r.at>6*3600e3){clearRound();return}
+  done=r.done;Object.assign(sess,r.sess);activeMs=r.activeMs||0;roundXP=r.roundXP||0;roundNew=[];
+  items=newItems();idx=0;phase='paused';lineStart=performance.now();
+  setStartLabel();updateProg();updateStats();render();
+  say(`前回の続き（${done}問 済み）から。「再開」で続けられます`);
+}
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(phase==='running')toggleRun();saveRound()}});
+window.addEventListener('pagehide',saveRound);
 function advance(){
   if(S.mode==='single'){items=[pickWeighted()];showCurrent();return}
   idx++;
@@ -575,7 +603,8 @@ function finish(){
     <div class="rgrid"><div>一発正解<b>${sess.first}/${done}</b></div><div>平均反応<b>${sess.correct?avg.toFixed(2)+'秒':'–'}</b></div><div>ミス<b>${sess.miss}</b></div><div>かかった時間<b>${Math.round(activeMs/1000)}秒</b></div></div>
     <p>${comment}</p>${onRoundEnd(firstRate,avg)}`;
   resultEl.hidden=false;
-  say('');
+  say('');clearRound();
+  requestAnimationFrame(()=>resultEl.scrollIntoView({block:'nearest',behavior:'smooth'}));
 }
 function press(m,exactOct){
   tone(m);
@@ -611,7 +640,7 @@ function reveal(){
   record(t,0,true,true);sess.miss++;sess.streak=0;updateStats();
   say(`正解は ${jpName(t.n)}（${codeName(t.n)}）`,'bad');
   if(S.mode==='seq')t.state='missed';
-  setTimeout(()=>{if(running&&current()===t)complete()},1000);
+  revealTimer=setTimeout(()=>{revealTimer=0;if(running&&current()===t)complete()},1000);
 }
 document.getElementById('startBtn').onclick=toggleRun;
 document.getElementById('skipBtn').onclick=()=>{if(running)reveal()};
@@ -869,7 +898,7 @@ function stepFx(){
 
 applyTheme();
 const retro=checkBadges(true);saveP();
-updateSummary();rebuild();renderWeak();updateStats();renderPlayer();
+updateSummary();rebuild();restoreRound();renderWeak();updateStats();renderPlayer();
 if(retro)toast('🏅',`これまでの記録からバッジを${retro}個獲得しました`,'プレイヤーカードをタップして確認');
 
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
