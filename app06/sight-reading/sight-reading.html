@@ -250,7 +250,7 @@ html[data-theme=aurora] body{background:radial-gradient(120% 60% at 20% 0%,rgba(
       </ul>
     </div>
   </div>
-  <div class="muted ver">初見トレーナー v5</div>
+  <div class="muted ver">初見トレーナー v6</div>
 </div>
 
 <div class="sheet-bg" id="sheetBg" hidden>
@@ -288,7 +288,7 @@ const pcOf=m=>((m%12)+12)%12;
 const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},
              set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const narrow=()=>window.innerWidth<620;
-const APP_VERSION='v5';
+const APP_VERSION='v6';
 function reportErr(e){
   try{console.error(e);
     const box=document.getElementById('toasts');const t=document.createElement('div');t.className='toast';
@@ -408,6 +408,14 @@ function render(){
     svg.appendChild(el('path',{d:`M10 ${t} Q2 ${t+(b-t)/4} 8 ${m-2} L4 ${m} L8 ${m+2} Q2 ${b-(b-t)/4} 10 ${b}`,fill:'none',stroke:ink,'stroke-width':2}));
   }
   if(!items.length) return;
+  if(!running){   // スタート前・一時停止中・完了後は音符を隠す
+    const msg=phase==='paused'?'一時停止中 ―「再開」で続きの音符が出ます':phase==='finished'?'「もう一度」で次の回へ':'「スタート」を押すと音符が出ます';
+    const cy=S.clef==='grand'?(L.yB.treble+L.yB.bass-40)/2+5:L.yB[S.clef]-15;
+    const tw=msg.length*13+28, cx=(70+R)/2+6;
+    svg.appendChild(el('rect',{x:cx-tw/2,y:cy-17,width:tw,height:30,rx:15,fill:css('--card'),stroke:css('--line')}));
+    svg.appendChild(el('text',{x:cx,y:cy+3,'text-anchor':'middle','font-size':13,fill:css('--muted'),'font-family':'-apple-system,"Hiragino Sans",sans-serif'},msg));
+    return;
+  }
   if(S.mode==='single'){
     drawNote(items[0],(70+R)/2+10,L,running?(items[0].reveal?'reveal':'cur'):'idle');
   } else {
