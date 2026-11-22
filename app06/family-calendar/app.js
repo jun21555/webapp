@@ -5,6 +5,7 @@
 //  データの読み書きは store.js にまとめてあります。
 // ===============================================================
 import { createStore, COLORS, ymdOf } from './store.js';
+import { DEFAULT_HINTS, buildPrompt, parseImportText, sameEvent } from './import.js';
 
 const $ = id => document.getElementById(id);
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
@@ -51,7 +52,7 @@ function avatar(m) {
 function memberById(id) { return state.members.find(m => m.id === id); }
 
 function showScreen(id) {
-  for (const s of ['loadingScreen', 'loginScreen', 'setupScreen', 'mainScreen']) $(s).classList.toggle('hidden', s !== id);
+  for (const s of ['loadingScreen', 'loginScreen', 'setupScreen', 'mainScreen', 'importScreen']) $(s).classList.toggle('hidden', s !== id);
 }
 
 // 色を選ぶボタンを並べる
@@ -92,7 +93,7 @@ async function start() {
   // ホームボタンを各画面の左上に置く
   document.querySelectorAll('[data-home]').forEach(slot => slot.replaceWith($('homeBtn').content.cloneNode(true)));
   document.querySelectorAll('a.home').forEach(a => a.addEventListener('click', e => {
-    if (isEditorDirty() && !confirm('入力中の予定は保存されていません。ホームに戻りますか？')) e.preventDefault();
+    if ((isEditorDirty() || isImportPending()) && !confirm('入力中の内容は保存されていません。ホームに戻りますか？')) e.preventDefault();
   }));
 
   try {
@@ -116,6 +117,7 @@ async function start() {
   bindMain();
   bindEditor();
   bindSettings();
+  bindImport();
 
   store.onUser(async user => {
     stopWatching();
@@ -255,6 +257,7 @@ function bindMain() {
   });
   $('addBtn').addEventListener('click', () => openEditor(null));
   $('settingsBtn').addEventListener('click', () => openSheet('settingsSheet'));
+  $('importBtn').addEventListener('click', openImport);
 }
 
 // 絞り込み中のメンバーの予定だけにする（「だれの予定」が空の予定は全員向けとして常に出す）
@@ -398,6 +401,7 @@ function bindEditor() {
       memberIds: editMembers,
       note: $('evNote').value.trim(),
     };
+    if (editorHooks) { closeSheet(); editorHooks.onSave(ev); return; } // 取り込みの確認画面から開いたとき
     if (editing) ev.id = editing.id;
     closeSheet();
     state.selected = ev.date;
@@ -411,6 +415,7 @@ function bindEditor() {
   });
 
   $('evDelete').addEventListener('click', async () => {
+    if (editorHooks) { closeSheet(); editorHooks.onDelete(); return; }
     if (!editing || !confirm(`「${editing.title}」を削除しますか？`)) return;
     const id = editing.id;
     closeSheet();
@@ -423,9 +428,13 @@ function tryCloseSheet() {
   closeSheet();
 }
 
-function openEditor(ev) {
+// hooks を渡すと、保存・削除をデータベースではなく hooks に任せる（取り込みの確認画面用）
+let editorHooks = null;
+function openEditor(ev, hooks = null) {
   editing = ev;
-  $('eventSheetTitle').textContent = ev ? '予定を編集' : '予定を追加';
+  editorHooks = hooks;
+  $('eventSheetTitle').textContent = hooks ? '取り込む予定を直す' : ev ? '予定を編集' : '予定を追加';
+  $('evDelete').textContent = hooks ? 'この予定は取り込まない' : 'この予定を削除';
   $('evTitle').value = ev ? ev.title : '';
   $('evDate').value = ev ? ev.date : state.selected;
   $('evAllDay').checked = ev ? !!ev.allDay : false;
@@ -496,6 +505,140 @@ function renderSettings() {
     myColor = me.color;
     colorPicker($('setColors'), myColor, c => { myColor = c; });
   }
+}
+
+// ===============================================================
+//  写真から取り込み（Claude で読み取ったテキストを貼り付けて登録）
+// ===============================================================
+let importItems = [];   // 確認中の予定 [{ ...予定, on:登録するか, dup:登録済みと同じか, check:要確認か }]
+
+function isImportPending() {
+  return !$('importScreen').classList.contains('hidden') && importItems.some(it => it.on);
+}
+
+function openImport() {
+  $('hintsText').value = (state.family && state.family.importHints) || DEFAULT_HINTS;
+  showScreen('importScreen');
+  window.scrollTo(0, 0);
+}
+function closeImport() {
+  if (isImportPending() && !confirm('まだ登録していない予定があります。閉じますか？')) return;
+  resetImport();
+  showScreen('mainScreen');
+}
+function resetImport() {
+  importItems = [];
+  $('importText').value = '';
+  $('importErr').textContent = '';
+  $('importErr').classList.add('hidden');
+  renderImport();
+}
+
+function bindImport() {
+  $('importClose').addEventListener('click', closeImport);
+
+  $('copyPrompt').addEventListener('click', async () => {
+    const text = buildPrompt({ members: state.members, hints: $('hintsText').value, year: state.month.getFullYear() });
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('指示文をコピーしました。Claude に貼り付けてください');
+    } catch (_) {
+      // コピーできない環境では、貼り付け欄に出して手でコピーしてもらう
+      $('importText').value = text;
+      toast('自動でコピーできませんでした。下の欄から手でコピーしてください');
+    }
+  });
+
+  $('hintsSave').addEventListener('click', async () => {
+    try { await store.updateFamily(state.familyId, { importHints: $('hintsText').value.trim() }); toast('ヒントを保存しました'); }
+    catch (e) { console.error(e); toast(errText(e)); }
+  });
+  $('hintsReset').addEventListener('click', () => { $('hintsText').value = DEFAULT_HINTS; });
+
+  $('parseBtn').addEventListener('click', async () => {
+    const { items, errors } = parseImportText($('importText').value, { members: state.members, year: state.month.getFullYear() });
+    $('importErr').classList.toggle('hidden', !errors.length);
+    $('importErr').textContent = errors.length ? `読み取れなかった行（${errors.length}件）\n${errors.join('\n')}` : '';
+    if (!items.length) {
+      importItems = [];
+      renderImport();
+      toast('予定が見つかりませんでした。Claude の返事をそのまま貼り付けてください');
+      return;
+    }
+    // すでに登録してある予定と同じものは、最初からチェックを外しておく
+    const dates = items.map(it => it.date).sort();
+    let existing = [];
+    try { existing = await store.getEvents(state.familyId, dates[0], dates[dates.length - 1]); }
+    catch (e) { console.error(e); }
+    importItems = items.map(it => {
+      const dup = existing.some(ex => sameEvent(ex, it));
+      return { ...it, dup, on: !dup };
+    });
+    renderImport();
+    $('importResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  $('toggleAll').addEventListener('click', () => {
+    const anyOn = importItems.some(it => it.on);
+    importItems.forEach(it => { it.on = !anyOn; });
+    renderImport();
+  });
+
+  $('importSave').addEventListener('click', async () => {
+    const list = importItems.filter(it => it.on)
+      .map(({ date, allDay, start, end, title, memberIds, note }) => ({ date, allDay, start, end, title, memberIds, note }));
+    if (!list.length || !confirm(`${list.length}件の予定を登録します。よろしいですか？`)) return;
+    $('importSave').disabled = true;
+    try {
+      await store.saveEvents(state.familyId, list);
+      toast(`${list.length}件を登録しました`);
+      resetImport();
+      // 登録した最初の予定の月を表示する
+      state.month = firstOfMonth(parseYmd(list[0].date));
+      state.selected = list[0].date;
+      watchMonth(); renderAll();
+      showScreen('mainScreen');
+    } catch (e) { console.error(e); toast(errText(e)); }
+    finally { renderImport(); }
+  });
+}
+
+function renderImport() {
+  const on = importItems.filter(it => it.on).length;
+  const has = importItems.length > 0;
+  $('importResult').classList.toggle('hidden', !has && $('importErr').classList.contains('hidden'));
+  $('importBar').classList.toggle('hidden', !has);
+  $('importCount').textContent = has ? `${importItems.length}件中 ${on}件を登録` : '';
+  $('toggleAll').classList.toggle('hidden', !has);
+  $('toggleAll').textContent = on ? 'すべて外す' : 'すべて選ぶ';
+  $('importSave').textContent = `${on}件を登録する`;
+  $('importSave').disabled = !on;
+
+  $('importList').replaceChildren(...importItems.map((it, i) => {
+    const d = parseYmd(it.date);
+    const time = it.allDay ? '終日' : it.start + (it.end ? `〜${it.end}` : '');
+    return h('div', { class: 'imp-item' + (it.on ? '' : ' off') },
+      h('button', {
+        type: 'button', class: 'tick', 'aria-label': it.on ? '登録しない' : '登録する',
+        onclick: () => { it.on = !it.on; renderImport(); },
+      }, h('i', {}, it.on ? '✓' : '')),
+      h('button', { type: 'button', class: 'main', onclick: () => editImportItem(i) },
+        h('div', { class: 'when' }, `${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}） ${time}`,
+          it.dup ? h('span', { class: 'badge dup' }, '登録済み') : null,
+          it.check ? h('span', { class: 'badge chk' }, '要確認') : null),
+        h('div', { class: 'title' }, it.title),
+        it.note ? h('div', { class: 'memo' }, it.note) : null,
+        h('div', { class: 'who' }, it.memberIds.map(memberById).filter(Boolean).map(avatar)),
+      ));
+  }));
+}
+
+// 確認画面の予定をタップ → いつもの編集シートで直す（保存先はデータベースではなく確認リスト）
+function editImportItem(i) {
+  openEditor(importItems[i], {
+    onSave: ev => { importItems[i] = { ...importItems[i], ...ev, on: true, check: false }; renderImport(); },
+    onDelete: () => { importItems[i].on = false; renderImport(); },
+  });
 }
 
 start();

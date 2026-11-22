@@ -125,6 +125,40 @@
     box-shadow:0 8px 22px rgba(255,122,89,.45);display:flex;align-items:center;justify-content:center;transition:transform .12s}
   .fab:active{transform:scale(.9)}
   .fab svg{width:28px;height:28px}
+  .fab.mini{width:48px;height:48px;right:calc(env(safe-area-inset-right) + 92px);bottom:calc(env(safe-area-inset-bottom) + 26px);
+    background:#fff;color:var(--accent);box-shadow:0 4px 14px rgba(80,50,30,.18)}
+  .fab.mini svg{width:24px;height:24px}
+
+  /* ---- 写真から取り込み ---- */
+  .imp{padding:4px 12px calc(env(safe-area-inset-bottom) + 110px)}
+  .step{background:var(--card);border-radius:var(--radius);padding:14px;margin:0 0 12px;box-shadow:0 1px 6px rgba(80,50,30,.06)}
+  .step h2{margin:0 0 6px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .step h2 b{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;display:inline-flex;align-items:center;justify-content:center}
+  .step p{margin:0 0 10px;font-size:13.5px;color:var(--dim);line-height:1.6}
+  .step .row{margin-top:8px}
+  .step textarea.input{min-height:120px;font-size:16px}
+  details.hints{margin-top:10px}
+  details.hints summary{min-height:44px;display:flex;align-items:center;font-size:14px;font-weight:700;color:var(--accent);cursor:pointer;list-style:none}
+  details.hints summary::-webkit-details-marker{display:none}
+  details.hints textarea.input{min-height:220px;font-size:16px;line-height:1.5}
+  .imp-head{display:flex;align-items:center;justify-content:space-between;margin:6px 4px 8px;font-size:14px;font-weight:700}
+  .imp-item{display:flex;align-items:stretch;background:var(--card);border-radius:14px;margin:0 0 8px;box-shadow:0 1px 4px rgba(80,50,30,.06);overflow:hidden}
+  .imp-item.off{opacity:.45}
+  .imp-item .tick{flex:0 0 48px;border:none;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+  .imp-item .tick i{width:24px;height:24px;border-radius:7px;border:2px solid #d6cbc2;display:flex;align-items:center;justify-content:center;color:#fff;font-style:normal;font-size:15px;font-weight:900}
+  .imp-item:not(.off) .tick i{background:var(--accent);border-color:var(--accent)}
+  .imp-item .main{flex:1;min-width:0;border:none;background:none;text-align:left;padding:10px 12px 10px 0;cursor:pointer}
+  .imp-item .when{font-size:12.5px;color:var(--dim);font-weight:700;font-variant-numeric:tabular-nums}
+  .imp-item .title{font-size:15.5px;font-weight:700;margin:2px 0;word-break:break-word}
+  .imp-item .memo{font-size:12.5px;color:var(--dim);word-break:break-word}
+  .imp-item .who{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+  .imp-item .who .avatar{width:20px;height:20px;font-size:10.5px}
+  .badge{display:inline-block;font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:1px}
+  .badge.dup{background:#eee6df;color:#6d625b}
+  .badge.chk{background:#fff0c2;color:#7a5b00}
+  .imp-err{font-size:13px;color:var(--sun);background:#fff;border-radius:12px;padding:10px 14px;margin:0 0 12px;white-space:pre-wrap;word-break:break-all}
+  .bottom-bar{position:fixed;left:0;right:0;bottom:0;z-index:7;padding:10px 16px calc(env(safe-area-inset-bottom) + 12px);
+    background:linear-gradient(rgba(255,248,242,0),var(--bg) 30%);max-width:520px;margin:0 auto}
 
   /* ---- 下から出るシート ---- */
   .sheet-bg{position:fixed;inset:0;z-index:20;background:rgba(30,20,15,.38);opacity:0;pointer-events:none;transition:opacity .2s}
@@ -242,8 +276,45 @@
     <h3 id="agendaTitle"></h3>
     <div id="agendaList"></div>
   </section>
+  <button class="fab mini" id="importBtn" type="button" aria-label="写真から取り込み">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
   <button class="fab" id="addBtn" type="button" aria-label="予定を追加">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+</section>
+
+<!-- 写真から取り込み -->
+<section class="screen hidden" id="importScreen">
+  <div class="top"><span data-home></span><h1>写真から取り込み</h1>
+    <button class="round ghost" id="importClose" type="button" aria-label="閉じる">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="imp">
+    <div class="step">
+      <h2><b>1</b>Claude に写真を読んでもらう</h2>
+      <p>「指示文をコピー」を押してから Claude を開き、手帳の写真を添付して、指示文を貼り付けて送ってください。</p>
+      <div class="row">
+        <button class="btn" type="button" id="copyPrompt">指示文をコピー</button>
+        <a class="btn sub" id="openClaude" href="https://claude.ai/new" target="_blank" rel="noopener" style="text-decoration:none">Claude を開く</a>
+      </div>
+      <details class="hints" id="hintsBox">
+        <summary>▸ 読み取りのヒントを編集（家族で共通）</summary>
+        <p>マークの意味や、だれの予定かを書いておくと読み取りが正確になります。例：「波のマーク → スイミング（だれ：はると）」</p>
+        <textarea class="input" id="hintsText"></textarea>
+        <div class="row"><button class="btn sub" type="button" id="hintsReset">最初の内容に戻す</button><button class="btn" type="button" id="hintsSave">ヒントを保存</button></div>
+      </details>
+    </div>
+    <div class="step">
+      <h2><b>2</b>Claude の返事を貼り付ける</h2>
+      <p>Claude の返事のコードの部分（右上のコピーボタン）をコピーして、ここに貼り付けます。</p>
+      <textarea class="input" id="importText" placeholder="2026-11-04 | 14:00 | Ash | ママ |"></textarea>
+      <div class="row"><button class="btn" type="button" id="parseBtn">読み込む</button></div>
+    </div>
+    <div id="importResult" class="hidden">
+      <div class="imp-err hidden" id="importErr"></div>
+      <div class="imp-head"><span id="importCount"></span><button class="link" type="button" id="toggleAll">すべて外す</button></div>
+      <div id="importList"></div>
+    </div>
+  </div>
+  <div class="bottom-bar hidden" id="importBar"><button class="btn" type="button" id="importSave">登録する</button></div>
 </section>
 
 <!-- 予定の編集シート -->

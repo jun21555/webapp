@@ -11,7 +11,7 @@
 //      familyId, name, color
 //
 //  families/{familyId}              … 家族の文書（Notes の「データベース」のイメージ）
-//      name, inviteCode, createdBy, createdAt
+//      name, inviteCode, createdBy, createdAt, importHints（写真取り込みのヒント）
 //    ├ members/{uid}                … 家族のメンバー（ACL のエントリーのイメージ）
 //    │   name, color, joinedAt
 //    └ events/{eventId}             … 予定の文書（NotesDocument のイメージ）
@@ -137,6 +137,27 @@ async function createFirebaseStore() {
     },
     deleteEvent: (familyId, id) => F.deleteDoc(F.doc(db, 'families', familyId, 'events', id)),
 
+    // ---- 写真から取り込み用 ----
+    // 期間内の予定を1回だけ読む（重複チェック用）
+    async getEvents(familyId, from, to) {
+      const q = F.query(F.collection(db, 'families', familyId, 'events'),
+        F.where('date', '>=', from), F.where('date', '<=', to));
+      return (await F.getDocs(q)).docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+    // まとめて登録（1回の書き込みは500件まで）
+    async saveEvents(familyId, list) {
+      for (let i = 0; i < list.length; i += 400) {
+        const batch = F.writeBatch(db);
+        for (const ev of list.slice(i, i + 400)) {
+          batch.set(F.doc(F.collection(db, 'families', familyId, 'events')),
+            { ...ev, createdBy: uid(), updatedAt: F.serverTimestamp() });
+        }
+        await batch.commit();
+      }
+    },
+    // 家族の文書の項目を書き換える（読み取りのヒントなど）
+    updateFamily: (familyId, data) => F.updateDoc(F.doc(db, 'families', familyId), data),
+
     // ---- 自分の名前・色を変える ----
     async updateMe(familyId, { name, color }) {
       const batch = F.writeBatch(db);
@@ -213,6 +234,15 @@ function createDemoStore() {
       save();
     },
     async deleteEvent(familyId, id) { delete data.events[id]; save(); },
+    async getEvents(familyId, from, to) {
+      return Object.entries(data.events || {}).map(([id, e]) => ({ id, ...e })).filter(e => e.date >= from && e.date <= to);
+    },
+    async saveEvents(familyId, list) {
+      data.events = data.events || {};
+      for (const ev of list) data.events[newId()] = { ...ev, createdBy: ME };
+      save();
+    },
+    async updateFamily(familyId, patch) { data.family = { ...data.family, ...patch }; save(); },
     async updateMe(familyId, { name, color }) {
       data.members[ME] = { ...data.members[ME], name, color };
       data.profile = { ...data.profile, name, color };
