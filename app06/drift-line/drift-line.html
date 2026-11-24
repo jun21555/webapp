@@ -76,6 +76,20 @@ body.touch .kb-only{display:none}
 #touch .tb.on{background:rgba(255,176,32,.35)}
 #tL{left:calc(env(safe-area-inset-left) + 12px);bottom:calc(env(safe-area-inset-bottom) + 18px);width:84px;height:84px;font-size:30px!important}
 #tR{left:calc(env(safe-area-inset-left) + 106px);bottom:calc(env(safe-area-inset-bottom) + 18px);width:84px;height:84px;font-size:30px!important}
+/* アナログステア・スライダー */
+#tSteer{left:calc(env(safe-area-inset-left) + 12px);bottom:calc(env(safe-area-inset-bottom) + 18px);width:max(178px,calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 200px));max-width:340px;height:84px;align-items:stretch!important;justify-content:stretch!important}
+#tSteer .rail{position:absolute;left:30px;right:30px;top:50%;height:6px;margin-top:-3px;border-radius:3px;background:rgba(255,255,255,.18)}
+#tSteer .fill{position:absolute;top:50%;height:6px;margin-top:-3px;border-radius:3px;background:var(--acc)}
+#tSteer .ctr{position:absolute;left:50%;top:22%;bottom:22%;width:2px;margin-left:-1px;background:rgba(255,255,255,.35)}
+#tSteer .knob{position:absolute;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(255,255,255,.88);box-shadow:0 2px 10px rgba(0,0,0,.4);transition:left .12s ease-out}
+#tSteer.on .knob{transition:none;background:#fff}
+#tSteer .lbl{position:absolute;bottom:5px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.55)}
+#tSteer .arr{position:absolute;top:50%;margin-top:-10px;font-size:16px;color:rgba(255,255,255,.45)}
+body.steer-slider #tL,body.steer-slider #tR{display:none}
+body:not(.steer-slider) #tSteer{display:none}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;min-height:44px;border-radius:10px;border:1px solid #3b414b;background:#22262d;color:var(--ink);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.seg button.sel{background:var(--acc);border-color:var(--acc);color:#111}
 #tThr{right:calc(env(safe-area-inset-right) + 12px);bottom:calc(env(safe-area-inset-bottom) + 18px);width:76px;height:232px;overflow:hidden;align-items:flex-end!important}
 #tThr i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(to top,rgba(255,176,32,.65),rgba(255,74,61,.65))}
 #tThr span{position:relative;margin-bottom:8px}
@@ -129,6 +143,7 @@ body.touch #help{display:none}
 
 <div id="touch">
   <div class="tb" id="tL">◀</div><div class="tb" id="tR">▶</div>
+  <div class="tb" id="tSteer"><span class="rail"></span><span class="fill" id="tSteerFill"></span><span class="ctr"></span><span class="arr" style="left:8px">◀</span><span class="arr" style="right:8px">▶</span><span class="knob" id="tSteerKnob"></span><span class="lbl">STEER</span></div>
   <div class="tb" id="tHb">SIDE</div><div class="tb" id="tBrk">BRAKE</div>
   <div class="tb" id="tThr"><i id="tThrFill"></i><span>THR</span></div>
 </div>
@@ -145,7 +160,7 @@ body.touch #help{display:none}
     <h3 class="touch-only">スマホの操作</h3>
     <div class="tip touch-only">
       <b>右端の縦スライダー＝アクセル</b>：指を置いた高さがそのまま開度になります（上ほど全開）。指を上下させてスピン量を調整。<br>
-      <b>◀ ▶</b>：ステア（離すと前輪が進行方向へ戻る＝カウンター）<br>
+      <b>左下のステア</b>：スライダーの位置がそのまま切れ角になるアナログ操作（指を離すと中央に戻り、前輪は進行方向へ戻る＝カウンター）。<b>Ⅱ → 設定</b>で ◀ ▶ ボタン操作に切り替えられます。<br>
       <b>BRAKE</b>：ブレーキ／止まっているとバック　<b>SIDE</b>：サイドブレーキ<br>
       右上の <b>Ⅱ</b> で一時停止・設定、左上の家マークでホームへ。横向きにすると広く見渡せます。
     </div>
@@ -170,6 +185,7 @@ body.touch #help{display:none}
   <div class="card">
     <h1 style="font-size:28px">SETUP</h1>
     <div class="sub">セッティングはこのブラウザに保存されます</div>
+    <div class="set touch-only"><label>ステア操作</label><div class="seg" style="grid-column:2 / 4"><button type="button" id="mSlider">スライダー</button><button type="button" id="mButton">ボタン</button></div></div>
     <div class="set"><label>エンジン出力</label><input type="range" id="sPower" min="150" max="420" step="5"><output id="oPower"></output></div>
     <div class="set"><label>リアグリップ</label><input type="range" id="sGrip" min="0.75" max="1.3" step="0.01"><output id="oGrip"></output></div>
     <div class="set"><label>カウンター補助</label><input type="range" id="sAssist" min="0" max="1" step="0.05"><output id="oAssist"></output></div>
@@ -191,7 +207,7 @@ const clamp=(x,a,b)=>x<a?a:x>b?b:x;
 const angDiff=(a,b)=>{let d=a-b;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return d;};
 
 /* ---------- settings ---------- */
-const DEF={power:230,rearGrip:1.0,assist:0.75,lock:54};
+const DEF={power:230,rearGrip:1.0,assist:0.75,lock:54,steerMode:'slider'};
 const S=Object.assign({},DEF);
 try{Object.assign(S,JSON.parse(localStorage.getItem('driftline_set')||'{}'));}catch(e){}
 function saveS(){try{localStorage.setItem('driftline_set',JSON.stringify(S));}catch(e){}}
@@ -312,7 +328,7 @@ function physStep(dt){
 /* ---------- input ---------- */
 const keys={};
 let kThr=0,kSteer=0,thrCap=1,muted=false;
-const tch={thr:0,L:false,R:false,brk:false,hb:false};
+const tch={thr:0,steer:0,L:false,R:false,brk:false,hb:false};
 addEventListener('keydown',e=>{
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
   keys[e.code]=true;
@@ -332,7 +348,7 @@ function readInput(dt){
   const sT=(rt?1:0)-(lf?1:0);
   const rate=sT===0?7:(Math.sign(sT)!==Math.sign(kSteer)&&kSteer!==0?9:4.2);
   kSteer+=clamp(sT-kSteer,-rate*dt,rate*dt);
-  let thr=kThr,brk=dn||tch.brk?1:0,hb=keys.Space||tch.hb?1:0,st=kSteer;
+  let thr=kThr,brk=dn||tch.brk?1:0,hb=keys.Space||tch.hb?1:0,st=clamp(kSteer+tch.steer,-1,1);
   thr=Math.max(thr,tch.thr);
   const gps=navigator.getGamepads?navigator.getGamepads():[];
   for(const gp of gps){if(!gp)continue;
@@ -360,6 +376,21 @@ holdBtn($('tL'),'L');holdBtn($('tR'),'R');holdBtn($('tBrk'),'brk');holdBtn($('tH
  el.addEventListener('pointerdown',e=>{e.preventDefault();try{el.setPointerCapture(e.pointerId);}catch(_){}set(e);el._a=true;});
  el.addEventListener('pointermove',e=>{if(el._a)set(e);});
  const end=()=>{el._a=false;tch.thr=0;};el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);}
+/* アナログステア：指の左右位置＝切れ角。離すと中央へ戻る */
+{const el=$('tSteer'),knob=$('tSteerKnob'),fill=$('tSteerFill');let pid=null;
+ const draw=v=>{const w=el.clientWidth,pad=30,half=(w-2*pad)/2,cx=w/2;const x=cx+v*half;knob.style.left=x+'px';
+   fill.style.left=Math.min(cx,x)+'px';fill.style.width=Math.abs(x-cx)+'px';};
+ const set=e=>{const r=el.getBoundingClientRect(),pad=30,half=(r.width-2*pad)/2;let v=clamp((e.clientX-(r.left+r.width/2))/half,-1,1);
+   const dz=0.04;v=Math.abs(v)<dz?0:Math.sign(v)*(Math.abs(v)-dz)/(1-dz);tch.steer=v;draw(v);};
+ el.addEventListener('pointerdown',e=>{e.preventDefault();if(pid!==null)return;pid=e.pointerId;try{el.setPointerCapture(pid);}catch(_){}el.classList.add('on');set(e);});
+ el.addEventListener('pointermove',e=>{if(e.pointerId===pid)set(e);});
+ const end=e=>{if(e.pointerId!==pid)return;pid=null;tch.steer=0;el.classList.remove('on');draw(0);};
+ el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);
+ addEventListener('resize',()=>draw(tch.steer));requestAnimationFrame(()=>draw(0));}
+function applySteerMode(){document.body.classList.toggle('steer-slider',S.steerMode!=='button');
+  $('mSlider').classList.toggle('sel',S.steerMode!=='button');$('mButton').classList.toggle('sel',S.steerMode==='button');
+  tch.steer=0;tch.L=tch.R=false;}
+applySteerMode();
 
 /* ---------- audio ---------- */
 let AC=null,o1,o2,eg,lp,sqG,sqF;
@@ -563,7 +594,9 @@ requestAnimationFrame(frame);
 function start(){initAudio();$('ovStart').classList.add('hidden');state='run';last=performance.now();}
 $('go').addEventListener('click',start);
 const sl=[['sPower','oPower','power',v=>v+' kW'],['sGrip','oGrip','rearGrip',v=>(+v).toFixed(2)],['sAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['sLock','oLock','lock',v=>v+'°']];
-function syncSet(){for(const[i,o,k,f]of sl){$(i).value=S[k];$(o).textContent=f(S[k]);}}
+function syncSet(){for(const[i,o,k,f]of sl){$(i).value=S[k];$(o).textContent=f(S[k]);}applySteerMode();}
+$('mSlider').addEventListener('click',()=>{S.steerMode='slider';saveS();applySteerMode();});
+$('mButton').addEventListener('click',()=>{S.steerMode='button';saveS();applySteerMode();});
 for(const[i,o,k,f]of sl){$(i).addEventListener('input',e=>{S[k]=+e.target.value;$(o).textContent=f(S[k]);saveS();});}
 function openSet(){syncSet();$('ovSet').classList.remove('hidden');state='set';}
 function closeSet(){$('ovSet').classList.add('hidden');state='run';last=performance.now();initAudio();}

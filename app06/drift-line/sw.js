@@ -1,5 +1,5 @@
 // DRIFT LINE Service Worker: アプリ一式をキャッシュしてオフラインでも遊べるようにする
-const CACHE = 'drift-line-v1';
+const CACHE = 'drift-line-v2';
 const SHELL = ['drift-line.html', 'manifest.webmanifest', 'favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
