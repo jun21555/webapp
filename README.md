@@ -9,6 +9,7 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [app07 ランチャー](app07/index.html) | app07 のアプリをホーム画面風に並べたランチャー |
 | [ふせチャレ](app07/phone-down/phone-down.html) | スマホを伏せて置いている時間が長いほど高スコア。デトックスの森に生きものが集まるスマホ依存対策アプリ |
 | [app06 ランチャー](app06/index.html) | app06 のアプリをホーム画面風に並べたランチャー |
+| [オンラインオセロ](app06/othello/othello.html) | Firebase（匿名ログイン＋Firestore）で友だちとリアルタイム対戦できるオセロ。5文字の部屋コード／招待リンクで参加、再戦で色を交代、満員の部屋は観戦。オフラインでも CPU 対戦・ふたりで対戦ができる |
 | [DRIFT LINE](app06/drift-line/drift-line.html) | アクセル開度でホイールスピンを操り、ドリフトの効きをコントロールする見下ろし型ドリフトレース。アナログアクセル（スマホは縦スライダー）、ドリフトスコア・ラップタイム・セッティング |
 | [初見トレーナー](app06/sight-reading/sight-reading.html) | ピアノの初見（譜読み）練習。五線の音符を見て鍵盤を押す。ト音・ヘ音・大譜表、初級〜上級（♯♭）、1音ずつ／先読み8音、問題数・制限時間の指定、苦手な音を多めに出題、レベル・バッジ・ごほうび |
 | [かぞくカレンダー](app06/family-calendar/family-calendar.html) | 家族みんなで予定を共有するカレンダー。Firebase（ログイン＋Firestore）でリアルタイムに同期。メンバーごとの色分け・絞り込み・招待コード。設定前はデモモードで動く |
@@ -22,6 +23,30 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [カップ麺タイマー](app06/cup-noodle-timer/cup-noodle-timer.html) | 3分・5分をワンタップで計測し、できあがりをプッシュ通知とアラーム音で知らせる |
 | [ゆで卵タイマー](app06/boiled-egg-timer/boiled-egg-timer.html) | ゆで時間ごとの卵の断面（とろとろ〜固ゆで）を見ながら時間をセットし、ゆで上がりをプッシュ通知とアラーム音で知らせる |
 | [ピンボール](app06/pinball.html) / [コップの水](app06/cup.html) / [Gメーター](app06/gmeter.html) / [現在地](app06/location.html) / [マップ](app06/map.html) / [サウンド](app06/visualizer.html) | app06 のその他のアプリ |
+
+### オンラインオセロ（app06/othello）
+
+- **オンライン対戦**：「部屋をつくる」で5文字の部屋コードが出るので、相手に伝えるか「招待を送る」でリンクを送る。相手はコードを入れて「参加する」（リンクから開くと自動で参加）。部屋を作った人が黒（先手）
+- 打てるマスに点（ヒント）を表示、最後に打ったマスに赤い印、裏返しアニメーション。打てる場所がないときは自動でパス
+- 終局すると結果を表示。ふたりとも「もう一度」を押すと色を交代して再戦。投了もできる
+- 3人目以降が同じコードで入ると観戦になる。アプリを閉じても「前回の部屋に戻る」で復帰できる
+- **CPU と対戦**（2手先読み＋終盤は読み切り）と **ふたりで**（1台を交互に使う）は Firebase なし・オフラインでも遊べる
+
+| ファイル | 役割 |
+| --- | --- |
+| `othello.html` | 画面のHTMLとCSS |
+| `app.js` | ルール計算・CPU・画面・Firebase との通信 |
+| `firebase-config.js` | Firebase の設定（かぞくカレンダーと同じプロジェクト） |
+| `firestore.rules` | Firestore のセキュリティルール（かぞくカレンダーのルール＋オセロのルール） |
+
+#### Firebase の設定手順（最初に1回だけ）
+
+かぞくカレンダーと同じ Firebase プロジェクト（`terabe-family-shopping`）を使います。
+
+1. Firebase コンソール →「Authentication」→「Sign-in method」で **匿名** を有効にする
+2. 「Firestore Database」→「ルール」に `app06/othello/firestore.rules` の内容を**まるごと**貼り付けて「公開」（かぞくカレンダーのルールも含まれているので、カレンダーはそのまま動きます）
+
+Firestore には `othello/{部屋コード}` に盤面（64文字）・手番・対局者などを保存します。対局中に盤面を変えられるのは手番の人だけ、参加できるのは空いている席だけ、というルールにしています。
 
 ### DRIFT LINE（app06/drift-line）
 
@@ -199,6 +224,7 @@ python3 -m http.server 8000
 # → http://localhost:8000/app06/weather/weather.html
 # → http://localhost:8000/app06/kyou-nan-no-hi/kyou-nan-no-hi.html
 # → http://localhost:8000/app06/family-calendar/family-calendar.html
+# → http://localhost:8000/app06/othello/othello.html
 ```
 
 位置情報は https か localhost でのみ使えます。
