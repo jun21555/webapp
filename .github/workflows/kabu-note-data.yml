@@ -1,0 +1,79 @@
+# 株ノート（app06/kabu-note）の株価・指標データを毎日取得して data/ にコミットする
+name: 株ノート データ更新
+
+on:
+  schedule:
+    - cron: "43 7 * * 1-5"   # 平日 16:43 JST（大引け後）
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "app06/kabu-note/watchlist.json"
+      - "app06/kabu-note/tools/**"
+      - ".github/workflows/kabu-note-data.yml"
+  issues:
+    types: [opened]   # アプリの「追加」「削除」ボタンで作られる Issue
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: kabu-note-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    # Issue はリポジトリの持ち主が「株ノート:」で始まるタイトルで作ったものだけ処理する
+    if: >-
+      github.event_name != 'issues' ||
+      (startsWith(github.event.issue.title, '株ノート:') && github.event.issue.user.login == github.repository_owner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: ライブラリのインストール
+        run: pip install --quiet yfinance pandas xlrd
+
+      - name: 銘柄の追加・削除（Issue から）
+        if: github.event_name == 'issues'
+        env:
+          TITLE: ${{ github.event.issue.title }}
+        run: python app06/kabu-note/tools/manage_watchlist.py "$TITLE"
+
+      - name: 東証の上場銘柄一覧（週1回）
+        continue-on-error: true
+        run: python app06/kabu-note/tools/fetch_jpx_list.py
+
+      - name: 株価・指標・業績の取得
+        run: python app06/kabu-note/tools/fetch_data.py
+
+      - name: コミット
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app06/kabu-note/watchlist.json app06/kabu-note/data
+          if git diff --cached --quiet; then echo "変更なし"; exit 0; fi
+          git commit -q -m "株ノート: データ更新 $(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M')"
+          for i in 1 2 3; do
+            git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0
+            sleep 5
+          done
+          exit 1
+
+      - name: Issue を閉じる
+        if: github.event_name == 'issues' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue close "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --comment "反映しました。1〜2分後にアプリの更新ボタンを押してください。"
+
+      - name: 失敗を Issue に書く
+        if: github.event_name == 'issues' && failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "反映できませんでした。Actions のログを確認してください。"

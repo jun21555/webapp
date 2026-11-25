@@ -1,0 +1,163 @@
+{
+ "_about": "株主優待の情報（手入力）。checked は確認日。内容は変更・廃止されることがあるため、取引前に必ず企業の公式サイトで確認すること。valueYen は最低株数で1年間にもらえる優待の円換算の目安（金額にしにくいものは null。アプリ側で自分の見積もりを入れられる）。",
+ "2702": {
+  "title": "優待食事券",
+  "category": "食事券",
+  "months": [6, 12],
+  "minShares": 100,
+  "condition": "1年以上の継続保有（6月末・12月末の名簿に同一株主番号で3回以上連続して100株以上）",
+  "tiers": [
+   {"shares": 100, "text": "1冊／回（年2冊）"},
+   {"shares": 300, "text": "3冊／回（年6冊）"},
+   {"shares": 500, "text": "5冊／回（年10冊）"}
+  ],
+  "detail": "1冊にバーガー類・サイドメニュー・ドリンクの引換券が6枚ずつ。モバイルオーダー・デリバリー・セルフオーダー端末では使えない。",
+  "valueYen": null,
+  "sources": ["https://finance.yahoo.co.jp/quote/2702.T/incentive"],
+  "checked": "2026-11-26"
+ },
+ "3197": {
+  "title": "株主優待券（電子チケット）",
+  "category": "食事券",
+  "months": [6, 12],
+  "minShares": 100,
+  "condition": "保有期間の条件なし（2027年6月末の権利から6カ月以上の継続保有が条件になる予定）",
+  "tiers": [
+   {"shares": 100, "text": "2,000円分／回（年4,000円）"},
+   {"shares": 300, "text": "5,000円分／回（年10,000円）"},
+   {"shares": 500, "text": "8,000円分／回（年16,000円）"},
+   {"shares": 1000, "text": "17,000円分／回（年34,000円）"}
+  ],
+  "detail": "ガスト・バーミヤン・ジョナサン・資さんうどん等で1円単位で使える。スマホ表示でも紙でも利用可。",
+  "valueYen": 4000,
+  "sources": ["https://finance.matsui.co.jp/stock/3197/complimentary/index", "https://s.minkabu.jp/stock/3197/yutai"],
+  "checked": "2026-11-26"
+ },
+ "9861": {
+  "title": "株主ご優待券（500円券）",
+  "category": "食事券",
+  "months": [2, 8],
+  "minShares": 100,
+  "condition": "保有期間の条件なし",
+  "tiers": [
+   {"shares": 100, "text": "4枚／回（年8枚＝4,000円）"},
+   {"shares": 200, "text": "10枚／回（年20枚）・商品詰め合わせAセットと交換可"},
+   {"shares": 1000, "text": "12枚／回（年24枚）・商品詰め合わせBセットと交換可"},
+   {"shares": 2000, "text": "24枚／回（年48枚）"}
+  ],
+  "detail": "吉野家・はなまるうどん等のグループ店舗で使える。",
+  "valueYen": 4000,
+  "sources": ["https://finance.matsui.co.jp/stock/9861/complimentary/index"],
+  "checked": "2026-11-26"
+ },
+ "8267": {
+  "title": "オーナーズカード（買い物の返金）",
+  "category": "買い物",
+  "months": [2, 8],
+  "minShares": 100,
+  "condition": "保有期間の条件なし。半期100万円までの買い物が対象",
+  "tiers": [
+   {"shares": 100, "text": "返金率1%"},
+   {"shares": 200, "text": "返金率2%"},
+   {"shares": 300, "text": "返金率3%"},
+   {"shares": 1500, "text": "返金率4%"},
+   {"shares": 3000, "text": "返金率5%"},
+   {"shares": 9000, "text": "返金率7%"}
+  ],
+  "detail": "イオン等で提示し、現金・WAON・イオンマークのカードなどで払うと半年ごとに返金。お客さま感謝デー5%OFF、イオンシネマ割引、イオンラウンジ利用（100株〜月4回）など。",
+  "valueYen": null,
+  "sources": ["https://finance.yahoo.co.jp/quote/8267.T/incentive"],
+  "checked": "2026-11-26"
+ },
+ "9433": {
+  "title": "Pontaポイント等から1つ選択",
+  "category": "ポイント",
+  "months": [3],
+  "minShares": 200,
+  "condition": "1年以上の継続保有（3月末の名簿に同一株主番号で連続記録）",
+  "tiers": [
+   {"shares": 200, "text": "1年以上保有：2,000円相当／5年以上保有：3,000円相当"}
+  ],
+  "detail": "Pontaポイント・ローソン/成城石井の詰め合わせ・寄付から選択。",
+  "valueYen": 2000,
+  "sources": ["https://finance.matsui.co.jp/stock/9433/complimentary/index"],
+  "checked": "2026-11-26"
+ },
+ "9432": {
+  "title": "dポイント（長期保有）",
+  "category": "ポイント",
+  "months": [3],
+  "minShares": 100,
+  "condition": "保有2年に達したとき1,500pt、5年に達したとき3,000pt（毎年ではない）。エントリーが必要",
+  "tiers": [
+   {"shares": 100, "text": "保有2年：1,500pt／保有5年：3,000pt"}
+  ],
+  "detail": "毎年もらえる優待ではないため、優待利回りは0として計算。",
+  "valueYen": 0,
+  "sources": ["https://group.ntt/jp/ir/private_investor/benefit/index.html"],
+  "checked": "2026-11-26"
+ },
+ "9202": {
+  "title": "国内線 株主優待割引ほか",
+  "category": "旅行",
+  "months": [3, 9],
+  "minShares": 100,
+  "condition": "保有期間の条件なし（2027年3月から長期保有で加算あり）",
+  "tiers": [
+   {"shares": 100, "text": "株主優待番号1枚／回（国内線50%割引）＋グループ優待券"},
+   {"shares": 200, "text": "2枚／回"},
+   {"shares": 400, "text": "3枚／回（以降、株数に応じて加算）"}
+  ],
+  "detail": "ホテル宿泊20%割引・ツアー10%割引・空港売店10%割引などのグループ優待券も。",
+  "valueYen": null,
+  "sources": ["https://www.ana.co.jp/ja/jp/promotion/shareholderbenefits/", "https://finance.matsui.co.jp/stock/9202/complimentary/index"],
+  "checked": "2026-11-26"
+ },
+ "4661": {
+  "title": "株主用パスポート（1デー）",
+  "category": "レジャー",
+  "months": [3, 9],
+  "minShares": 500,
+  "condition": "500株以上（100株は3年以上の継続保有で9月に1枚）",
+  "tiers": [
+   {"shares": 100, "text": "3年以上継続保有で年1枚（9月）"},
+   {"shares": 500, "text": "年1枚（3月）"},
+   {"shares": 2000, "text": "年2枚"},
+   {"shares": 4000, "text": "年4枚（以降2,000株ごとに年2枚）"}
+  ],
+  "detail": "東京ディズニーランドまたはディズニーシーで使える。2026年9月末は上場30周年の特別優待で100株以上に1枚追加。",
+  "valueYen": null,
+  "sources": ["https://www.rakuten-sec.co.jp/web/market/search/hp2/hp_4661.T.html"],
+  "checked": "2026-11-26"
+ },
+ "7203": {
+  "title": "TOYOTA Wallet 残高",
+  "category": "ポイント",
+  "months": [3],
+  "minShares": 100,
+  "condition": "保有期間で増える（継続保有は3月末・9月末の名簿で判定）",
+  "tiers": [
+   {"shares": 100, "text": "1年未満：500円分／1年以上：1,000円分／3年以上：3,000円分"},
+   {"shares": 1000, "text": "5年以上保有：30,000円分（トヨタグッズ選択も可）"}
+  ],
+  "detail": "受け取りに TOYOTA Wallet アプリの登録が必要。レース観戦ペアチケット等の抽選にも応募できる。",
+  "valueYen": 500,
+  "sources": ["https://global.toyota/jp/ir/stock/yutai/index.html"],
+  "checked": "2026-11-26"
+ },
+ "6758": {
+  "title": "ソニーストア割引クーポン",
+  "category": "割引券",
+  "months": [3],
+  "minShares": 100,
+  "condition": "保有期間の条件なし",
+  "tiers": [
+   {"shares": 100, "text": "AV商品15%割引・VAIO本体5%割引（各5回まで）"}
+  ],
+  "detail": "ソニーストア（通販・直営店）で使える。一部対象外商品あり。",
+  "valueYen": null,
+  "sources": ["https://finance.matsui.co.jp/stock/6758/complimentary/index"],
+  "checked": "2026-11-26"
+ },
+ "8306": {"title": "なし（2016年9月権利分で廃止）", "months": [], "minShares": null, "none": true, "checked": "2026-11-26"}
+}
