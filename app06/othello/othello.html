@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>オンラインオセロ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="オセロ">
+<meta name="theme-color" content="#0b3d26">
+<style>
+  :root{
+    --bg1:#0f5a37; --bg2:#06281a; --felt:#138a52; --felt2:#0e7444; --line:#0a4f2f;
+    --card:rgba(255,255,255,.1); --card2:rgba(255,255,255,.16); --txt:#fff; --sub:rgba(255,255,255,.7);
+    --gold:#ffd25a; --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{background:var(--bg2)}
+  html,body{margin:0;height:100%}
+  body{min-height:100dvh;color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    background:radial-gradient(120% 80% at 50% 0%,var(--bg1) 0%,var(--bg2) 70%);
+    -webkit-user-select:none;user-select:none;overscroll-behavior:none}
+  main{min-height:100dvh;display:flex;flex-direction:column;
+    padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 12px)}
+  .hidden{display:none!important}
+
+  /* ---- 上部バー ---- */
+  .top{display:flex;align-items:center;gap:8px;height:48px;flex:none}
+  .btn{min-width:44px;height:44px;border:0;border-radius:22px;background:var(--card);color:#fff;
+    font:inherit;font-size:15px;display:inline-grid;place-items:center;cursor:pointer;text-decoration:none;
+    transition:transform .12s,background .12s;padding:0 12px}
+  .btn:active{transform:scale(.92);background:var(--card2)}
+  .btn svg{width:22px;height:22px}
+  .btn.round{width:44px;padding:0}
+  .title{flex:1;text-align:center;font-weight:700;font-size:17px;letter-spacing:.04em}
+  .spacer{width:44px;flex:none}
+
+  /* ---- ホーム（メニュー） ---- */
+  .menu{flex:1;display:flex;flex-direction:column;gap:14px;padding-top:6px}
+  .hero{display:flex;flex-direction:column;align-items:center;gap:6px;margin:6px 0 4px}
+  .hero img{width:76px;height:76px;border-radius:17px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+  .hero h1{margin:6px 0 0;font-size:24px;letter-spacing:.08em}
+  .hero p{margin:0;color:var(--sub);font-size:13px}
+  .card{background:var(--card);border:.5px solid rgba(255,255,255,.14);border-radius:18px;padding:14px;
+    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+  .card h2{margin:0 0 10px;font-size:14px;color:var(--sub);font-weight:600;letter-spacing:.06em}
+  label.small{display:block;font-size:12px;color:var(--sub);margin-bottom:6px}
+  input[type=text]{width:100%;height:48px;border-radius:12px;border:1px solid rgba(255,255,255,.2);
+    background:rgba(0,0,0,.25);color:#fff;font-size:17px;padding:0 14px;outline:none;-webkit-user-select:text;user-select:text}
+  input[type=text]:focus{border-color:var(--gold)}
+  input.code{text-transform:uppercase;letter-spacing:.3em;font-weight:700;text-align:center}
+  .big{width:100%;height:52px;border-radius:14px;font-size:17px;font-weight:700}
+  .primary{background:linear-gradient(180deg,#ffe07a,#f5b81c);color:#3a2800}
+  .primary:active{background:linear-gradient(180deg,#f5d36a,#e0a612)}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1}
+  .stack{display:flex;flex-direction:column;gap:10px}
+  .resume{font-size:13px;color:var(--sub);text-align:center}
+  .resume button{background:none;border:0;color:var(--gold);font:inherit;text-decoration:underline;min-height:44px;cursor:pointer}
+
+  /* ---- 待機画面 ---- */
+  .wait{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center}
+  .wait .codebox{font-size:44px;font-weight:800;letter-spacing:.25em;padding:14px 10px 14px 22px;border-radius:18px;
+    background:rgba(0,0,0,.3);border:1px dashed rgba(255,255,255,.35);-webkit-user-select:text;user-select:text}
+  .wait p{margin:0;color:var(--sub);font-size:14px;line-height:1.7}
+  .dotsload span{display:inline-block;width:8px;height:8px;margin:0 3px;border-radius:50%;background:var(--gold);animation:bl 1.2s infinite}
+  .dotsload span:nth-child(2){animation-delay:.2s}.dotsload span:nth-child(3){animation-delay:.4s}
+  @keyframes bl{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+
+  /* ---- 対戦画面 ---- */
+  .game{flex:1;display:flex;flex-direction:column;align-items:center;gap:10px}
+  .players{width:100%;display:flex;gap:10px}
+  .pl{flex:1;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:16px;background:var(--card);
+    border:2px solid transparent;transition:border-color .2s,background .2s;min-width:0}
+  .pl.active{border-color:var(--gold);background:rgba(255,210,90,.12)}
+  .pl .disc{width:30px;height:30px;flex:none}
+  .pl .info{min-width:0;flex:1}
+  .pl .nm{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pl .nm small{color:var(--gold);margin-left:4px}
+  .pl .sc{font-size:24px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+  .status{min-height:24px;font-size:15px;font-weight:600;text-align:center}
+  .status.mine{color:var(--gold)}
+
+  .boardwrap{width:min(100%, 62dvh, 520px);padding:8px;border-radius:14px;
+    background:linear-gradient(180deg,#5b3a1e,#3d2611);box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.15)}
+  .board{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;background:var(--line);gap:2px;border-radius:6px;overflow:hidden;
+    border:2px solid var(--line)}
+  .cell{position:relative;background:var(--felt);display:grid;place-items:center;cursor:pointer;touch-action:manipulation;
+    border:0;padding:0;aspect-ratio:1}
+  .cell:nth-child(odd){background:var(--felt)}
+  .cell.hint::after{content:"";width:26%;height:26%;border-radius:50%;background:rgba(0,0,0,.28)}
+  .cell.hint:active{background:#1aa463}
+  .cell .disc{width:84%;height:84%}
+  .cell.last::before{content:"";position:absolute;width:12%;height:12%;border-radius:50%;background:var(--danger);z-index:2;box-shadow:0 0 0 1.5px rgba(255,255,255,.7)}
+  .star{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--line);transform:translate(-50%,-50%);z-index:1;pointer-events:none}
+
+  .disc{border-radius:50%;position:relative;transform-style:preserve-3d}
+  .disc.b{background:radial-gradient(circle at 35% 30%,#5a5a5a,#0b0b0b 70%);box-shadow:0 2px 3px rgba(0,0,0,.5)}
+  .disc.w{background:radial-gradient(circle at 35% 30%,#ffffff,#cfd6d2 75%);box-shadow:0 2px 3px rgba(0,0,0,.4)}
+  .disc.flip{animation:flip .38s ease-in-out}
+  .disc.place{animation:place .22s ease-out}
+  @keyframes flip{0%{transform:rotateY(0) scale(1)}50%{transform:rotateY(90deg) scale(1.12)}100%{transform:rotateY(0) scale(1)}}
+  @keyframes place{0%{transform:scale(.4);opacity:.3}100%{transform:scale(1);opacity:1}}
+
+  .actions{width:100%;display:flex;gap:10px;margin-top:auto}
+  .actions .btn{flex:1;height:46px}
+
+  /* ---- 結果 ---- */
+  .overlay{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(0,0,0,.55);padding:24px;
+    -webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+  .dialog{width:min(100%,340px);background:#0f3b27;border:1px solid rgba(255,255,255,.18);border-radius:22px;padding:22px 18px;text-align:center;
+    box-shadow:0 20px 50px rgba(0,0,0,.5)}
+  .dialog h3{margin:0 0 6px;font-size:26px}
+  .dialog p{margin:0 0 16px;color:var(--sub);font-size:14px;line-height:1.6}
+  .dialog .stack{gap:10px}
+
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 76px);width:max-content;transform:translateX(-50%) translateY(20px);
+    background:rgba(0,0,0,.8);color:#fff;padding:12px 18px;border-radius:14px;font-size:14px;z-index:30;opacity:0;
+    transition:opacity .2s,transform .2s;pointer-events:none;max-width:calc(100% - 40px);text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .note{font-size:12px;color:var(--sub);line-height:1.6;margin:0}
+  .err{color:#ffb4b4;font-size:13px;line-height:1.6;margin:0}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <a class="btn round" id="homeBtn" href="../index.html" aria-label="ホームへ戻る">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></svg>
+    </a>
+    <div class="title" id="title">オセロ</div>
+    <button class="btn round hidden" id="backBtn" type="button" aria-label="メニューに戻る">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="spacer" id="topSpacer"></div>
+  </div>
+
+  <!-- ===== メニュー ===== -->
+  <section class="menu" id="menuView">
+    <div class="hero">
+      <img src="apple-touch-icon.png" alt="">
+      <h1>OTHELLO</h1>
+      <p>友だちとオンラインで対戦しよう</p>
+    </div>
+
+    <div class="card stack">
+      <div>
+        <label class="small" for="nameInput">あなたの名前</label>
+        <input type="text" id="nameInput" maxlength="12" placeholder="なまえ" autocomplete="nickname">
+      </div>
+    </div>
+
+    <div class="card stack">
+      <h2>オンライン対戦</h2>
+      <button class="btn big primary" id="createBtn" type="button">部屋をつくる</button>
+      <div class="row">
+        <input type="text" class="code" id="codeInput" maxlength="5" placeholder="コード" inputmode="latin" autocapitalize="characters" autocomplete="off">
+        <button class="btn big" id="joinBtn" type="button" style="flex:.7">参加する</button>
+      </div>
+      <div class="resume hidden" id="resumeBox">前回の部屋 <b id="resumeCode"></b> に<button type="button" id="resumeBtn">戻る</button></div>
+      <p class="err hidden" id="onlineErr"></p>
+    </div>
+
+    <div class="card stack">
+      <h2>この端末であそぶ</h2>
+      <div class="row">
+        <button class="btn big" id="cpuBtn" type="button">CPUと対戦</button>
+        <button class="btn big" id="localBtn" type="button">ふたりで</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 待機 ===== -->
+  <section class="wait hidden" id="waitView">
+    <p>相手にこのコードを伝えてください</p>
+    <div class="codebox" id="waitCode">-----</div>
+    <div class="row" style="width:100%;max-width:340px">
+      <button class="btn big" id="copyBtn" type="button">コピー</button>
+      <button class="btn big primary" id="shareBtn" type="button">招待を送る</button>
+    </div>
+    <p>相手の参加を待っています <span class="dotsload"><span></span><span></span><span></span></span></p>
+    <button class="btn" id="cancelBtn" type="button" style="margin-top:12px">部屋を閉じる</button>
+  </section>
+
+  <!-- ===== 対戦 ===== -->
+  <section class="game hidden" id="gameView">
+    <div class="players">
+      <div class="pl" id="plB"><div class="disc b"></div><div class="info"><div class="nm" id="nmB">黒</div><div class="sc" id="scB">2</div></div></div>
+      <div class="pl" id="plW"><div class="disc w"></div><div class="info"><div class="nm" id="nmW">白</div><div class="sc" id="scW">2</div></div></div>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="boardwrap"><div class="board" id="board"></div></div>
+    <div class="actions">
+      <button class="btn" id="hintBtn" type="button">ヒント: ON</button>
+      <button class="btn" id="resignBtn" type="button">投了</button>
+    </div>
+  </section>
+</main>
+
+<div class="overlay hidden" id="resultOverlay">
+  <div class="dialog">
+    <h3 id="resultTitle">勝ち！</h3>
+    <p id="resultText"></p>
+    <div class="stack">
+      <button class="btn big primary" id="againBtn" type="button">もう一度</button>
+      <button class="btn big" id="viewBtn" type="button">盤面を見る</button>
+      <button class="btn big" id="menuBtn" type="button">メニューへ</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="confirmOverlay">
+  <div class="dialog">
+    <h3 id="confirmTitle">確認</h3>
+    <p id="confirmText"></p>
+    <div class="row">
+      <button class="btn big" id="confirmNo" type="button">やめる</button>
+      <button class="btn big primary" id="confirmYes" type="button">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

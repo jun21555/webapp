@@ -1,0 +1,115 @@
+// ===============================================================
+//  Firestore セキュリティルール（かぞく予定 ＋ オンラインオセロ）
+// ---------------------------------------------------------------
+//  かぞく予定と同じ Firebase プロジェクトを使っているので、
+//  このファイルは「かぞく予定のルール」に「オセロのルール」を足したものです。
+//
+//  Firebase コンソール → Firestore Database →「ルール」タブに
+//  この内容をまるごと貼り付けて「公開」してください。
+//  （かぞく予定のルールもそのまま入っているので、カレンダーは今まで通り動きます）
+// ===============================================================
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    // families/{fid}/members/{自分のuid} があれば、その家族のメンバー
+    function isMember(fid) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/families/$(fid)/members/$(request.auth.uid));
+    }
+
+    // ---- ユーザーごとの文書：本人だけ ----
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ---- 招待コード ----
+    match /invites/{code} {
+      // コードを知っている人が1件だけ読める（一覧は取れない）
+      allow get: if signedIn();
+      // 家族を作った本人だけが、その家族のコードを登録できる
+      allow create: if signedIn()
+        && getAfter(/databases/$(database)/documents/families/$(request.resource.data.familyId)).data.createdBy == request.auth.uid;
+      allow delete: if isMember(resource.data.familyId);
+    }
+
+    // ---- 家族 ----
+    match /families/{fid} {
+      allow read, update: if isMember(fid);
+      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+
+      // メンバー
+      match /members/{uid} {
+        allow read: if isMember(fid);
+        // 自分のぶんだけ追加できる。条件は「家族を作った本人」か「正しい招待コードを持っている」こと
+        allow create: if signedIn() && request.auth.uid == uid && (
+          getAfter(/databases/$(database)/documents/families/$(fid)).data.createdBy == request.auth.uid
+          || get(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.familyId == fid
+        );
+        allow update, delete: if signedIn() && request.auth.uid == uid;
+      }
+
+      // 予定：家族のメンバーなら誰でも読み書きできる
+      match /events/{eid} {
+        allow read, delete: if isMember(fid);
+        allow create, update: if isMember(fid)
+          && request.resource.data.title is string
+          && request.resource.data.title.size() <= 100
+          && request.resource.data.date is string;
+      }
+    }
+
+    // ===========================================================
+    //  オンラインオセロ（othello/{部屋コード}）
+    // ===========================================================
+    match /othello/{code} {
+      function validGame(d) {
+        return d.board is string && d.board.size() == 64
+          && d.turn in ['b', 'w']
+          && d.status in ['waiting', 'playing', 'finished']
+          && d.blackName is string && d.blackName.size() <= 20
+          && d.whiteName is string && d.whiteName.size() <= 20;
+      }
+      function turnUid() {
+        return resource.data.turn == 'b' ? resource.data.blackUid : resource.data.whiteUid;
+      }
+
+      // 部屋コードを知っている人だけが読める（一覧は取れない）
+      allow get: if signedIn();
+
+      // 部屋を作る：作った人が黒
+      allow create: if signedIn()
+        && request.resource.data.blackUid == request.auth.uid
+        && request.resource.data.whiteUid == ''
+        && request.resource.data.status == 'waiting'
+        && validGame(request.resource.data);
+
+      allow update: if signedIn() && validGame(request.resource.data) && (
+        // 参加する：空いている白の席に自分が座るだけ
+        (resource.data.whiteUid == ''
+          && resource.data.blackUid != request.auth.uid
+          && request.resource.data.whiteUid == request.auth.uid
+          && request.resource.data.blackUid == resource.data.blackUid
+          && request.resource.data.board == resource.data.board)
+        ||
+        // 対局者：ふたりの顔ぶれは変えられない（再戦で色の交代はOK）
+        // 対局中に盤面を変えられるのは手番の人だけ
+        (resource.data.whiteUid != ''
+          && request.auth.uid in [resource.data.blackUid, resource.data.whiteUid]
+          && [request.resource.data.blackUid, request.resource.data.whiteUid].toSet()
+               == [resource.data.blackUid, resource.data.whiteUid].toSet()
+          && (resource.data.status != 'playing'
+              || request.resource.data.board == resource.data.board
+              || turnUid() == request.auth.uid))
+      );
+
+      // 相手が来る前なら、作った人が部屋を閉じられる
+      allow delete: if signedIn()
+        && resource.data.blackUid == request.auth.uid
+        && resource.data.status == 'waiting';
+    }
+  }
+}
