@@ -352,7 +352,7 @@ $('localBtn').onclick = () => newLocalGame('local');
 // ---------------------------------------------------------------
 //  オンライン（Firebase）
 // ---------------------------------------------------------------
-let fb = null;          // { db, F, uid }
+let fb = null;          // { db, F, A, auth }
 let unsub = null;
 let room = null;
 let spectator = false;
@@ -365,7 +365,16 @@ function showOnlineErr(msg) {
 function fbErrorText(err) {
   const code = err && err.code || '';
   const map = {
-    'auth/operation-not-allowed': 'Firebase で「匿名ログイン」が有効になっていません（README の手順を参照してください）',
+    'auth/operation-not-allowed': 'このログイン方法が Firebase で有効になっていません（README 参照）',
+    'auth/popup-closed-by-user': 'ログインがキャンセルされました',
+    'auth/cancelled-popup-request': 'ログインがキャンセルされました',
+    'auth/popup-blocked': 'ポップアップがブロックされました。もう一度押すか、メールでログインしてください',
+    'auth/invalid-credential': 'メールアドレスかパスワードが違います',
+    'auth/invalid-email': 'メールアドレスの形が正しくありません',
+    'auth/email-already-in-use': 'このメールアドレスはもう登録されています。「ログイン」を押してください',
+    'auth/weak-password': 'パスワードは6文字以上にしてください',
+    'auth/unauthorized-domain': 'このURLが Firebase の「承認済みドメイン」に入っていません（README 参照）',
+    'auth/too-many-requests': '試行回数が多すぎます。しばらく待ってからもう一度お試しください',
     'auth/network-request-failed': '通信できませんでした。電波の状態を確認してください',
     'permission-denied': 'Firestore のルールで拒否されました（README の手順でルールを公開してください）',
     'unavailable': 'サーバーにつながりません。通信状態を確認してください',
@@ -374,26 +383,102 @@ function fbErrorText(err) {
   return map[code] || map[code.replace(/^firestore\//, '')] || `エラー: ${err && err.message || err}`;
 }
 
-async function ensureFirebase() {
-  if (fb) return fb;
-  if (!firebaseConfig.apiKey) throw new Error('firebase-config.js に Firebase の設定がありません');
-  if (!navigator.onLine) throw Object.assign(new Error('offline'), { code: 'auth/network-request-failed' });
-  const V = '13.4.0';
-  const [{ initializeApp, getApps, getApp }, A, F] = await Promise.all([
-    import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),
-    import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`),
-    import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`),
-  ]);
-  // かぞく予定と同じ Firebase プロジェクトを使うので、アプリ名を分けておく
-  const app = getApps().some(a => a.name === 'othello') ? getApp('othello') : initializeApp(firebaseConfig, 'othello');
-  const auth = A.getAuth(app);
-  await A.setPersistence(auth, A.browserLocalPersistence).catch(() => {});
-  const user = await new Promise(res => { const u = A.onAuthStateChanged(auth, x => { u(); res(x); }); });
-  const cred = user || (await A.signInAnonymously(auth)).user;
-  const db = F.getFirestore(app);
-  fb = { db, F, uid: cred.uid };
-  return fb;
+// Firebase を読み込む（かぞく予定と同じアプリ名＝ログイン状態も共有される）
+let fbLoading = null;
+function loadFirebase() {
+  if (fbLoading) return fbLoading;
+  fbLoading = (async () => {
+    if (!firebaseConfig.apiKey) throw new Error('firebase-config.js に Firebase の設定がありません');
+    const V = '13.4.0';
+    const [{ initializeApp, getApps, getApp }, A, F] = await Promise.all([
+      import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),
+      import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`),
+      import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`),
+    ]);
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    const auth = A.getAuth(app);
+    const db = F.getFirestore(app);
+    fb = { db, F, A, auth };
+    return fb;
+  })();
+  fbLoading.catch(() => { fbLoading = null; });
+  return fbLoading;
 }
+
+// ログインしている人だけがオンライン対戦できる
+async function ensureFirebase() {
+  const f = await loadFirebase();
+  const u = f.auth.currentUser;
+  if (!u || u.isAnonymous) throw new Error('ログインしてください');
+  return { db: f.db, F: f.F, uid: u.uid };
+}
+
+let pendingRoom = null;   // ログイン前に招待リンクから開いたときの部屋コード
+function setAuthUI(state, user) {
+  $('authLoading').classList.toggle('hidden', state !== 'loading');
+  $('loginBox').classList.toggle('hidden', state !== 'out');
+  $('onlineBox').classList.toggle('hidden', state !== 'in');
+  if (state === 'in') {
+    $('acctName').textContent = user.displayName || user.email || 'ユーザー';
+    if (!nameInput.value.trim() && user.displayName) {
+      nameInput.value = user.displayName.slice(0, 12);
+      localStorage.setItem('othello.name', nameInput.value);
+    }
+  }
+}
+
+async function startAuth() {
+  setAuthUI('loading');
+  try {
+    const { A, auth } = await loadFirebase();
+    await A.setPersistence(auth, A.browserLocalPersistence).catch(() => {});
+    A.onAuthStateChanged(auth, async user => {
+      if (user && user.isAnonymous) { await A.signOut(auth); return; } // 以前の匿名ログインは使わない
+      if (!user) {
+        if (mode === 'online') { toast('ログアウトしました'); leaveGame(); }
+        setAuthUI('out');
+        if (pendingRoom) toast(`ログインすると部屋 ${pendingRoom} に参加します`, 3500);
+        return;
+      }
+      setAuthUI('in', user);
+      showOnlineErr('');
+      if (pendingRoom) {
+        const code = pendingRoom; pendingRoom = null;
+        $('codeInput').value = code;
+        if (nameInput.value.trim()) $('joinBtn').click();
+        else { nameInput.focus(); toast('名前を入れて「参加する」を押してください', 3500); }
+      }
+    });
+  } catch (e) {
+    console.error(e);
+    $('authLoading').classList.add('hidden');
+    showOnlineErr(fbErrorText(e) + '（CPU対戦・ふたりで対戦は遊べます）');
+    // 通信が戻ったらもう一度
+    addEventListener('online', () => { showOnlineErr(''); startAuth(); }, { once: true });
+  }
+}
+
+$('googleBtn').onclick = async () => {
+  showOnlineErr('');
+  try { const { A, auth } = await loadFirebase(); await A.signInWithPopup(auth, new A.GoogleAuthProvider()); }
+  catch (e) { showOnlineErr(fbErrorText(e)); }
+};
+$('emailForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  showOnlineErr('');
+  const signup = e.submitter && e.submitter.dataset.mode === 'signup';
+  const email = $('email').value.trim(), pw = $('password').value;
+  try {
+    const { A, auth } = await loadFirebase();
+    if (signup) await A.createUserWithEmailAndPassword(auth, email, pw);
+    else await A.signInWithEmailAndPassword(auth, email, pw);
+    $('password').value = '';
+  } catch (e2) { showOnlineErr(fbErrorText(e2)); }
+});
+$('logoutBtn').onclick = async () => {
+  if (!await confirmBox('ログアウト', 'ログアウトしますか？（かぞく予定からもログアウトします）', 'ログアウト')) return;
+  try { await fb.A.signOut(fb.auth); } catch (e) { toast(fbErrorText(e)); }
+};
 
 function makeCode() {
   let s = '';
@@ -462,7 +547,8 @@ function openRoom(code) {
   localStorage.setItem('othello.lastRoom', code);
   const u = new URL(location.href); u.searchParams.set('room', code); history.replaceState(null, '', u);
   $('waitCode').textContent = code;
-  const { db, F, uid } = fb;
+  const { db, F } = fb;
+  const uid = fb.auth.currentUser && fb.auth.currentUser.uid;
   let firstSnap = true;
   unsub = F.onSnapshot(F.doc(db, 'othello', code), snap => {
     if (!snap.exists()) {
@@ -595,10 +681,10 @@ refreshResume();
 show('menu');
 const qRoom = new URL(location.href).searchParams.get('room');
 if (qRoom) {
-  $('codeInput').value = qRoom.toUpperCase();
-  if (nameInput.value.trim()) $('joinBtn').click();
-  else { nameInput.focus(); toast('名前を入れて「参加する」を押してください', 3500); }
+  pendingRoom = qRoom.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+  $('codeInput').value = pendingRoom;
 }
+startAuth();
 
 // テスト用に公開（ブラウザのコンソールから確認できるように）
 window.__othello = { legalMoves, applyMove, afterMove, flipsFor, cpuChoose, INIT };

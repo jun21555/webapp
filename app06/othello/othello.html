@@ -50,9 +50,18 @@
     -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
   .card h2{margin:0 0 10px;font-size:14px;color:var(--sub);font-weight:600;letter-spacing:.06em}
   label.small{display:block;font-size:12px;color:var(--sub);margin-bottom:6px}
-  input[type=text]{width:100%;height:48px;border-radius:12px;border:1px solid rgba(255,255,255,.2);
+  input[type=text],input[type=email],input[type=password]{width:100%;height:48px;border-radius:12px;border:1px solid rgba(255,255,255,.2);
     background:rgba(0,0,0,.25);color:#fff;font-size:17px;padding:0 14px;outline:none;-webkit-user-select:text;user-select:text}
   input[type=text]:focus{border-color:var(--gold)}
+  .google{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f}
+  .google:active{background:#e8e8e8}
+  .google svg{width:20px;height:20px;color:#4285f4}
+  .or{display:flex;align-items:center;gap:10px;color:var(--sub);font-size:12px}
+  .or::before,.or::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.2)}
+  .account{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--sub);min-width:0}
+  .account span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .account b{color:#fff;font-weight:600}
+  .account button{flex:none;background:none;border:0;color:var(--gold);font:inherit;text-decoration:underline;min-height:44px;cursor:pointer}
   input.code{text-transform:uppercase;letter-spacing:.3em;font-weight:700;text-align:center}
   .big{width:100%;height:52px;border-radius:14px;font-size:17px;font-weight:700}
   .primary{background:linear-gradient(180deg,#ffe07a,#f5b81c);color:#3a2800}
@@ -157,12 +166,36 @@
 
     <div class="card stack">
       <h2>オンライン対戦</h2>
-      <button class="btn big primary" id="createBtn" type="button">部屋をつくる</button>
-      <div class="row">
-        <input type="text" class="code" id="codeInput" maxlength="5" placeholder="コード" inputmode="latin" autocapitalize="characters" autocomplete="off">
-        <button class="btn big" id="joinBtn" type="button" style="flex:.7">参加する</button>
+      <p class="note" id="authLoading">ログイン状態を確認しています…</p>
+
+      <!-- ログイン前 -->
+      <div class="stack hidden" id="loginBox">
+        <p class="note">オンライン対戦は、登録した人だけが使えます。<br>かぞく予定と同じアカウントでログインできます。</p>
+        <button class="btn big google" id="googleBtn" type="button">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="currentColor" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z"/></svg>
+          <span>Google でログイン</span>
+        </button>
+        <div class="or">または</div>
+        <form class="stack" id="emailForm">
+          <input type="email" id="email" placeholder="メールアドレス" autocomplete="email" required>
+          <input type="password" id="password" placeholder="パスワード（6文字以上）" autocomplete="current-password" minlength="6" required>
+          <div class="row">
+            <button class="btn big" type="submit" data-mode="signin">ログイン</button>
+            <button class="btn big" type="submit" data-mode="signup">新しく登録</button>
+          </div>
+        </form>
       </div>
-      <div class="resume hidden" id="resumeBox">前回の部屋 <b id="resumeCode"></b> に<button type="button" id="resumeBtn">戻る</button></div>
+
+      <!-- ログイン後 -->
+      <div class="stack hidden" id="onlineBox">
+        <div class="account"><span>ログイン中：<b id="acctName"></b></span><button type="button" id="logoutBtn">ログアウト</button></div>
+        <button class="btn big primary" id="createBtn" type="button">部屋をつくる</button>
+        <div class="row">
+          <input type="text" class="code" id="codeInput" maxlength="5" placeholder="コード" inputmode="latin" autocapitalize="characters" autocomplete="off">
+          <button class="btn big" id="joinBtn" type="button" style="flex:.7">参加する</button>
+        </div>
+        <div class="resume hidden" id="resumeBox">前回の部屋 <b id="resumeCode"></b> に<button type="button" id="resumeBtn">戻る</button></div>
+      </div>
       <p class="err hidden" id="onlineErr"></p>
     </div>
 

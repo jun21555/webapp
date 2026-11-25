@@ -66,6 +66,11 @@ service cloud.firestore {
     //  オンラインオセロ（othello/{部屋コード}）
     // ===========================================================
     match /othello/{code} {
+      // 登録した人（Google かメールでログインした人）だけ。匿名ログインは不可
+      function registered() {
+        return request.auth != null
+          && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      }
       function validGame(d) {
         return d.board is string && d.board.size() == 64
           && d.turn in ['b', 'w']
@@ -77,17 +82,17 @@ service cloud.firestore {
         return resource.data.turn == 'b' ? resource.data.blackUid : resource.data.whiteUid;
       }
 
-      // 部屋コードを知っている人だけが読める（一覧は取れない）
-      allow get: if signedIn();
+      // 部屋コードを知っている登録ユーザーだけが読める（一覧は取れない）
+      allow get: if registered();
 
       // 部屋を作る：作った人が黒
-      allow create: if signedIn()
+      allow create: if registered()
         && request.resource.data.blackUid == request.auth.uid
         && request.resource.data.whiteUid == ''
         && request.resource.data.status == 'waiting'
         && validGame(request.resource.data);
 
-      allow update: if signedIn() && validGame(request.resource.data) && (
+      allow update: if registered() && validGame(request.resource.data) && (
         // 参加する：空いている白の席に自分が座るだけ
         (resource.data.whiteUid == ''
           && resource.data.blackUid != request.auth.uid
@@ -107,7 +112,7 @@ service cloud.firestore {
       );
 
       // 相手が来る前なら、作った人が部屋を閉じられる
-      allow delete: if signedIn()
+      allow delete: if registered()
         && resource.data.blackUid == request.auth.uid
         && resource.data.status == 'waiting';
     }
