@@ -258,7 +258,7 @@ python3 -m http.server 8000
 # → http://localhost:8000/app06/kabu-note/kabu-note.html
 ```
 
-株ノートのデータを手元で取るには `pip install yfinance pandas xlrd` のあと `python app06/kabu-note/tools/fetch_data.py`。
+株ノートのデータを手元で取るには `pip install yfinance pandas xlrd openpyxl` のあと `python app06/kabu-note/tools/fetch_data.py`。
 
 位置情報は https か localhost でのみ使えます。
 

@@ -38,7 +38,7 @@ jobs:
           python-version: "3.12"
 
       - name: ライブラリのインストール
-        run: pip install --quiet yfinance pandas xlrd
+        run: pip install --quiet yfinance pandas xlrd openpyxl
 
       - name: 銘柄の追加・削除（Issue から）
         if: github.event_name == 'issues'

@@ -7,12 +7,28 @@ import datetime as dt
 import io
 import json
 import pathlib
+import re
 import sys
+import urllib.parse
 import urllib.request
 
 import pandas as pd
 
-URL = "https://www.jpx.co.jp/markets/statistics-equities/misc/tvdivq0000001vg2-att/data_j.xls"
+PAGE = "https://www.jpx.co.jp/markets/statistics-equities/misc/01.html"
+FALLBACK = "https://www.jpx.co.jp/markets/statistics-equities/misc/tvdivq0000001vg2-att/data_j.xlsx"
+UA = {"User-Agent": "Mozilla/5.0 (kabu-note)"}
+
+
+def excel_url():
+    """一覧ページから Excel のリンクを探す（.xls → .xlsx のようにファイル名が変わっても追従する）"""
+    try:
+        html = urllib.request.urlopen(urllib.request.Request(PAGE, headers=UA), timeout=60).read().decode("utf-8", "ignore")
+        m = re.search(r'href="([^"]+data_j\.xlsx?)"', html)
+        if m:
+            return urllib.parse.urljoin(PAGE, m.group(1))
+    except Exception as e:
+        print(f"一覧ページを読めませんでした: {e}", file=sys.stderr)
+    return FALLBACK
 OUT = pathlib.Path(__file__).resolve().parent.parent / "data" / "jpx-list.json"
 JST = dt.timezone(dt.timedelta(hours=9))
 
@@ -26,9 +42,10 @@ def main():
                 return
         except Exception:
             pass
-    req = urllib.request.Request(URL, headers={"User-Agent": "Mozilla/5.0 (kabu-note)"})
-    raw = urllib.request.urlopen(req, timeout=60).read()
-    df = pd.read_excel(io.BytesIO(raw), dtype=str, engine="xlrd")
+    url = excel_url()
+    print(f"取得: {url}")
+    raw = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=60).read()
+    df = pd.read_excel(io.BytesIO(raw), dtype=str)  # 形式（xls / xlsx）は中身から自動判定
     rows = []
     for _, r in df.iterrows():
         market = str(r.get("市場・商品区分", ""))
