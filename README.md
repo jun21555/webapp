@@ -9,6 +9,7 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [app07 ランチャー](app07/index.html) | app07 のアプリをホーム画面風に並べたランチャー |
 | [ふせチャレ](app07/phone-down/phone-down.html) | スマホを伏せて置いている時間が長いほど高スコア。デトックスの森に生きものが集まるスマホ依存対策アプリ |
 | [app06 ランチャー](app06/index.html) | app06 のアプリをホーム画面風に並べたランチャー |
+| [株ノート](app06/kabu-note/kabu-note.html) | 日本株の株価チャート（ローソク足・移動平均・ボリンジャー・RSI・MACD、最長10年）、期間分析、PER・PBR・ROE などの指標、業績・配当の推移、企業情報、株主優待と権利付最終日、銘柄比較、保有株の損益メモ。データは GitHub Actions が毎日自動取得 |
 | [オンラインオセロ](app06/othello/othello.html) | Firebase（ログイン＋Firestore）で、登録した人どうしがリアルタイム対戦できるオセロ。5文字の部屋コード／招待リンクで参加、再戦で色を交代、満員の部屋は観戦。オフラインでも CPU 対戦・ふたりで対戦ができる |
 | [DRIFT LINE](app06/drift-line/drift-line.html) | アクセル開度でホイールスピンを操り、ドリフトの効きをコントロールする見下ろし型ドリフトレース。アナログアクセル（スマホは縦スライダー）、ドリフトスコア・ラップタイム・セッティング |
 | [初見トレーナー](app06/sight-reading/sight-reading.html) | ピアノの初見（譜読み）練習。五線の音符を見て鍵盤を押す。ト音・ヘ音・大譜表、初級〜上級（♯♭）、1音ずつ／先読み8音、問題数・制限時間の指定、苦手な音を多めに出題、レベル・バッジ・ごほうび |
@@ -23,6 +24,34 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [カップ麺タイマー](app06/cup-noodle-timer/cup-noodle-timer.html) | 3分・5分をワンタップで計測し、できあがりをプッシュ通知とアラーム音で知らせる |
 | [ゆで卵タイマー](app06/boiled-egg-timer/boiled-egg-timer.html) | ゆで時間ごとの卵の断面（とろとろ〜固ゆで）を見ながら時間をセットし、ゆで上がりをプッシュ通知とアラーム音で知らせる |
 | [ピンボール](app06/pinball.html) / [コップの水](app06/cup.html) / [Gメーター](app06/gmeter.html) / [現在地](app06/location.html) / [マップ](app06/map.html) / [サウンド](app06/visualizer.html) | app06 のその他のアプリ |
+
+### 株ノート（app06/kabu-note）
+
+- **銘柄**：ウォッチ中の銘柄の株価・前日比・60日のミニチャート・PER・利回り。日経平均もタップで詳しく見られる
+- **詳細**：ローソク足／ライン（1ヶ月〜10年。3年以上は週足、10年は月足）、移動平均・ボリンジャーバンド・日経平均との比較、出来高・RSI・MACD。チャートを指でなぞると日付ごとの四本値を表示
+  - 期間分析（騰落率・年率リターン・ボラティリティ・最大下落率・日経平均との β と相関・52週レンジ）と、月別の傾向（月ごとの平均騰落率と上昇した年の割合）
+  - 指標・業績（年次）・配当（年ごとの推移）・優待・企業情報・保有とメモ
+- **比較**：選んだ銘柄の値動きを起点100で重ねて表示。PER・PBR・ROE・配当／優待／総合利回り・時価総額の表をタップで並び替え
+- **優待**：権利確定月ごとに優待銘柄と次の権利付最終日（東証の営業日から計算した目安）を一覧
+- **保有**：株数と取得単価を入れると評価損益・年間配当・優待の見込みをまとめて表示（この端末のブラウザ内だけに保存）
+- 株価・指標は Yahoo Finance のデータで、リアルタイムではない（平日 16:43 ごろに更新）。投資判断はご自身で
+
+#### データの仕組み
+
+| ファイル | 役割 |
+| --- | --- |
+| `watchlist.json` | ウォッチする銘柄（証券コードと名前） |
+| `yutai.json` | 株主優待の情報（手入力・確認日つき）。`valueYen` は優待利回りの計算に使う年間の円換算額 |
+| `data/*.json` | 自動で作られる株価（10年分の日足）・指標・業績・配当。`index.json` は一覧用、`jpx-list.json` は東証の上場銘柄一覧 |
+| `tools/fetch_data.py` | yfinance で株価・指標を取得して `data/` に保存 |
+| `tools/fetch_jpx_list.py` | JPX の上場銘柄一覧を取得（週1回） |
+| `tools/manage_watchlist.py` | Issue のタイトル（`株ノート: 追加 7203` など）からウォッチリストを更新 |
+| `tools/make_sample_data.py` | 画面確認用のダミーデータを作る（開発用） |
+| `.github/workflows/kabu-note-data.yml` | 上の処理を平日の大引け後・`watchlist.json` 変更時・Issue 作成時に実行してコミット |
+
+- **銘柄の追加・削除**：アプリの「＋ 銘柄を追加・削除」で銘柄を検索して「追加」を押すと、GitHub の Issue 作成画面が開く。そのまま作成すると Actions がウォッチリストに追加してデータを取得し、Issue を閉じる（リポジトリの持ち主が作った Issue だけを処理）。`watchlist.json` を直接編集してもよい
+- すぐ更新したいときは GitHub の「Actions」→「株ノート データ更新」→「Run workflow」
+- Actions がコミットできない場合は、リポジトリの Settings → Actions → General → Workflow permissions を「Read and write permissions」にする
 
 ### オンラインオセロ（app06/othello）
 
@@ -226,7 +255,10 @@ python3 -m http.server 8000
 # → http://localhost:8000/app06/kyou-nan-no-hi/kyou-nan-no-hi.html
 # → http://localhost:8000/app06/family-calendar/family-calendar.html
 # → http://localhost:8000/app06/othello/othello.html
+# → http://localhost:8000/app06/kabu-note/kabu-note.html
 ```
+
+株ノートのデータを手元で取るには `pip install yfinance pandas xlrd` のあと `python app06/kabu-note/tools/fetch_data.py`。
 
 位置情報は https か localhost でのみ使えます。
 
