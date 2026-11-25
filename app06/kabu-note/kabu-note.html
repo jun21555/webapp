@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="株ノート">
+<meta name="theme-color" content="#0b1020">
+<title>株ノート – 株価・指標・株主優待</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --bg:#0b1020; --card:#141b2e; --card2:#1b2339; --line:rgba(255,255,255,.08);
+    --text:#e8ecf4; --dim:#8c97ad; --accent:#f5b942; --accent2:#5cc8ff;
+    --up:#ff5a5f; --down:#3d9bff; --hdr:56px; --tab:58px;
+  }
+  body.us{--up:#22c55e; --down:#ef4444}
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html,body{-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;background:var(--bg)}
+  body{min-height:100dvh;color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;font-size:15px;line-height:1.45}
+  button,input,select,textarea{font:inherit;color:inherit}
+  a{color:var(--accent2)}
+  .num{font-variant-numeric:tabular-nums}
+  .up{color:var(--up)} .down{color:var(--down)} .dim{color:var(--dim)}
+
+  /* ヘッダー */
+  header.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:6px;
+    padding:calc(env(safe-area-inset-top) + 6px) calc(env(safe-area-inset-right) + 10px) 6px calc(env(safe-area-inset-left) + 10px);
+    background:rgba(11,16,32,.86);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+  .ibtn{flex:none;min-width:44px;height:44px;border:0;border-radius:22px;background:rgba(255,255,255,.07);color:var(--text);
+    display:inline-flex;align-items:center;justify-content:center;gap:2px;text-decoration:none;cursor:pointer;padding:0 10px}
+  .ibtn:active{transform:scale(.92);background:rgba(255,255,255,.14)}
+  .ibtn svg{width:22px;height:22px}
+  .ibtn.spin svg{animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .ttl{flex:1;min-width:0;padding:0 4px}
+  .ttl h1{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ttl p{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  main{max-width:640px;margin:0 auto;padding:12px calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + var(--tab) + 24px) calc(env(safe-area-inset-left) + 12px)}
+  .view{display:none}.view.on{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+  .card h2{font-size:14px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+  .card h2 small{font-weight:400;color:var(--dim);font-size:11.5px;margin-left:auto}
+  .note{font-size:12px;color:var(--dim);line-height:1.55}
+  .msg{padding:28px 16px;text-align:center;color:var(--dim)}
+  .msg b{display:block;color:var(--text);font-size:16px;margin-bottom:6px}
+
+  /* ベンチマーク */
+  .bench{display:flex;align-items:center;gap:12px}
+  .bench .l{flex:1;min-width:0}
+  .bench .nm{font-size:12.5px;color:var(--dim)}
+  .bench .px{font-size:24px;font-weight:700;letter-spacing:-.3px}
+  .bench canvas{width:120px;height:44px}
+
+  /* ツールバー */
+  .tools{display:flex;gap:8px;margin-bottom:10px}
+  .inp{flex:1;min-width:0;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);padding:0 12px;font-size:16px;outline:none}
+  .inp:focus{border-color:var(--accent)}
+  select.inp{flex:none;width:auto;max-width:46%;-webkit-appearance:none;appearance:none;padding-right:26px;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c97ad' stroke-width='1.6' fill='none'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 10px center;background-size:11px}
+
+  /* 銘柄リスト */
+  .stock{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:var(--card);border:1px solid var(--line);margin-bottom:8px;cursor:pointer;min-height:64px}
+  .stock:active{background:var(--card2);transform:scale(.99)}
+  .stock .l{flex:1;min-width:0}
+  .stock .nm{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stock .sub{font-size:11.5px;color:var(--dim);display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+  .tag{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:6px;background:rgba(245,185,66,.16);color:var(--accent);font-weight:600}
+  .tag.b{background:rgba(92,200,255,.14);color:var(--accent2)}
+  .tag.g{background:rgba(255,255,255,.08);color:var(--dim)}
+  .stock canvas{width:64px;height:30px;flex:none}
+  .stock .r{text-align:right;flex:none;min-width:84px}
+  .stock .px{font-weight:700;font-size:16px}
+  .stock .ch{font-size:12.5px;font-weight:600}
+  .addbtn{width:100%;height:48px;border-radius:14px;border:1px dashed rgba(245,185,66,.5);background:transparent;color:var(--accent);font-weight:700;cursor:pointer}
+  .addbtn:active{background:rgba(245,185,66,.08)}
+
+  /* タブバー */
+  nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:space-around;
+    padding:4px calc(env(safe-area-inset-right) + 6px) calc(env(safe-area-inset-bottom) + 4px) calc(env(safe-area-inset-left) + 6px);
+    background:rgba(14,20,38,.92);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid var(--line)}
+  nav.tabs button{flex:1;max-width:120px;height:50px;border:0;background:none;color:var(--dim);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10.5px;cursor:pointer}
+  nav.tabs button svg{width:24px;height:24px}
+  nav.tabs button.on{color:var(--accent)}
+
+  /* セグメント・チップ */
+  .seg{display:flex;background:rgba(255,255,255,.06);border-radius:11px;padding:3px;gap:2px;overflow-x:auto;scrollbar-width:none}
+  .seg::-webkit-scrollbar{display:none}
+  .seg button{flex:1;min-width:40px;min-height:36px;border:0;border-radius:9px;background:none;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;padding:0 8px}
+  .seg button.on{background:var(--card2);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{min-height:36px;padding:0 12px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--dim);font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .chip.on{border-color:var(--accent);color:var(--text);background:rgba(245,185,66,.12)}
+  .chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+  /* 詳細画面 */
+  #detail{position:fixed;inset:0;z-index:30;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;
+    transform:translateX(100%);transition:transform .28s cubic-bezier(.2,.8,.2,1);visibility:hidden}
+  #detail.on{transform:none;visibility:visible}
+  #detail main{padding-bottom:calc(env(safe-area-inset-bottom) + 30px)}
+  .dhead .px{font-size:32px;font-weight:800;letter-spacing:-.5px;line-height:1.1}
+  .dhead .ch{font-size:14px;font-weight:700;margin-top:2px}
+  .dhead .meta{font-size:12px;color:var(--dim);margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .chartbox{position:relative;margin:10px -4px 0}
+  .chartbox canvas{display:block;width:100%;touch-action:pan-y}
+  #cInfo{min-height:34px;font-size:11.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:2px 10px;align-items:center;margin-top:8px}
+  #cInfo b{color:var(--text);font-weight:600}
+  .ctl{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .kv{background:var(--card2);border-radius:12px;padding:9px 11px;min-height:58px}
+  .kv .k{font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:4px}
+  .kv .v{font-size:17px;font-weight:700;margin-top:1px}
+  .kv .s{font-size:11px;color:var(--dim)}
+  .kv.tap{cursor:pointer}
+  .rng{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--down),#8c97ad,var(--up));position:relative;margin:14px 2px 6px}
+  .rng i{position:absolute;top:-5px;width:4px;height:18px;border-radius:2px;background:#fff;box-shadow:0 0 0 2px var(--bg);transform:translateX(-2px)}
+  .rngl{display:flex;justify-content:space-between;font-size:11.5px;color:var(--dim)}
+  table.t{width:100%;border-collapse:collapse;font-size:13px}
+  table.t th,table.t td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  table.t th{font-size:11.5px;color:var(--dim);font-weight:600}
+  table.t td:first-child,table.t th:first-child{text-align:left}
+  .scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -14px;padding:0 14px}
+  table.cmp th{position:sticky;top:0;background:var(--card);cursor:pointer;min-height:44px}
+  table.cmp th.on{color:var(--accent)}
+  table.cmp td:first-child{position:sticky;left:0;background:var(--card);max-width:118px;overflow:hidden;text-overflow:ellipsis}
+  table.cmp tr{cursor:pointer}
+  .links{display:flex;flex-wrap:wrap;gap:8px}
+  .links a{min-height:40px;display:inline-flex;align-items:center;padding:0 12px;border-radius:10px;background:var(--card2);text-decoration:none;font-size:13px}
+  .btn{min-height:44px;padding:0 16px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:12px;border:0;background:var(--accent);color:#1a1300;font-weight:700;cursor:pointer}
+  .btn.ghost{background:rgba(255,255,255,.08);color:var(--text)}
+  .btn:active{transform:scale(.97)}
+  .row{display:flex;gap:8px;align-items:center}
+  .row .inp{height:44px}
+  label.f{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
+  textarea.inp{width:100%;height:120px;padding:10px 12px;resize:vertical}
+  .sum{font-size:12.5px;line-height:1.6;color:#c9d1e0;white-space:pre-wrap}
+  .yt h3{font-size:16px;margin-bottom:4px}
+  .ymonths{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+  .badge{font-size:11px;padding:2px 7px;border-radius:7px;background:var(--card2);color:var(--dim)}
+  .badge.ok{background:rgba(34,197,94,.16);color:#4ade80}
+
+  /* 優待カレンダー */
+  .yitem{padding:12px;border-radius:14px;background:var(--card);border:1px solid var(--line);margin-bottom:8px;cursor:pointer}
+  .yitem:active{background:var(--card2)}
+  .yitem .h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+  .yitem .h b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .yitem .c{font-size:13px;margin:3px 0 5px}
+  .yitem .m{font-size:11.5px;color:var(--dim);display:flex;gap:10px;flex-wrap:wrap}
+
+  /* シート */
+  .sheet{position:fixed;inset:0;z-index:50;display:none;background:rgba(0,0,0,.5)}
+  .sheet.on{display:block}
+  .sheet .p{position:absolute;left:0;right:0;bottom:0;max-height:88dvh;overflow-y:auto;background:#121a2d;border-radius:20px 20px 0 0;
+    padding:10px calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 20px) calc(env(safe-area-inset-left) + 16px);max-width:640px;margin:0 auto}
+  .sheet .grab{width:40px;height:5px;border-radius:3px;background:rgba(255,255,255,.25);margin:0 auto 10px}
+  .sheet h3{font-size:17px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+  .res{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);min-height:52px}
+  .res .l{flex:1;min-width:0}
+  .res .l b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .res .l span{font-size:11.5px;color:var(--dim)}
+  .res .btn{min-height:40px;padding:0 14px;font-size:13px}
+  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 80px);transform:translateX(-50%);z-index:60;background:#26304a;color:#fff;
+    padding:10px 16px;border-radius:12px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .2s;max-width:86vw;text-align:center}
+  .toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="ibtn" href="../index.html" aria-label="ホームへ戻る">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></svg>
+  </a>
+  <div class="ttl"><h1 id="vTitle">株ノート</h1><p id="updated">読み込み中…</p></div>
+  <button class="ibtn" id="reload" aria-label="データを更新">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+  </button>
+</header>
+
+<main>
+  <!-- 銘柄 -->
+  <section class="view on" id="v-list">
+    <div class="card bench" id="bench" hidden></div>
+    <div class="tools">
+      <input class="inp" id="q" type="search" placeholder="銘柄名・コード" autocomplete="off">
+      <select class="inp" id="sort" aria-label="並び替え">
+        <option value="order">登録順</option>
+        <option value="chg">前日比</option>
+        <option value="ret1y">1年騰落</option>
+        <option value="div">配当利回り</option>
+        <option value="total">総合利回り</option>
+        <option value="per">PER（低い順）</option>
+        <option value="pbr">PBR（低い順）</option>
+        <option value="mcap">時価総額</option>
+      </select>
+    </div>
+    <div id="list"></div>
+    <button class="addbtn" id="addOpen">＋ 銘柄を追加・削除</button>
+    <p class="note" style="margin-top:12px">株価・指標は Yahoo Finance のデータを平日の大引け後に自動取得しています（リアルタイムではありません）。投資判断はご自身で、最新情報は証券会社や企業の公式情報で確認してください。</p>
+  </section>
+
+  <!-- 比較 -->
+  <section class="view" id="v-cmp">
+    <div class="card">
+      <h2>値動きの比較 <small>起点＝100</small></h2>
+      <div class="seg" id="cmpPer"></div>
+      <div class="chartbox"><canvas id="cmpCv"></canvas></div>
+      <div class="chips" id="cmpChips" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2>指標で比べる <small>見出しをタップで並び替え</small></h2>
+      <div class="scrollx"><table class="t cmp" id="cmpTbl"></table></div>
+      <p class="note" style="margin-top:8px">優待利回り＝優待の年間価値（円換算の目安）÷ 最低投資金額。総合利回り＝配当利回り＋優待利回り。</p>
+    </div>
+  </section>
+
+  <!-- 優待 -->
+  <section class="view" id="v-yutai">
+    <div class="card">
+      <h2>権利確定月で探す</h2>
+      <div class="seg" id="ymSeg"></div>
+    </div>
+    <div id="ylist"></div>
+    <p class="note">権利付最終日は東証の営業日から計算した目安です。優待内容は変更・廃止されることがあるため、必ず企業の公式サイトで確認してください。</p>
+  </section>
+
+  <!-- 保有 -->
+  <section class="view" id="v-hold">
+    <div class="card" id="holdSum"></div>
+    <div id="holdList"></div>
+    <div class="card">
+      <h2>表示設定</h2>
+      <label class="f">値上がり・値下がりの色</label>
+      <div class="seg" id="colorSeg">
+        <button data-v="jp">日本式（上昇=赤）</button>
+        <button data-v="us">米国式（上昇=緑）</button>
+      </div>
+      <p class="note" style="margin-top:10px">保有株・メモ・優待の見積もりはこの端末（ブラウザ）の中だけに保存されます。</p>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs" id="tabs">
+  <button class="on" data-v="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><path d="M15 7h5v5"/></svg>銘柄</button>
+  <button data-v="cmp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>比較</button>
+  <button data-v="yutai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="12" rx="2"/><path d="M12 9v12M3 13h18"/><path d="M12 9c-2-4-6-4-6-1.5S10 9 12 9zm0 0c2-4 6-4 6-1.5S14 9 12 9z"/></svg>優待</button>
+  <button data-v="hold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="2.5"/><path d="M3 10h18M16 15h2"/></svg>保有</button>
+</nav>
+
+<!-- 銘柄の詳細 -->
+<section id="detail" aria-hidden="true">
+  <header class="top">
+    <a class="ibtn" href="../index.html" aria-label="ホームへ戻る">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></svg>
+    </a>
+    <button class="ibtn" id="back" aria-label="一覧へ戻る"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>一覧</button>
+    <div class="ttl"><h1 id="dTitle"></h1><p id="dSub"></p></div>
+  </header>
+  <main>
+    <div class="card dhead" id="dHead"></div>
+    <div class="card">
+      <div class="seg" id="perSeg"></div>
+      <div class="chartbox"><canvas id="cvMain"></canvas><canvas id="cvSub"></canvas></div>
+      <div id="cInfo"></div>
+      <div class="ctl">
+        <div class="chips" id="ovChips"></div>
+        <div class="seg" id="subSeg"></div>
+      </div>
+    </div>
+    <div class="card" id="dStats"></div>
+    <div class="card" id="dSeason"></div>
+    <div class="seg" id="secSeg" style="margin-bottom:12px;position:sticky;top:calc(env(safe-area-inset-top) + 57px);z-index:5;background:#151c30"></div>
+    <div id="dSec"></div>
+  </main>
+</section>
+
+<!-- 銘柄の追加 -->
+<div class="sheet" id="addSheet">
+  <div class="p">
+    <div class="grab"></div>
+    <h3>銘柄を追加・削除 <button class="ibtn" id="addClose" aria-label="閉じる">✕</button></h3>
+    <p class="note" style="margin-bottom:10px">「追加」を押すと GitHub の Issue 作成画面が開きます。そのまま <b>Create</b>（Submit new issue）を押すと、自動でウォッチリストに追加され、1〜3分ほどでデータが取得されます（GitHub へのログインが必要）。</p>
+    <input class="inp" id="aq" type="search" placeholder="銘柄名 または 4桁コード" autocomplete="off" style="width:100%">
+    <div id="ares"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="kabu-note.js"></script>
+</body>
+</html>
