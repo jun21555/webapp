@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2a52"/><stop offset="1" stop-color="#0b1020"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <g transform="translate(0.0 0.0) scale(1.0)">
+    <g stroke="rgba(255,255,255,.07)" stroke-width="3">
+      <path d="M70 150H442M70 250H442M70 350H442"/>
+    </g>
+    <!-- ローソク足 -->
+    <g stroke-width="8" stroke-linecap="round">
+      <path d="M128 300V400" stroke="#3d9bff"/><rect x="106" y="318" width="44" height="66" rx="7" fill="#3d9bff"/>
+      <path d="M208 250V372" stroke="#ff5a5f"/><rect x="186" y="270" width="44" height="80" rx="7" fill="#ff5a5f"/>
+      <path d="M288 200V330" stroke="#3d9bff"/><rect x="266" y="232" width="44" height="64" rx="7" fill="#3d9bff"/>
+      <path d="M368 120V280" stroke="#ff5a5f"/><rect x="346" y="146" width="44" height="106" rx="7" fill="#ff5a5f"/>
+    </g>
+    <!-- 上昇トレンド -->
+    <path d="M96 352 L196 300 L282 268 L420 150" fill="none" stroke="#f5b942" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M384 140 L428 142 L420 186" fill="none" stroke="#f5b942" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- 優待のギフト -->
+    <g transform="translate(92 92)">
+      <rect x="0" y="34" width="92" height="66" rx="10" fill="#f5b942"/>
+      <rect x="-6" y="20" width="104" height="24" rx="7" fill="#ffd27a"/>
+      <rect x="38" y="20" width="16" height="80" fill="#c2410c"/>
+      <path d="M46 20 C30 -4 6 0 14 14 C20 24 40 20 46 20Z M46 20 C62 -4 86 0 78 14 C72 24 52 20 46 20Z" fill="none" stroke="#ffd27a" stroke-width="8" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>
