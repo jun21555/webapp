@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="騒音計">
+<meta name="theme-color" content="#0f1420">
+<title>騒音計</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --bg:#0f1420;--card:#181f2e;--card2:#1f2839;--line:rgba(255,255,255,.08);
+    --fg:#eef2f8;--dim:#8b96ab;--acc:#3ddc97;--lvl:#3ddc97;
+  }
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  html,body{margin:0;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+  body{
+    min-height:100vh;min-height:100dvh;color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+    background:radial-gradient(120% 45% at 50% 0%,#1c2740 0%,transparent 70%),var(--bg);
+    display:flex;flex-direction:column;align-items:center;
+    padding:calc(env(safe-area-inset-top) + 6px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px);
+    -webkit-user-select:none;user-select:none;
+  }
+  header{width:100%;max-width:440px;display:flex;align-items:center;gap:10px;min-height:52px}
+  header h1{flex:1;margin:0;text-align:center;font-size:18px;font-weight:700;letter-spacing:.04em}
+  .round{width:44px;height:44px;flex:0 0 44px;border-radius:50%;border:none;padding:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;color:var(--fg);text-decoration:none;
+    background:var(--card2);box-shadow:0 2px 10px rgba(0,0,0,.3);transition:transform .12s}
+  .round:active{transform:scale(.88)}
+  .round svg{width:22px;height:22px}
+  main{width:100%;max-width:440px;display:flex;flex-direction:column;gap:12px;padding-top:4px;flex:1}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:24px}
+
+  /* ゲージ */
+  .gauge{position:relative;padding:10px 12px 14px}
+  .gauge svg{display:block;width:100%;height:auto}
+  .readout{position:absolute;left:0;right:0;top:31%;text-align:center;pointer-events:none}
+  .val{font-size:72px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-2px;color:var(--fg)}
+  .unit{margin-top:4px;font-size:15px;font-weight:700;color:var(--dim)}
+  .lvl{margin-top:10px;display:inline-block;padding:5px 12px;border-radius:999px;font-size:14px;font-weight:700;
+    color:#0f1420;background:var(--lvl);transition:background .3s}
+  .ex{margin-top:6px;font-size:13px;color:var(--dim);min-height:18px}
+  .warn{position:absolute;left:14px;right:14px;bottom:12px;text-align:center;font-size:12.5px;font-weight:700;color:#ff6b6b;
+    opacity:0;transition:opacity .3s}
+  .warn.on{opacity:1}
+
+  /* 統計 */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:9px 4px;text-align:center}
+  .stat b{display:block;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+  .stat span{font-size:11px;color:var(--dim);font-weight:600}
+
+  /* 履歴グラフ */
+  .hist{padding:10px 12px 8px}
+  .hist .ttl{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);font-weight:600;margin:0 2px 6px}
+  #chart{display:block;width:100%;height:130px}
+
+  /* 操作 */
+  .controls{display:flex;gap:10px;align-items:center;margin-top:auto;padding-top:4px}
+  .btn{height:60px;border:none;border-radius:20px;font-size:18px;font-weight:800;cursor:pointer;font-family:inherit;
+    transition:transform .12s,filter .12s;display:flex;align-items:center;justify-content:center;gap:8px}
+  .btn:active{transform:scale(.96);filter:brightness(.9)}
+  #toggle{flex:1;background:var(--acc);color:#0b1a12}
+  #toggle.stop{background:#ff5a5f;color:#fff}
+  #reset{width:84px;background:var(--card2);color:var(--fg);font-size:15px}
+  .btn svg{width:22px;height:22px}
+  .msg{font-size:13px;color:#ffb347;text-align:center;min-height:0;line-height:1.5}
+  .msg:empty{display:none}
+
+  /* 設定シート */
+  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-height:88dvh;overflow:auto;-webkit-overflow-scrolling:touch;
+    background:#141a27;border-radius:24px 24px 0 0;border-top:1px solid var(--line);
+    padding:10px calc(env(safe-area-inset-right) + 18px) calc(env(safe-area-inset-bottom) + 20px) calc(env(safe-area-inset-left) + 18px);
+    transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.9,.3,1)}
+  .open .sheet-bg{opacity:1;pointer-events:auto}
+  .open .sheet{transform:none}
+  .grab{width:40px;height:5px;border-radius:3px;background:rgba(255,255,255,.25);margin:0 auto 6px}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;max-width:440px;margin:0 auto}
+  .sheet-head h2{margin:0;font-size:18px}
+  .sheet-body{max-width:440px;margin:0 auto}
+  .row{margin-top:18px}
+  .row label,.row .lab{display:block;font-size:14px;font-weight:700;margin-bottom:8px}
+  .row small{display:block;margin-top:6px;font-size:12px;color:var(--dim);line-height:1.5}
+  .seg{display:flex;background:var(--card2);border-radius:12px;padding:3px;gap:3px}
+  .seg button{flex:1;min-height:44px;border:none;border-radius:10px;background:transparent;color:var(--dim);
+    font-size:15px;font-weight:700;font-family:inherit;cursor:pointer}
+  .seg button.on{background:#2e3a52;color:var(--fg)}
+  .cal{display:flex;align-items:center;gap:10px}
+  .cal button{width:44px;height:44px;flex:0 0 44px;border-radius:12px;border:none;background:var(--card2);color:var(--fg);font-size:22px;font-weight:700;cursor:pointer}
+  .cal input{flex:1;accent-color:var(--acc);height:44px}
+  .cal output{width:64px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td{padding:7px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+  td:first-child{width:74px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+  .note{font-size:12px;color:var(--dim);line-height:1.6;margin-top:14px}
+</style>
+</head>
+<body>
+<header>
+  <a class="round" href="../index.html" aria-label="ホームへ戻る">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg>
+  </a>
+  <h1>騒音計</h1>
+  <button class="round" id="openSet" type="button" aria-label="設定">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+  </button>
+</header>
+
+<main>
+  <section class="card gauge">
+    <svg viewBox="0 0 300 250" aria-hidden="true">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#3ddc97"/><stop offset=".45" stop-color="#c8e64b"/>
+          <stop offset=".65" stop-color="#ffc145"/><stop offset=".85" stop-color="#ff6b3d"/><stop offset="1" stop-color="#ff3b5c"/>
+        </linearGradient>
+      </defs>
+      <path id="track" d="" fill="none" stroke="#263049" stroke-width="18" stroke-linecap="round"/>
+      <path id="arc" d="" fill="none" stroke="url(#g)" stroke-width="18" stroke-linecap="round"/>
+      <g id="ticks"></g>
+      <line id="maxMark" x1="0" y1="0" x2="0" y2="0" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0"/>
+    </svg>
+    <div class="readout">
+      <div class="val" id="val">--</div>
+      <div class="unit" id="unit">dB(A)</div>
+      <div class="lvl" id="lvl">停止中</div>
+      <div class="ex" id="ex">「計測スタート」でマイクを使って測ります</div>
+    </div>
+    <div class="warn" id="warn">⚠ 85dB以上：長く聞き続けると耳に負担がかかります</div>
+  </section>
+
+  <section class="stats">
+    <div class="stat"><b id="sMin">--</b><span>最小</span></div>
+    <div class="stat"><b id="sAvg">--</b><span>平均(Leq)</span></div>
+    <div class="stat"><b id="sMax">--</b><span>最大</span></div>
+    <div class="stat"><b id="sTime">0:00</b><span>計測時間</span></div>
+  </section>
+
+  <section class="card hist">
+    <div class="ttl"><span>直近60秒</span><span id="mode">A特性・Fast</span></div>
+    <canvas id="chart"></canvas>
+  </section>
+
+  <div class="msg" id="msg"></div>
+
+  <div class="controls">
+    <button class="btn" id="reset" type="button">リセット</button>
+    <button class="btn" id="toggle" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <span>計測スタート</span>
+    </button>
+  </div>
+</main>
+
+<div id="setWrap">
+  <div class="sheet-bg" id="sheetBg"></div>
+  <div class="sheet" role="dialog" aria-label="設定">
+    <div class="grab"></div>
+    <div class="sheet-head">
+      <h2>設定</h2>
+      <button class="round" id="closeSet" type="button" aria-label="閉じる">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <div class="row">
+        <span class="lab">周波数重み付け</span>
+        <div class="seg" id="segW">
+          <button type="button" data-v="A">A特性（人の耳に近い）</button>
+          <button type="button" data-v="Z">Z（補正なし）</button>
+        </div>
+      </div>
+      <div class="row">
+        <span class="lab">時間重み付け</span>
+        <div class="seg" id="segT">
+          <button type="button" data-v="F">Fast（0.125秒）</button>
+          <button type="button" data-v="S">Slow（1秒）</button>
+        </div>
+      </div>
+      <div class="row">
+        <label for="cal">補正（キャリブレーション）</label>
+        <div class="cal">
+          <button type="button" id="calMinus" aria-label="補正を下げる">−</button>
+          <input type="range" id="cal" min="-20" max="20" step="0.5" value="0">
+          <output id="calOut">±0.0</output>
+          <button type="button" id="calPlus" aria-label="補正を上げる">＋</button>
+        </div>
+        <small>本物の騒音計や別のアプリと同じ場所で測り、表示が合うように調整します。</small>
+      </div>
+      <div class="row">
+        <span class="lab">音の大きさの目安</span>
+        <table id="ref"></table>
+      </div>
+      <p class="note">スマホのマイクで測った推定値です。機種やケースで誤差が出るため、正確な測定が必要なときは計量法に適合した騒音計を使ってください。音声は端末の中だけで処理し、録音・送信はしません。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---------- 設定 ----------
+  const BASE_OFFSET = 100;               // dBFS → 推定 dB SPL の基準オフセット
+  const MIN_DB = 20, MAX_DB = 120;       // ゲージの範囲
+  const LEVELS = [
+    [0,  '#5fd3ff', 'ほぼ無音',       '深夜の郊外・木の葉のふれあう音'],
+    [30, '#3ddc97', 'とても静か',     '図書館・ささやき声'],
+    [40, '#7be07a', '静か',           '静かな住宅地の昼・冷蔵庫'],
+    [50, '#c8e64b', 'ふつう',         '静かな事務所・エアコンの室外機'],
+    [60, '#ffd84a', 'やや騒がしい',   'ふつうの会話・テレビ'],
+    [70, '#ffb03d', '騒がしい',       '掃除機・セミの声・騒がしい街頭'],
+    [80, '#ff8a3d', 'とても騒がしい', '地下鉄の車内・ピアノ'],
+    [90, '#ff5f3d', 'きわめてうるさい','カラオケ店内・工場の中'],
+    [100,'#ff3b5c', '耳に危険',       '電車が通るときのガード下'],
+    [110,'#e0245e', '耳が痛いほど',   'ジェット機の近く・ライブの最前列'],
+  ];
+  const levelOf = db => { let r = LEVELS[0]; for (const l of LEVELS) if (db >= l[0]) r = l; return r; };
+
+  const store = {
+    get(k, d){ try{ const v = localStorage.getItem('noise-meter:'+k); return v === null ? d : JSON.parse(v); }catch(_){ return d; } },
+    set(k, v){ try{ localStorage.setItem('noise-meter:'+k, JSON.stringify(v)); }catch(_){} }
+  };
+  let weight = store.get('weight', 'A');   // 'A' | 'Z'
+  let tw     = store.get('tw', 'F');       // 'F' | 'S'
+  let cal    = store.get('cal', 0);
+
+  // ---------- 要素 ----------
+  const $ = id => document.getElementById(id);
+  const elVal=$('val'), elUnit=$('unit'), elLvl=$('lvl'), elEx=$('ex'), elWarn=$('warn');
+  const elMin=$('sMin'), elAvg=$('sAvg'), elMax=$('sMax'), elTime=$('sTime'), elMode=$('mode'), elMsg=$('msg');
+  const btn=$('toggle');
+
+  // ---------- ゲージ描画 ----------
+  const CX=150, CY=140, R=110, A0=135, SWEEP=270;   // 左下(135°)から時計回りに270°
+  const pt = (deg, r=R) => { const a = deg*Math.PI/180; return [CX + r*Math.cos(a), CY + r*Math.sin(a)]; };
+  const arcPath = (frac) => {
+    frac = Math.max(0.0001, Math.min(1, frac));
+    const [x0,y0] = pt(A0), [x1,y1] = pt(A0 + SWEEP*frac);
+    const large = SWEEP*frac > 180 ? 1 : 0;
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${R} ${R} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  };
+  $('track').setAttribute('d', arcPath(1));
+  const arc = $('arc');
+  const fracOf = db => (Math.max(MIN_DB, Math.min(MAX_DB, db)) - MIN_DB) / (MAX_DB - MIN_DB);
+  {
+    let s = '';
+    for (let db = MIN_DB; db <= MAX_DB; db += 10) {
+      const d = A0 + SWEEP*fracOf(db);
+      const [x1,y1] = pt(d, R-16), [x2,y2] = pt(d, R-22), [tx,ty] = pt(d, R-34);
+      s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#56627c" stroke-width="2" stroke-linecap="round"/>`;
+      if (db % 20 === 0) s += `<text x="${tx}" y="${ty+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#6c7891">${db}</text>`;
+    }
+    $('ticks').innerHTML = s;
+  }
+  const maxMark = $('maxMark');
+  function drawMax(db){
+    if (!isFinite(db)) { maxMark.setAttribute('opacity', 0); return; }
+    const d = A0 + SWEEP*fracOf(db);
+    const [x1,y1] = pt(d, R-11), [x2,y2] = pt(d, R+11);
+    maxMark.setAttribute('x1',x1); maxMark.setAttribute('y1',y1);
+    maxMark.setAttribute('x2',x2); maxMark.setAttribute('y2',y2);
+    maxMark.setAttribute('opacity', .9);
+  }
+
+  // 目安表
+  $('ref').innerHTML = LEVELS.slice().reverse().map(l =>
+    `<tr><td><i style="background:${l[1]}"></i>${l[0] ? l[0]+'dB〜' : '〜30dB'}</td><td><b>${l[2]}</b><br><span style="color:var(--dim)">${l[3]}</span></td></tr>`).join('');
+
+  // ---------- 音声処理 ----------
+  let ctx=null, stream=null, src=null, anZ=null, anA=null, buf=null, raf=0, wakeLock=null;
+  let running=false;
+  let msEma=0, lastT=0;
+  // 統計
+  let sMin=Infinity, sMax=-Infinity, eSum=0, eT=0, elapsed=0, settle=0;
+  // 履歴（0.25秒ごと・60秒分）
+  const HIST_N = 240; let hist = []; let histAcc = 0, histMs = 0, histCnt = 0;
+
+  // A特性フィルタ（IEC 61672 のアナログ極を双一次変換）
+  function aWeightNodes(c){
+    const fs = c.sampleRate, K = 2*fs;
+    const w = f => K*Math.tan(Math.PI*f/fs);          // プリワープ
+    const w1=w(20.598997), w2=w(107.65265), w3=w(737.86223), w4=w(12194.217);
+    const mul = (p,q) => { const r = new Array(p.length+q.length-1).fill(0); p.forEach((a,i)=>q.forEach((b,j)=>r[i+j]+=a*b)); return r; };
+    const hp = w0 => ({b:[K,-K], a:[K+w0, w0-K]});
+    const lp = w0 => ({b:[w0,w0], a:[K+w0, w0-K]});
+    const comb = (x,y) => ({b:mul(x.b,y.b), a:mul(x.a,y.a)});
+    const secs = [comb(hp(w1),hp(w1)), comb(hp(w2),hp(w3)), comb(lp(w4),lp(w4))];
+    const nodes = secs.map(s => c.createIIRFilter(s.b, s.a));
+    // 1kHz で 0dB になるよう正規化
+    let g = 1; const f = new Float32Array([1000]), m = new Float32Array(1), ph = new Float32Array(1);
+    nodes.forEach(n => { n.getFrequencyResponse(f, m, ph); g *= m[0]; });
+    const gain = c.createGain(); gain.gain.value = 1/g;
+    for (let i=0;i<nodes.length-1;i++) nodes[i].connect(nodes[i+1]);
+    nodes[nodes.length-1].connect(gain);
+    return {input:nodes[0], output:gain};
+  }
+
+  async function start(){
+    elMsg.textContent = '';
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      elMsg.textContent = 'このブラウザではマイクが使えません。Safari で https のページを開いてください。';
+      return;
+    }
+    try{
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!ctx) ctx = new AC();
+      stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+      await ctx.resume();
+      src = ctx.createMediaStreamSource(stream);
+      anZ = ctx.createAnalyser(); anZ.fftSize = 2048;
+      anA = ctx.createAnalyser(); anA.fftSize = 2048;
+      src.connect(anZ);
+      try{ const aw = aWeightNodes(ctx); src.connect(aw.input); aw.output.connect(anA); }
+      catch(_){ src.connect(anA); if (weight==='A') elMsg.textContent='この端末ではA特性フィルタが使えないため、補正なしで測ります。'; }
+      buf = new Float32Array(anZ.fftSize);
+      running = true; msEma = 0; lastT = 0; settle = 0;
+      setBtn(); requestWake();
+      raf = requestAnimationFrame(loop);
+    }catch(e){
+      console.error(e);
+      elMsg.textContent = (e && (e.name==='NotAllowedError' || e.name==='SecurityError'))
+        ? 'マイクの使用が許可されていません。設定 → Safari → マイク で「許可」にしてから、もう一度お試しください。'
+        : 'マイクを開始できませんでした（' + (e && e.name || 'エラー') + '）。';
+      stopAudio();
+    }
+  }
+  function stopAudio(){
+    running = false; cancelAnimationFrame(raf);
+    try{ src && src.disconnect(); }catch(_){}
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null; src = null;
+    releaseWake();
+  }
+  function stop(){
+    stopAudio(); setBtn();
+    elLvl.textContent = '停止中'; elLvl.style.background = '#56627c';
+    elEx.textContent = '「計測スタート」でもう一度測れます';
+    elWarn.classList.remove('on');
+  }
+  function setBtn(){
+    btn.classList.toggle('stop', running);
+    btn.querySelector('span').textContent = running ? '計測ストップ' : '計測スタート';
+  }
+
+  function loop(t){
+    if (!running) return;
+    raf = requestAnimationFrame(loop);
+    const dt = lastT ? Math.min(0.25, (t - lastT)/1000) : 0.016; lastT = t;
+    const an = weight === 'A' ? anA : anZ;
+    an.getFloatTimeDomainData(buf);
+    let s = 0; for (let i=0;i<buf.length;i++) s += buf[i]*buf[i];
+    const ms = s / buf.length;
+    const tau = tw === 'S' ? 1.0 : 0.125;
+    msEma = msEma === 0 ? ms : msEma + (ms - msEma) * (1 - Math.exp(-dt/tau));
+    const db = toDb(msEma);
+
+    elapsed += dt; settle += dt;
+    if (settle > 0.6) {                  // 起動直後の不安定な値は統計に入れない
+      eSum += ms*dt; eT += dt;
+      if (db < sMin) sMin = db;
+      if (db > sMax) sMax = db;
+    }
+    histMs += msEma; histCnt++; histAcc += dt;
+    if (histAcc >= 0.25) { hist.push(toDb(histMs/histCnt)); if (hist.length > HIST_N) hist.shift(); histAcc = 0; histMs = 0; histCnt = 0; drawChart(); }
+    render(db);
+  }
+  const toDb = ms => 10*Math.log10(Math.max(ms, 1e-12)) + BASE_OFFSET + cal;
+  const fmt = v => isFinite(v) ? Math.max(0, v).toFixed(1) : '--';
+
+  let lastRender = 0;
+  function render(db){
+    const now = performance.now();
+    arc.setAttribute('d', arcPath(fracOf(db)));
+    if (now - lastRender < 120) return;  // 数字は少しゆっくり更新して読みやすく
+    lastRender = now;
+    elVal.textContent = Math.max(0, db).toFixed(1);
+    const l = levelOf(db);
+    elLvl.textContent = l[2]; elLvl.style.background = l[1]; elEx.textContent = 'たとえば ' + l[3];
+    elWarn.classList.toggle('on', db >= 85);
+    drawStats();
+  }
+  function drawStats(){
+    elMin.textContent = fmt(sMin); elMax.textContent = fmt(sMax);
+    elAvg.textContent = eT > 0 ? fmt(toDb(eSum/eT)) : '--';
+    const s = Math.floor(elapsed); elTime.textContent = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+    drawMax(sMax);
+  }
+  function resetStats(){
+    sMin = Infinity; sMax = -Infinity; eSum = 0; eT = 0; elapsed = 0; settle = 0; hist = [];
+    drawStats(); drawChart();
+  }
+
+  // ---------- 履歴グラフ ----------
+  const cv = $('chart'), cx2 = cv.getContext('2d');
+  function sizeChart(){
+    const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    cv.width = Math.round(r.width*d); cv.height = Math.round(r.height*d);
+    cx2.setTransform(d,0,0,d,0,0); drawChart();
+  }
+  function drawChart(){
+    const W = cv.clientWidth, H = cv.clientHeight, L = 26, top = 4, bot = H - 4;
+    cx2.clearRect(0,0,W,H);
+    const lo = 20, hi = 120, y = v => bot - (Math.max(lo, Math.min(hi, v)) - lo)/(hi-lo)*(bot-top);
+    cx2.font = '600 10px -apple-system,sans-serif'; cx2.textBaseline = 'middle';
+    for (let v = 40; v <= 120; v += 20) {
+      cx2.strokeStyle = 'rgba(255,255,255,.07)'; cx2.lineWidth = 1;
+      cx2.beginPath(); cx2.moveTo(L, y(v)); cx2.lineTo(W, y(v)); cx2.stroke();
+      cx2.fillStyle = '#6c7891'; cx2.fillText(v, 2, y(v));
+    }
+    // 85dB ライン
+    cx2.strokeStyle = 'rgba(255,107,107,.55)'; cx2.setLineDash([4,4]);
+    cx2.beginPath(); cx2.moveTo(L, y(85)); cx2.lineTo(W, y(85)); cx2.stroke(); cx2.setLineDash([]);
+    if (hist.length < 2) return;
+    const step = (W - L) / (HIST_N - 1), x0 = W - (hist.length-1)*step;
+    const grad = cx2.createLinearGradient(0, y(120), 0, y(20));
+    grad.addColorStop(0,'#ff3b5c'); grad.addColorStop(.35,'#ffc145'); grad.addColorStop(.6,'#c8e64b'); grad.addColorStop(1,'#3ddc97');
+    cx2.beginPath();
+    hist.forEach((v,i) => { const px = x0 + i*step; i ? cx2.lineTo(px, y(v)) : cx2.moveTo(px, y(v)); });
+    cx2.strokeStyle = grad; cx2.lineWidth = 2; cx2.lineJoin = 'round'; cx2.stroke();
+    cx2.lineTo(W, bot); cx2.lineTo(x0, bot); cx2.closePath();
+    cx2.globalAlpha = .15; cx2.fillStyle = grad; cx2.fill(); cx2.globalAlpha = 1;
+  }
+  window.addEventListener('resize', sizeChart);
+
+  // ---------- 画面スリープ防止 ----------
+  async function requestWake(){
+    try{ if ('wakeLock' in navigator && running && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); }catch(_){}
+  }
+  function releaseWake(){ try{ wakeLock && wakeLock.release(); }catch(_){} wakeLock = null; }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && running) { requestWake(); ctx && ctx.resume(); lastT = 0; }
+  });
+
+  // ---------- 設定UI ----------
+  function seg(id, val, cb){
+    const el = $(id);
+    const paint = v => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    paint(val);
+    el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; paint(b.dataset.v); cb(b.dataset.v); });
+  }
+  function updMode(){
+    elUnit.textContent = weight === 'A' ? 'dB(A)' : 'dB(Z)';
+    elMode.textContent = (weight === 'A' ? 'A特性' : 'Z特性') + '・' + (tw === 'S' ? 'Slow' : 'Fast');
+  }
+  seg('segW', weight, v => { weight = v; store.set('weight', v); msEma = 0; resetStats(); updMode(); });
+  seg('segT', tw, v => { tw = v; store.set('tw', v); updMode(); });
+  const calIn = $('cal'), calOut = $('calOut');
+  const setCal = v => {
+    v = Math.max(-20, Math.min(20, Math.round(v*2)/2));
+    cal = v; calIn.value = v; calOut.textContent = (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v).toFixed(1);
+    store.set('cal', v); drawStats();
+  };
+  setCal(cal);
+  calIn.addEventListener('input', () => setCal(parseFloat(calIn.value)));
+  $('calMinus').addEventListener('click', () => setCal(cal - 0.5));
+  $('calPlus').addEventListener('click', () => setCal(cal + 0.5));
+  const wrap = $('setWrap');
+  $('openSet').addEventListener('click', () => wrap.classList.add('open'));
+  $('closeSet').addEventListener('click', () => wrap.classList.remove('open'));
+  $('sheetBg').addEventListener('click', () => wrap.classList.remove('open'));
+
+  btn.addEventListener('click', () => running ? stop() : start());
+  $('reset').addEventListener('click', resetStats);
+
+  updMode(); sizeChart(); drawStats();
+  arc.setAttribute('d', arcPath(0.0001)); arc.setAttribute('opacity', .0);
+  // 最初の計測で弧を表示
+  btn.addEventListener('click', () => arc.setAttribute('opacity', 1), {once:true});
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>
