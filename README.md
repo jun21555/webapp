@@ -9,6 +9,7 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [app07 ランチャー](app07/index.html) | app07 のアプリをホーム画面風に並べたランチャー |
 | [ふせチャレ](app07/phone-down/phone-down.html) | スマホを伏せて置いている時間が長いほど高スコア。デトックスの森に生きものが集まるスマホ依存対策アプリ |
 | [app06 ランチャー](app06/index.html) | app06 のアプリをホーム画面風に並べたランチャー |
+| [オンライン エアホッケー](app06/air-hockey/air-hockey.html) | Firebase（ログイン＋Realtime Database）で、別の端末の人とリアルタイムに対戦できるエアホッケー。4文字の部屋コード／招待リンクで参加、7点先取、再戦。CPU 対戦（3段階）と1台でふたり対戦はオフラインでも遊べる |
 | [騒音計](app06/noise-meter/noise-meter.html) | iPhone のマイクでまわりの音の大きさを dB で表示。A特性／Z特性、Fast／Slow、最小・平均(Leq)・最大、直近60秒のグラフ、音の大きさの目安、補正（キャリブレーション）。音声は端末内で処理し録音・送信しない |
 | [株ノート](app06/kabu-note/kabu-note.html) | 日本株の株価チャート（ローソク足・移動平均・ボリンジャー・RSI・MACD、最長10年）、期間分析、PER・PBR・ROE などの指標、業績・配当の推移、企業情報、株主優待と権利付最終日、銘柄比較、保有株の損益メモ。データは GitHub Actions が毎日自動取得 |
 | [オンラインオセロ](app06/othello/othello.html) | Firebase（ログイン＋Firestore）で、登録した人どうしがリアルタイム対戦できるオセロ。5文字の部屋コード／招待リンクで参加、再戦で色を交代、満員の部屋は観戦。オフラインでも CPU 対戦・ふたりで対戦ができる |
@@ -25,6 +26,34 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [カップ麺タイマー](app06/cup-noodle-timer/cup-noodle-timer.html) | 3分・5分をワンタップで計測し、できあがりをプッシュ通知とアラーム音で知らせる |
 | [ゆで卵タイマー](app06/boiled-egg-timer/boiled-egg-timer.html) | ゆで時間ごとの卵の断面（とろとろ〜固ゆで）を見ながら時間をセットし、ゆで上がりをプッシュ通知とアラーム音で知らせる |
 | [ピンボール](app06/pinball.html) / [コップの水](app06/cup.html) / [Gメーター](app06/gmeter.html) / [現在地](app06/location.html) / [マップ](app06/map.html) / [サウンド](app06/visualizer.html) | app06 のその他のアプリ |
+
+### オンライン エアホッケー（app06/air-hockey）
+
+- **オンライン対戦**：「部屋をつくる」で4文字の部屋コードが出るので、相手に伝えるか「招待を送る」でリンクを送る。相手はコードを入れて「参加する」（リンクから開くと、ログイン後に自動で参加）。7点先取、ふたりとも「もう一度」を押すと再戦
+- ログインはオセロ・かぞく予定と同じアカウント（Google かメール／パスワード）。どちらかでログイン済みならそのまま遊べる
+- 自分のマレットはいつも画面の下。指のすこし上にマレットが出るので、指で隠れない。画面右上に通信の速さ（ms）を表示
+- **CPU と対戦**（よわい／ふつう／つよい）と **ふたりで**（1台を向かい合って、上下の陣地を別々の指で操作）は Firebase なし・オフラインでも遊べる
+
+#### 同期のしくみ
+
+- パックが自分の陣地にあるあいだは自分の端末がパックを計算し、センターラインを越えたら計算の担当を相手に渡す。自分が打つときは通信を待たないので、遅延を感じにくい
+- 担当でない側は、届いた最新の状態から壁の反射だけを先読みして表示し、ずれはなめらかに補正する
+- 位置は 1 秒に 25 回、Realtime Database に書き込む（2人で1時間遊んで、ダウンロードはひとり十数MB程度）
+
+#### 最初の設定（1回だけ）
+
+1. [Firebase コンソール](https://console.firebase.google.com/) でオセロと同じプロジェクト（terabe-family-shopping）を開く
+2. 「構築」→「Realtime Database」→「データベースを作成」。場所は **シンガポール（asia-southeast1）** を選び（日本から近く、遅延が小さい）、「ロックモードで開始」で作成する
+3. 「ルール」タブに `app06/air-hockey/database.rules.json` の内容をまるごと貼り付けて「公開」
+4. 画面上部に出るデータベースの URL が、`firebase-config.js` の `databaseURL`（`https://terabe-family-shopping-default-rtdb.asia-southeast1.firebasedatabase.app`）と同じか確認する。違うときは書き換える
+- Realtime Database は無料の Spark プランで使える（同時接続 100、保存 1GB、ダウンロード 月10GB まで）
+
+| ファイル | 役割 |
+| --- | --- |
+| `air-hockey.html` | 画面のHTMLとCSS |
+| `app.js` | 物理演算・CPU・描画・Realtime Database との同期 |
+| `firebase-config.js` | Firebase の設定（オセロと同じプロジェクト＋ `databaseURL`） |
+| `database.rules.json` | Realtime Database のセキュリティルール（ログインした人だけ、部屋の2人だけが書き込める） |
 
 ### 騒音計（app06/noise-meter）
 
