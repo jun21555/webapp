@@ -1,0 +1,42 @@
+{
+  "rules": {
+    "airhockey": {
+      "$code": {
+        ".read": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous'",
+        ".write": "auth != null && !newData.exists() && data.child('meta/host').val() === auth.uid",
+        ".validate": "$code.matches(/^[A-Z2-9]{4}$/)",
+        "meta": {
+          ".write": "auth != null && auth.token.firebase.sign_in_provider != 'anonymous' && ((!data.exists() && newData.child('host').val() === auth.uid && newData.child('guest').val() === '') || data.child('host').val() === auth.uid || (data.child('guest').val() === '' && newData.child('guest').val() === auth.uid) || data.child('guest').val() === auth.uid )",
+          ".validate": "newData.hasChildren(['host', 'guest', 'status']) && (!data.exists() || newData.child('host').val() === data.child('host').val()) && (data.child('guest').val() === '' || data.child('guest').val() === null || newData.child('guest').val() === data.child('guest').val())",
+          "hostName": {
+            ".validate": "newData.isString() && newData.val().length <= 20"
+          },
+          "guestName": {
+            ".validate": "newData.isString() && newData.val().length <= 20"
+          },
+          "status": {
+            ".validate": "newData.val() === 'waiting' || newData.val() === 'playing'"
+          }
+        },
+        "round": {
+          ".write": "auth != null && (root.child('airhockey/' + $code + '/meta/host').val() === auth.uid || root.child('airhockey/' + $code + '/meta/guest').val() === auth.uid)",
+          ".validate": "newData.child('n').isNumber() && newData.child('h').isNumber() && newData.child('g').isNumber()"
+        },
+        "st": {
+          "h": {
+            ".write": "auth != null && root.child('airhockey/' + $code + '/meta/host').val() === auth.uid"
+          },
+          "g": {
+            ".write": "auth != null && root.child('airhockey/' + $code + '/meta/guest').val() === auth.uid"
+          }
+        },
+        "rematch": {
+          ".write": "auth != null && (root.child('airhockey/' + $code + '/meta/host').val() === auth.uid || root.child('airhockey/' + $code + '/meta/guest').val() === auth.uid)"
+        },
+        "online": {
+          ".write": "auth != null && (root.child('airhockey/' + $code + '/meta/host').val() === auth.uid || root.child('airhockey/' + $code + '/meta/guest').val() === auth.uid)"
+        }
+      }
+    }
+  }
+}
