@@ -9,6 +9,7 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [app07 ランチャー](app07/index.html) | app07 のアプリをホーム画面風に並べたランチャー |
 | [ふせチャレ](app07/phone-down/phone-down.html) | スマホを伏せて置いている時間が長いほど高スコア。デトックスの森に生きものが集まるスマホ依存対策アプリ |
 | [app06 ランチャー](app06/index.html) | app06 のアプリをホーム画面風に並べたランチャー |
+| [騒音計](app06/noise-meter/noise-meter.html) | iPhone のマイクでまわりの音の大きさを dB で表示。A特性／Z特性、Fast／Slow、最小・平均(Leq)・最大、直近60秒のグラフ、音の大きさの目安、補正（キャリブレーション）。音声は端末内で処理し録音・送信しない |
 | [株ノート](app06/kabu-note/kabu-note.html) | 日本株の株価チャート（ローソク足・移動平均・ボリンジャー・RSI・MACD、最長10年）、期間分析、PER・PBR・ROE などの指標、業績・配当の推移、企業情報、株主優待と権利付最終日、銘柄比較、保有株の損益メモ。データは GitHub Actions が毎日自動取得 |
 | [オンラインオセロ](app06/othello/othello.html) | Firebase（ログイン＋Firestore）で、登録した人どうしがリアルタイム対戦できるオセロ。5文字の部屋コード／招待リンクで参加、再戦で色を交代、満員の部屋は観戦。オフラインでも CPU 対戦・ふたりで対戦ができる |
 | [DRIFT LINE](app06/drift-line/drift-line.html) | アクセル開度でホイールスピンを操り、ドリフトの効きをコントロールする見下ろし型ドリフトレース。アナログアクセル（スマホは縦スライダー）、ドリフトスコア・ラップタイム・セッティング |
@@ -24,6 +25,14 @@ iPhone 向けの小さな WEB アプリ集です。GitHub Pages で公開する�
 | [カップ麺タイマー](app06/cup-noodle-timer/cup-noodle-timer.html) | 3分・5分をワンタップで計測し、できあがりをプッシュ通知とアラーム音で知らせる |
 | [ゆで卵タイマー](app06/boiled-egg-timer/boiled-egg-timer.html) | ゆで時間ごとの卵の断面（とろとろ〜固ゆで）を見ながら時間をセットし、ゆで上がりをプッシュ通知とアラーム音で知らせる |
 | [ピンボール](app06/pinball.html) / [コップの水](app06/cup.html) / [Gメーター](app06/gmeter.html) / [現在地](app06/location.html) / [マップ](app06/map.html) / [サウンド](app06/visualizer.html) | app06 のその他のアプリ |
+
+### 騒音計（app06/noise-meter）
+
+- 「計測スタート」でマイクを使い、音の大きさを推定 dB で表示（ゲージ・数値・「図書館」「電車の車内」などの目安）
+- A特性（人の耳に近い）／Z特性（補正なし）、時間重み付け Fast（0.125秒）／Slow（1秒）を設定で切り替え
+- 最小・平均（Leq）・最大・計測時間、直近60秒のグラフ。85dB 以上で注意表示
+- スマホのマイクの推定値なので、本物の騒音計に合わせて補正（±20dB）できる。設定は端末に保存
+- 計測中は画面が消えないようにする（対応ブラウザのみ）。マイクは https か localhost でのみ使える
 
 ### 株ノート（app06/kabu-note）
 
@@ -256,6 +265,7 @@ python3 -m http.server 8000
 # → http://localhost:8000/app06/family-calendar/family-calendar.html
 # → http://localhost:8000/app06/othello/othello.html
 # → http://localhost:8000/app06/kabu-note/kabu-note.html
+# → http://localhost:8000/app06/noise-meter/noise-meter.html
 ```
 
 株ノートのデータを手元で取るには `pip install yfinance pandas xlrd openpyxl` のあと `python app06/kabu-note/tools/fetch_data.py`。
