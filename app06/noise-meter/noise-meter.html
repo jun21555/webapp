@@ -39,15 +39,15 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:24px}
 
   /* ゲージ */
-  .gauge{position:relative;padding:10px 12px 14px}
+  .gauge{position:relative;padding:12px 12px 12px}
   .gauge svg{display:block;width:100%;height:auto}
-  .readout{position:absolute;left:0;right:0;top:31%;text-align:center;pointer-events:none}
-  .val{font-size:72px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-2px;color:var(--fg)}
+  .readout{position:absolute;left:0;right:0;top:30%;text-align:center;pointer-events:none}
+  .val{font-size:64px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-2px;color:var(--fg)}
   .unit{margin-top:4px;font-size:15px;font-weight:700;color:var(--dim)}
   .lvl{margin-top:10px;display:inline-block;padding:5px 12px;border-radius:999px;font-size:14px;font-weight:700;
     color:#0f1420;background:var(--lvl);transition:background .3s}
-  .ex{margin-top:6px;font-size:13px;color:var(--dim);min-height:18px}
-  .warn{position:absolute;left:14px;right:14px;bottom:12px;text-align:center;font-size:12.5px;font-weight:700;color:#ff6b6b;
+  .ex{margin-top:2px;font-size:13px;color:var(--dim);min-height:18px;text-align:center}
+  .warn{margin-top:6px;text-align:center;font-size:12.5px;font-weight:700;color:#ff6b6b;min-height:18px;
     opacity:0;transition:opacity .3s}
   .warn.on{opacity:1}
 
@@ -60,7 +60,7 @@
   /* 履歴グラフ */
   .hist{padding:10px 12px 8px}
   .hist .ttl{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);font-weight:600;margin:0 2px 6px}
-  #chart{display:block;width:100%;height:130px}
+  #chart{display:block;width:100%;height:150px}
 
   /* 操作 */
   .controls{display:flex;gap:10px;align-items:center;margin-top:auto;padding-top:4px}
@@ -117,7 +117,7 @@
 
 <main>
   <section class="card gauge">
-    <svg viewBox="0 0 300 250" aria-hidden="true">
+    <svg viewBox="0 0 300 236" aria-hidden="true">
       <defs>
         <linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stop-color="#3ddc97"/><stop offset=".45" stop-color="#c8e64b"/>
@@ -133,8 +133,8 @@
       <div class="val" id="val">--</div>
       <div class="unit" id="unit">dB(A)</div>
       <div class="lvl" id="lvl">停止中</div>
-      <div class="ex" id="ex">「計測スタート」でマイクを使って測ります</div>
     </div>
+    <div class="ex" id="ex">「計測スタート」でマイクを使って測ります</div>
     <div class="warn" id="warn">⚠ 85dB以上：長く聞き続けると耳に負担がかかります</div>
   </section>
 
@@ -239,7 +239,7 @@
   const btn=$('toggle');
 
   // ---------- ゲージ描画 ----------
-  const CX=150, CY=140, R=110, A0=135, SWEEP=270;   // 左下(135°)から時計回りに270°
+  const CX=150, CY=130, R=100, A0=135, SWEEP=270;   // 左下(135°)から時計回りに270°
   const pt = (deg, r=R) => { const a = deg*Math.PI/180; return [CX + r*Math.cos(a), CY + r*Math.sin(a)]; };
   const arcPath = (frac) => {
     frac = Math.max(0.0001, Math.min(1, frac));
@@ -254,7 +254,7 @@
     let s = '';
     for (let db = MIN_DB; db <= MAX_DB; db += 10) {
       const d = A0 + SWEEP*fracOf(db);
-      const [x1,y1] = pt(d, R-16), [x2,y2] = pt(d, R-22), [tx,ty] = pt(d, R-34);
+      const [x1,y1] = pt(d, R-16), [x2,y2] = pt(d, R-22), [tx,ty] = pt(d, R+24);
       s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#56627c" stroke-width="2" stroke-linecap="round"/>`;
       if (db % 20 === 0) s += `<text x="${tx}" y="${ty+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#6c7891">${db}</text>`;
     }
