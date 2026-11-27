@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="タイルゲーム">
+<meta name="theme-color" content="#111111">
+<title>タイルゲーム</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    min-height: 100dvh;
+    background: #111;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 16px);
+    min-height: 100dvh;
+  }
+
+  /* ホームボタン */
+  #home-btn {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 10px);
+    left: calc(env(safe-area-inset-left) + 12px);
+    z-index: 100;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    text-decoration: none;
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    transition: transform .15s, background .15s;
+  }
+  #home-btn:active { transform: scale(.88); background: rgba(255,255,255,.28); }
+  #home-btn svg { width: 20px; height: 20px; }
+
+  h1 {
+    font-size: 15px;
+    letter-spacing: 2px;
+    color: #ccc;
+    margin-top: 56px;
+    margin-bottom: 10px;
+  }
+
+  /* グリッド */
+  .grid-label {
+    font-size: 11px;
+    color: #888;
+    letter-spacing: 1px;
+    text-align: center;
+    margin-bottom: 5px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 3px;
+    margin-bottom: 10px;
+  }
+  .tile {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+  .tile.red  { background: #e74c3c; box-shadow: 0 0 5px #e74c3c55; }
+  .tile.blue { background: #2980b9; box-shadow: 0 0 5px #2980b955; }
+
+  /* 仕切り */
+  .divider {
+    width: 100%;
+    max-width: 400px;
+    border: none;
+    border-top: 1px solid #333;
+    margin: 4px 0 10px;
+  }
+
+  /* シャッフルボタン */
+  #shuffle-btn {
+    padding: 14px 48px;
+    font-size: 17px;
+    font-weight: bold;
+    background: linear-gradient(135deg, #e74c3c, #2980b9);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.45);
+    min-width: 200px;
+    min-height: 52px;
+    transition: transform .12s, filter .12s;
+    margin-bottom: 20px;
+  }
+  #shuffle-btn:active { transform: scale(.93); filter: brightness(.85); }
+  #shuffle-btn:disabled { background: #444; cursor: default; }
+
+  /* HUD */
+  .hud {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .hud-item { text-align: center; }
+  .hud-label { font-size: 11px; color: #888; margin-bottom: 2px; }
+  .hud-value { font-size: 24px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .hud-value.green  { color: #2ecc71; }
+  .hud-value.yellow { color: #f39c12; }
+  .hud-value.red    { color: #e74c3c; }
+  .hud-value.gold   { color: #f1c40f; }
+
+  /* クリアオーバーレイ */
+  #overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.85);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 200;
+  }
+  #overlay.show { display: flex; }
+  #overlay .emoji { font-size: 64px; }
+  #overlay .clear-title { font-size: 28px; font-weight: bold; color: #2ecc71; }
+  #overlay .clear-time  { font-size: 36px; font-weight: bold; }
+  #overlay .clear-info  { font-size: 13px; color: #aaa; }
+  #overlay .best-badge  { font-size: 14px; font-weight: bold; color: #f1c40f; }
+  #retry-btn {
+    margin-top: 10px;
+    padding: 14px 40px;
+    font-size: 17px;
+    font-weight: bold;
+    background: #2ecc71;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    min-height: 52px;
+    transition: transform .12s;
+  }
+  #retry-btn:active { transform: scale(.93); }
+
+  /* グリッドをmax-widthで中央揃え */
+  .grid-wrap {
+    width: 100%;
+    max-width: 400px;
+  }
+</style>
+</head>
+<body>
+
+<a id="home-btn" href="../index.html" aria-label="ホームへ戻る">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    <polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+</a>
+
+<h1>🔴🔵 タイムアタックゲーム</h1>
+
+<div class="grid-wrap">
+  <p class="grid-label">🎯 目標パターン（左右対称）</p>
+  <div class="grid" id="target-grid"></div>
+</div>
+
+<hr class="divider">
+
+<div class="grid-wrap">
+  <p class="grid-label">🎮 現在のタイル</p>
+  <div class="grid" id="current-grid"></div>
+</div>
+
+<button id="shuffle-btn">シャッフル！</button>
+
+<div class="hud">
+  <div class="hud-item">
+    <div class="hud-label">タイム</div>
+    <div class="hud-value green" id="hud-time">00.00</div>
+  </div>
+  <div class="hud-item">
+    <div class="hud-label">一致率</div>
+    <div class="hud-value" id="hud-match">0%</div>
+  </div>
+  <div class="hud-item">
+    <div class="hud-label">ベスト</div>
+    <div class="hud-value gold" id="hud-best">--.--.--</div>
+  </div>
+  <div class="hud-item">
+    <div class="hud-label">シャッフル</div>
+    <div class="hud-value" id="hud-count">0</div>
+  </div>
+</div>
+
+<!-- クリアオーバーレイ -->
+<div id="overlay">
+  <div class="emoji">🎉</div>
+  <div class="clear-title">クリア！</div>
+  <div class="clear-time" id="overlay-time"></div>
+  <div class="clear-info" id="overlay-info"></div>
+  <div class="best-badge" id="overlay-best"></div>
+  <button id="retry-btn">もう一度</button>
+</div>
+
+<script>
+const ROWS = 8, COLS = 8;
+
+// 左右対称グリッド生成
+function genSymmetric() {
+  return Array.from({ length: ROWS }, () => {
+    const half = Array.from({ length: COLS / 2 }, () => Math.random() < 0.5);
+    return [...half, ...[...half].reverse()];
+  });
+}
+
+// 非対称グリッド生成（初期タイル用）
+function genAsymmetric() {
+  while (true) {
+    const grid = Array.from({ length: ROWS }, () =>
+      Array.from({ length: COLS }, () => Math.random() < 0.5)
+    );
+    if (!isSymmetric(grid)) return grid;
+  }
+}
+
+// シャッフル用：左右対称だが目標と一致しないグリッド
+function genShuffled(target) {
+  let tries = 0;
+  while (true) {
+    const grid = genSymmetric();
+    if (!matchesTarget(grid, target)) return grid;
+    if (++tries > 50) return grid; // 無限ループ防止
+  }
+}
+
+function isSymmetric(grid) {
+  return grid.every(row => row.every((v, c) => v === row[COLS - 1 - c]));
+}
+
+function matchesTarget(grid, target) {
+  return grid.every((row, r) => row.every((v, c) => v === target[r][c]));
+}
+
+function fmt(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const ss = s % 60;
+  const cs = Math.floor((ms % 1000) / 10);
+  return m > 0
+    ? `${m}:${String(ss).padStart(2,'0')}.${String(cs).padStart(2,'0')}`
+    : `${String(ss).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
+}
+
+// --- 状態 ---
+let target = genSymmetric();
+let tiles  = genAsymmetric();
+let startTime = Date.now();
+let elapsed = 0;
+let shuffleCount = 0;
+let bestTime = null;
+let phase = 'playing'; // 'playing' | 'clear'
+let rafId = null;
+
+// --- DOM ---
+const targetGrid  = document.getElementById('target-grid');
+const currentGrid = document.getElementById('current-grid');
+const shuffleBtn  = document.getElementById('shuffle-btn');
+const retryBtn    = document.getElementById('retry-btn');
+const overlay     = document.getElementById('overlay');
+const hudTime     = document.getElementById('hud-time');
+const hudMatch    = document.getElementById('hud-match');
+const hudBest     = document.getElementById('hud-best');
+const hudCount    = document.getElementById('hud-count');
+const overlayTime = document.getElementById('overlay-time');
+const overlayInfo = document.getElementById('overlay-info');
+const overlayBest = document.getElementById('overlay-best');
+
+// --- グリッド描画 ---
+function renderGrid(container, grid) {
+  container.innerHTML = '';
+  grid.forEach(row => {
+    row.forEach(isRed => {
+      const d = document.createElement('div');
+      d.className = 'tile ' + (isRed ? 'red' : 'blue');
+      container.appendChild(d);
+    });
+  });
+}
+
+function calcMatch() {
+  let match = 0;
+  tiles.forEach((row, r) => row.forEach((v, c) => { if (v === target[r][c]) match++; }));
+  return Math.round(match / (ROWS * COLS) * 100);
+}
+
+function updateHudTime() {
+  const ms = phase === 'playing' ? Date.now() - startTime : elapsed;
+  hudTime.textContent = fmt(ms);
+  const color = ms < 10000 ? 'green' : ms < 30000 ? 'yellow' : 'red';
+  hudTime.className = 'hud-value ' + color;
+}
+
+function loop() {
+  if (phase === 'playing') {
+    updateHudTime();
+    rafId = requestAnimationFrame(loop);
+  }
+}
+
+function startGame() {
+  target = genSymmetric();
+  tiles  = genAsymmetric();
+  startTime = Date.now();
+  elapsed = 0;
+  shuffleCount = 0;
+  phase = 'playing';
+  overlay.classList.remove('show');
+  shuffleBtn.disabled = false;
+
+  renderGrid(targetGrid, target);
+  renderGrid(currentGrid, tiles);
+  hudCount.textContent = '0';
+  hudMatch.textContent = calcMatch() + '%';
+  hudBest.textContent = bestTime !== null ? fmt(bestTime) : '--.--.--';
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+
+function checkClear() {
+  if (matchesTarget(tiles, target)) {
+    elapsed = Date.now() - startTime;
+    phase = 'clear';
+    cancelAnimationFrame(rafId);
+    updateHudTime();
+
+    const isNewBest = bestTime === null || elapsed < bestTime;
+    if (isNewBest) bestTime = elapsed;
+    hudBest.textContent = fmt(bestTime);
+
+    overlayTime.textContent = fmt(elapsed);
+    overlayTime.className = 'clear-time ' + (elapsed < 10000 ? 'green' : elapsed < 30000 ? 'yellow' : 'red');
+    overlayInfo.textContent = `シャッフル ${shuffleCount} 回`;
+    overlayBest.textContent = isNewBest ? '🏆 ベスト更新！' : '';
+    overlay.classList.add('show');
+    shuffleBtn.disabled = true;
+  }
+}
+
+shuffleBtn.addEventListener('click', () => {
+  if (phase !== 'playing') return;
+  tiles = genShuffled(target);
+  renderGrid(currentGrid, tiles);
+  shuffleCount++;
+  hudCount.textContent = shuffleCount;
+  hudMatch.textContent = calcMatch() + '%';
+  checkClear();
+});
+
+retryBtn.addEventListener('click', startGame);
+
+startGame();
+</script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
