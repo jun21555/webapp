@@ -43,6 +43,7 @@ const MAX_MALLET = 4.5;         // マレットの最高速度
 const FRICTION = 0.18;          // 空気の上なので摩擦は小さめ
 const WALL_E = 0.88, HIT_E = 0.92;
 const WIN = 7;
+const FINGER_LIFT = 0.05 + PR * 2; // 指とマレットの距離（前よりパック1個分前へ）
 const SUB = 1 / 240;            // 物理のこまかさ（すり抜け防止）
 const SEND_MS = 40;             // 25 回/秒
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -289,8 +290,9 @@ function pointerPos(e) {
 }
 function aimMallet(side, w) {
   const m = G.m[side];
-  // 指のすこし上にマレットを出す（指でマレットが隠れないように）
-  const lift = mode === 'local' ? 0 : 0.05;
+  // 指よりパック1個分（直径）前にマレットを出す（指でマレットが隠れないように）。
+  // ふたり対戦の上の人は、上の人から見た「前」（画面の下向き）にずらす
+  const lift = FINGER_LIFT;
   m.tx = w.x; m.ty = side === 'h' ? w.y - lift : w.y + lift;
 }
 cv.addEventListener('pointerdown', e => {

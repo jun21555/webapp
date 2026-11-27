@@ -1,5 +1,5 @@
 // エアホッケー Service Worker: アプリ本体だけをキャッシュ（Firebase との通信はキャッシュしない）
-const CACHE = 'airhockey-v1';
+const CACHE = 'airhockey-v2';
 const SHELL = ['air-hockey.html', 'app.js', 'firebase-config.js', 'manifest.webmanifest', 'favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
