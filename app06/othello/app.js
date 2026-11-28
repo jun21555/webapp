@@ -106,8 +106,32 @@ function search(board, turn, me, depth, alpha, beta) {
   for (const m of moves) { best = Math.min(best, search(applyMove(board, m, turn), opp(turn), me, depth - 1, alpha, beta)); beta = Math.min(beta, best); if (alpha >= beta) break; }
   return best;
 }
-function cpuChoose(board, me) {
+// level: 1=やさしい 2=ふつう 3=つよい
+const LEVELS = { 1: 'やさしい', 2: 'ふつう', 3: 'つよい' };
+function cpuChoose(board, me, level = 3) {
   const moves = legalMoves(board, me);
+  if (moves.length === 1) return moves[0];
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+
+  // やさしい：ほぼでたらめ。たまに石を多く取れる手を選ぶ（角の価値は知らない）
+  if (level === 1) {
+    if (Math.random() < 0.3) {
+      const n = m => flipsFor(board, m, me).length;
+      const max = Math.max(...moves.map(n));
+      return pick(moves.filter(m => n(m) === max));
+    }
+    return pick(moves);
+  }
+
+  // ふつう：1手だけ見て、マスの価値で選ぶ。ときどき（25%）2番目以下の手も打つ
+  if (level === 2) {
+    const scored = moves.map(m => ({ m, s: W[m] + flipsFor(board, m, me).length + Math.random() * 6 }))
+      .sort((a, b) => b.s - a.s);
+    if (Math.random() < 0.25 && scored.length > 1) return scored[1 + Math.floor(Math.random() * Math.min(2, scored.length - 1))].m;
+    return scored[0].m;
+  }
+
+  // つよい：先読み（序中盤3手・終盤は読み切り）
   const empties = board.split('.').length - 1;
   const depth = empties <= 10 ? 8 : 3;
   let best = moves[0], bestScore = -Infinity;
@@ -127,7 +151,7 @@ function show(name) {
   const inMenu = name === 'menu';
   $('backBtn').classList.toggle('hidden', inMenu);
   $('topSpacer').classList.toggle('hidden', !inMenu);
-  $('title').textContent = inMenu ? 'オセロ' : (mode === 'online' ? `部屋 ${room || ''}` : mode === 'cpu' ? 'CPU対戦' : 'ふたりで対戦');
+  $('title').textContent = inMenu ? 'オセロ' : (mode === 'online' ? `部屋 ${room || ''}` : mode === 'cpu' ? `CPU対戦（${LEVELS[cpuLevel]}）` : 'ふたりで対戦');
 }
 let toastTimer;
 function toast(msg, ms = 2200) {
@@ -295,7 +319,7 @@ function cpuTurn() {
   const token = ++cpuToken;
   setTimeout(() => {
     if (token !== cpuToken || mode !== 'cpu' || !game) return;
-    const m = cpuChoose(game.board, game.turn);
+    const m = cpuChoose(game.board, game.turn, cpuLevel);
     const nb = applyMove(game.board, m, game.turn);
     const nx = afterMove(nb, game.turn);
     game = { ...game, board: nb, lastMove: m, ...nx };
@@ -346,6 +370,18 @@ nameInput.value = localStorage.getItem('othello.name') || '';
 nameInput.addEventListener('change', () => localStorage.setItem('othello.name', nameInput.value.trim()));
 function myName() { return (nameInput.value.trim() || 'ゲスト').slice(0, 12); }
 
+// CPU の強さ（端末に保存）
+let cpuLevel = Number(localStorage.getItem('othello.cpuLevel')) || 2;
+function renderLevel() {
+  document.querySelectorAll('#levelSeg button').forEach(b => {
+    const on = Number(b.dataset.level) === cpuLevel;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on);
+  });
+}
+document.querySelectorAll('#levelSeg button').forEach(b => b.addEventListener('click', () => {
+  cpuLevel = Number(b.dataset.level); localStorage.setItem('othello.cpuLevel', cpuLevel); renderLevel();
+}));
+renderLevel();
 $('cpuBtn').onclick = () => newLocalGame('cpu', 'b');
 $('localBtn').onclick = () => newLocalGame('local');
 

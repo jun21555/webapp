@@ -1,5 +1,5 @@
 // オセロ Service Worker: アプリ本体だけをキャッシュ（Firebase との通信はキャッシュしない）
-const CACHE = 'othello-v2';
+const CACHE = 'othello-v3';
 const SHELL = ['othello.html', 'app.js', 'firebase-config.js', 'manifest.webmanifest', 'favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
