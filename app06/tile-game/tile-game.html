@@ -16,9 +16,16 @@
   html, body {
     height: 100dvh;
     overflow: hidden;
-    background: #111;
-    color: #fff;
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    background: #0a0a0a;
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(0,255,80,0.03) 0px,
+      rgba(0,255,80,0.03) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+    color: #e0e0e0;
+    font-family: "Courier New", Courier, monospace;
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
   }
@@ -57,7 +64,7 @@
   }
   #home-btn:active { transform: scale(.88); }
   #home-btn svg { width: 18px; height: 18px; }
-  .title { font-size: 13px; letter-spacing: 1.5px; color: #bbb; }
+  .title { font-size: 13px; letter-spacing: 2px; color: #00ff50; text-shadow: 0 0 8px #00ff5088; }
   .header-right {
     display: flex; gap: 8px;
   }
@@ -80,8 +87,9 @@
   /* ── グリッド共通 ── */
   .grid-section { width: 100%; max-width: 420px; flex-shrink: 0; }
   .grid-label {
-    font-size: 10px; color: #666; letter-spacing: 1px;
+    font-size: 10px; color: #00cc40; letter-spacing: 2px;
     text-align: center; margin-bottom: 3px;
+    text-shadow: 0 0 6px #00cc4066;
   }
   .grid {
     display: grid;
@@ -93,8 +101,16 @@
     border-radius: 3px;
     transition: background 0.12s;
   }
-  .tile.red  { background: #e74c3c; }
-  .tile.blue { background: #2980b9; }
+  .tile.red  {
+    background: #f0f0f0;
+    box-shadow: inset 0 0 0 1.5px #bbb, inset 2px 2px 0 #fff, inset -2px -2px 0 #999;
+    image-rendering: pixelated;
+  }
+  .tile.blue {
+    background: #1a1a1a;
+    box-shadow: inset 0 0 0 1.5px #000, inset 2px 2px 0 #333, inset -2px -2px 0 #000;
+    image-rendering: pixelated;
+  }
 
   /* 目標グリッドは小さめ */
   #target-grid .tile { border-radius: 2px; }
@@ -102,7 +118,7 @@
   /* ── 仕切り ── */
   .divider {
     width: 100%; max-width: 420px;
-    border: none; border-top: 1px solid #2a2a2a;
+    border: none; border-top: 1px solid #00ff5033;
     margin: 5px 0;
     flex-shrink: 0;
   }
@@ -110,19 +126,27 @@
   /* ── シャッフルボタン ── */
   #shuffle-btn {
     padding: 0 32px;
-    font-size: 16px; font-weight: bold;
-    background: linear-gradient(135deg, #e74c3c, #2980b9);
-    color: #fff; border: none; border-radius: 10px;
-    cursor: pointer; letter-spacing: 1px;
-    box-shadow: 0 3px 14px rgba(0,0,0,.4);
+    font-size: 15px; font-weight: bold;
+    background: #0a0a0a;
+    color: #00ff50;
+    border: 2px solid #00ff50;
+    border-radius: 4px;
+    cursor: pointer; letter-spacing: 3px;
+    box-shadow: 0 0 12px #00ff5055, inset 0 0 8px #00ff5011;
     height: 48px;
     width: 100%; max-width: 420px;
-    transition: transform .1s, filter .1s;
+    transition: transform .1s, box-shadow .1s, background .1s;
     flex-shrink: 0;
     margin: 5px 0;
+    font-family: "Courier New", Courier, monospace;
+    text-shadow: 0 0 8px #00ff50;
   }
-  #shuffle-btn:active { transform: scale(.96); filter: brightness(.85); }
-  #shuffle-btn:disabled { background: #333; color: #666; cursor: default; box-shadow: none; }
+  #shuffle-btn:active {
+    transform: scale(.96);
+    background: #00ff5022;
+    box-shadow: 0 0 20px #00ff5099, inset 0 0 12px #00ff5033;
+  }
+  #shuffle-btn:disabled { border-color: #333; color: #333; cursor: default; box-shadow: none; text-shadow: none; background: #0a0a0a; }
 
   /* ── HUD ── */
   .hud {
@@ -132,38 +156,47 @@
     margin-top: 2px;
   }
   .hud-item { text-align: center; }
-  .hud-label { font-size: 10px; color: #666; }
-  .hud-value { font-size: 20px; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1.3; }
-  .hud-value.green  { color: #2ecc71; }
-  .hud-value.yellow { color: #f39c12; }
-  .hud-value.red    { color: #e74c3c; }
-  .hud-value.gold   { color: #f1c40f; }
+  .hud-label { font-size: 10px; color: #00883a; letter-spacing: 1px; }
+  .hud-value { font-size: 20px; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1.3; font-family: "Courier New", Courier, monospace; }
+  .hud-value.green  { color: #00ff50; text-shadow: 0 0 8px #00ff5088; }
+  .hud-value.yellow { color: #ffe000; text-shadow: 0 0 8px #ffe00088; }
+  .hud-value.red    { color: #ff4040; text-shadow: 0 0 8px #ff404088; }
+  .hud-value.gold   { color: #ffe000; text-shadow: 0 0 8px #ffe00088; }
 
   /* ── オーバーレイ（クリア・ポーズ共用） ── */
   .overlay {
     display: none;
     position: fixed; inset: 0;
-    background: rgba(0,0,0,.88);
+    background: rgba(0,0,0,.93);
+    background-image: repeating-linear-gradient(
+      0deg, rgba(0,255,80,0.04) 0px, rgba(0,255,80,0.04) 1px, transparent 1px, transparent 4px
+    );
     flex-direction: column;
     align-items: center; justify-content: center;
     gap: 12px; z-index: 200;
+    font-family: "Courier New", Courier, monospace;
   }
   .overlay.show { display: flex; }
-  .overlay .emoji { font-size: 56px; }
-  .overlay .ov-title { font-size: 26px; font-weight: bold; }
-  .overlay .ov-time  { font-size: 32px; font-weight: bold; }
-  .overlay .ov-info  { font-size: 13px; color: #aaa; }
-  .overlay .ov-best  { font-size: 14px; font-weight: bold; color: #f1c40f; }
+  .overlay .emoji { font-size: 52px; }
+  .overlay .ov-title { font-size: 26px; font-weight: bold; letter-spacing: 3px; }
+  .overlay .ov-time  { font-size: 32px; font-weight: bold; letter-spacing: 2px; }
+  .overlay .ov-info  { font-size: 13px; color: #00883a; letter-spacing: 1px; }
+  .overlay .ov-best  { font-size: 14px; font-weight: bold; color: #ffe000; text-shadow: 0 0 8px #ffe00088; }
   .ov-buttons { display: flex; gap: 12px; margin-top: 8px; }
   .ov-btn {
-    padding: 13px 28px; font-size: 16px; font-weight: bold;
-    border: none; border-radius: 10px; cursor: pointer;
+    padding: 13px 28px; font-size: 14px; font-weight: bold;
+    border: 2px solid; border-radius: 4px; cursor: pointer;
     min-height: 48px; min-width: 120px;
-    transition: transform .12s;
+    transition: transform .12s, background .12s;
+    font-family: "Courier New", Courier, monospace;
+    letter-spacing: 2px;
+    background: transparent;
   }
   .ov-btn:active { transform: scale(.93); }
-  .ov-btn.green { background: #2ecc71; color: #fff; }
-  .ov-btn.gray  { background: #444; color: #ccc; }
+  .ov-btn.green { border-color: #00ff50; color: #00ff50; text-shadow: 0 0 8px #00ff5088; box-shadow: 0 0 10px #00ff5044; }
+  .ov-btn.green:active { background: #00ff5022; }
+  .ov-btn.gray  { border-color: #555; color: #888; }
+  .ov-btn.gray:active { background: #ffffff11; }
 </style>
 </head>
 <body>
@@ -235,7 +268,7 @@
 <!-- クリアオーバーレイ -->
 <div class="overlay" id="clear-overlay">
   <div class="emoji">🎉</div>
-  <div class="ov-title" style="color:#2ecc71;">クリア！</div>
+  <div class="ov-title" style="color:#00ff50;text-shadow:0 0 16px #00ff50;">CLEAR!</div>
   <div class="ov-time" id="ov-time"></div>
   <div class="ov-info" id="ov-info"></div>
   <div class="ov-best" id="ov-best"></div>
@@ -248,7 +281,7 @@
 <!-- ポーズオーバーレイ -->
 <div class="overlay" id="pause-overlay">
   <div class="emoji">⏸️</div>
-  <div class="ov-title" style="color:#f39c12;">一時停止中</div>
+  <div class="ov-title" style="color:#ffe000;text-shadow:0 0 12px #ffe000;">PAUSE</div>
   <div class="ov-buttons">
     <button class="ov-btn green" id="resume-btn">再開</button>
     <button class="ov-btn gray"  id="pause-reset-btn">最初から</button>
