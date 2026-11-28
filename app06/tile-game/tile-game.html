@@ -14,7 +14,8 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
-    min-height: 100dvh;
+    height: 100dvh;
+    overflow: hidden;
     background: #111;
     color: #fff;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
@@ -25,169 +26,193 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 16px);
-    min-height: 100dvh;
+    padding:
+      calc(env(safe-area-inset-top) + 8px)
+      12px
+      calc(env(safe-area-inset-bottom) + 8px);
   }
 
-  /* ホームボタン */
+  /* ── ヘッダー ── */
+  .header {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+  }
   #home-btn {
-    position: fixed;
-    top: calc(env(safe-area-inset-top) + 10px);
-    left: calc(env(safe-area-inset-left) + 12px);
-    z-index: 100;
-    width: 44px; height: 44px;
+    width: 40px; height: 40px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
     color: #fff;
     display: flex; align-items: center; justify-content: center;
     text-decoration: none;
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     transition: transform .15s, background .15s;
+    flex-shrink: 0;
   }
-  #home-btn:active { transform: scale(.88); background: rgba(255,255,255,.28); }
-  #home-btn svg { width: 20px; height: 20px; }
-
-  h1 {
-    font-size: 15px;
-    letter-spacing: 2px;
-    color: #ccc;
-    margin-top: 56px;
-    margin-bottom: 10px;
+  #home-btn:active { transform: scale(.88); }
+  #home-btn svg { width: 18px; height: 18px; }
+  .title { font-size: 13px; letter-spacing: 1.5px; color: #bbb; }
+  .header-right {
+    display: flex; gap: 8px;
   }
+  /* 一時停止・リセットボタン */
+  .ctrl-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    transition: transform .12s, background .12s;
+  }
+  .ctrl-btn:active { transform: scale(.88); background: rgba(255,255,255,.24); }
+  .ctrl-btn svg { width: 18px; height: 18px; }
 
-  /* グリッド */
+  /* ── グリッド共通 ── */
+  .grid-section { width: 100%; max-width: 420px; flex-shrink: 0; }
   .grid-label {
-    font-size: 11px;
-    color: #888;
-    letter-spacing: 1px;
-    text-align: center;
-    margin-bottom: 5px;
+    font-size: 10px; color: #666; letter-spacing: 1px;
+    text-align: center; margin-bottom: 3px;
   }
   .grid {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    gap: 3px;
-    margin-bottom: 10px;
+    gap: 2px;
   }
   .tile {
-    width: 100%;
-    aspect-ratio: 1;
-    border-radius: 4px;
-    transition: background 0.15s;
+    width: 100%; aspect-ratio: 1;
+    border-radius: 3px;
+    transition: background 0.12s;
   }
-  .tile.red  { background: #e74c3c; box-shadow: 0 0 5px #e74c3c55; }
-  .tile.blue { background: #2980b9; box-shadow: 0 0 5px #2980b955; }
+  .tile.red  { background: #e74c3c; }
+  .tile.blue { background: #2980b9; }
 
-  /* 仕切り */
+  /* 目標グリッドは小さめ */
+  #target-grid .tile { border-radius: 2px; }
+
+  /* ── 仕切り ── */
   .divider {
-    width: 100%;
-    max-width: 400px;
-    border: none;
-    border-top: 1px solid #333;
-    margin: 4px 0 10px;
+    width: 100%; max-width: 420px;
+    border: none; border-top: 1px solid #2a2a2a;
+    margin: 5px 0;
+    flex-shrink: 0;
   }
 
-  /* シャッフルボタン */
+  /* ── シャッフルボタン ── */
   #shuffle-btn {
-    padding: 14px 48px;
-    font-size: 17px;
-    font-weight: bold;
+    padding: 0 32px;
+    font-size: 16px; font-weight: bold;
     background: linear-gradient(135deg, #e74c3c, #2980b9);
-    color: #fff;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    letter-spacing: 1px;
-    box-shadow: 0 4px 18px rgba(0,0,0,.45);
-    min-width: 200px;
-    min-height: 52px;
-    transition: transform .12s, filter .12s;
-    margin-bottom: 20px;
+    color: #fff; border: none; border-radius: 10px;
+    cursor: pointer; letter-spacing: 1px;
+    box-shadow: 0 3px 14px rgba(0,0,0,.4);
+    height: 48px;
+    width: 100%; max-width: 420px;
+    transition: transform .1s, filter .1s;
+    flex-shrink: 0;
+    margin: 5px 0;
   }
-  #shuffle-btn:active { transform: scale(.93); filter: brightness(.85); }
-  #shuffle-btn:disabled { background: #444; cursor: default; }
+  #shuffle-btn:active { transform: scale(.96); filter: brightness(.85); }
+  #shuffle-btn:disabled { background: #333; color: #666; cursor: default; box-shadow: none; }
 
-  /* HUD */
+  /* ── HUD ── */
   .hud {
-    display: flex;
-    gap: 20px;
-    justify-content: center;
-    flex-wrap: wrap;
+    width: 100%; max-width: 420px;
+    display: flex; justify-content: space-around;
+    flex-shrink: 0;
+    margin-top: 2px;
   }
   .hud-item { text-align: center; }
-  .hud-label { font-size: 11px; color: #888; margin-bottom: 2px; }
-  .hud-value { font-size: 24px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .hud-label { font-size: 10px; color: #666; }
+  .hud-value { font-size: 20px; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1.3; }
   .hud-value.green  { color: #2ecc71; }
   .hud-value.yellow { color: #f39c12; }
   .hud-value.red    { color: #e74c3c; }
   .hud-value.gold   { color: #f1c40f; }
 
-  /* クリアオーバーレイ */
-  #overlay {
+  /* ── オーバーレイ（クリア・ポーズ共用） ── */
+  .overlay {
     display: none;
     position: fixed; inset: 0;
-    background: rgba(0,0,0,.85);
+    background: rgba(0,0,0,.88);
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    z-index: 200;
+    align-items: center; justify-content: center;
+    gap: 12px; z-index: 200;
   }
-  #overlay.show { display: flex; }
-  #overlay .emoji { font-size: 64px; }
-  #overlay .clear-title { font-size: 28px; font-weight: bold; color: #2ecc71; }
-  #overlay .clear-time  { font-size: 36px; font-weight: bold; }
-  #overlay .clear-info  { font-size: 13px; color: #aaa; }
-  #overlay .best-badge  { font-size: 14px; font-weight: bold; color: #f1c40f; }
-  #retry-btn {
-    margin-top: 10px;
-    padding: 14px 40px;
-    font-size: 17px;
-    font-weight: bold;
-    background: #2ecc71;
-    color: #fff;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    min-height: 52px;
+  .overlay.show { display: flex; }
+  .overlay .emoji { font-size: 56px; }
+  .overlay .ov-title { font-size: 26px; font-weight: bold; }
+  .overlay .ov-time  { font-size: 32px; font-weight: bold; }
+  .overlay .ov-info  { font-size: 13px; color: #aaa; }
+  .overlay .ov-best  { font-size: 14px; font-weight: bold; color: #f1c40f; }
+  .ov-buttons { display: flex; gap: 12px; margin-top: 8px; }
+  .ov-btn {
+    padding: 13px 28px; font-size: 16px; font-weight: bold;
+    border: none; border-radius: 10px; cursor: pointer;
+    min-height: 48px; min-width: 120px;
     transition: transform .12s;
   }
-  #retry-btn:active { transform: scale(.93); }
-
-  /* グリッドをmax-widthで中央揃え */
-  .grid-wrap {
-    width: 100%;
-    max-width: 400px;
-  }
+  .ov-btn:active { transform: scale(.93); }
+  .ov-btn.green { background: #2ecc71; color: #fff; }
+  .ov-btn.gray  { background: #444; color: #ccc; }
 </style>
 </head>
 <body>
 
-<a id="home-btn" href="../index.html" aria-label="ホームへ戻る">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-    <polyline points="9 22 9 12 15 12 15 22"/>
-  </svg>
-</a>
+<!-- ヘッダー -->
+<div class="header">
+  <a id="home-btn" href="../index.html" aria-label="ホームへ戻る">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  </a>
+  <span class="title">🔴🔵 タイムアタック</span>
+  <div class="header-right">
+    <!-- 一時停止 -->
+    <button class="ctrl-btn" id="pause-btn" aria-label="一時停止">
+      <svg id="pause-icon" viewBox="0 0 24 24" fill="currentColor">
+        <rect x="6" y="4" width="4" height="16" rx="1"/>
+        <rect x="14" y="4" width="4" height="16" rx="1"/>
+      </svg>
+    </button>
+    <!-- リセット -->
+    <button class="ctrl-btn" id="reset-btn" aria-label="最初からスタート">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 1 2.6 6.4"/>
+        <path d="M3 21v-5h5"/>
+      </svg>
+    </button>
+  </div>
+</div>
 
-<h1>🔴🔵 タイムアタックゲーム</h1>
-
-<div class="grid-wrap">
+<!-- 目標グリッド（小さめ） -->
+<div class="grid-section" id="target-section">
   <p class="grid-label">🎯 目標パターン（左右対称）</p>
-  <div class="grid" id="target-grid"></div>
+  <div class="grid" id="target-grid" style="gap:2px;"></div>
 </div>
 
 <hr class="divider">
 
-<div class="grid-wrap">
+<!-- 現在のタイル -->
+<div class="grid-section">
   <p class="grid-label">🎮 現在のタイル</p>
   <div class="grid" id="current-grid"></div>
 </div>
 
+<!-- シャッフルボタン -->
 <button id="shuffle-btn">シャッフル！</button>
 
+<!-- HUD -->
 <div class="hud">
   <div class="hud-item">
     <div class="hud-label">タイム</div>
@@ -199,7 +224,7 @@
   </div>
   <div class="hud-item">
     <div class="hud-label">ベスト</div>
-    <div class="hud-value gold" id="hud-best">--.--.--</div>
+    <div class="hud-value gold" id="hud-best">--:--</div>
   </div>
   <div class="hud-item">
     <div class="hud-label">シャッフル</div>
@@ -208,159 +233,194 @@
 </div>
 
 <!-- クリアオーバーレイ -->
-<div id="overlay">
+<div class="overlay" id="clear-overlay">
   <div class="emoji">🎉</div>
-  <div class="clear-title">クリア！</div>
-  <div class="clear-time" id="overlay-time"></div>
-  <div class="clear-info" id="overlay-info"></div>
-  <div class="best-badge" id="overlay-best"></div>
-  <button id="retry-btn">もう一度</button>
+  <div class="ov-title" style="color:#2ecc71;">クリア！</div>
+  <div class="ov-time" id="ov-time"></div>
+  <div class="ov-info" id="ov-info"></div>
+  <div class="ov-best" id="ov-best"></div>
+  <div class="ov-buttons">
+    <button class="ov-btn green" id="retry-btn">もう一度</button>
+    <button class="ov-btn gray"  id="new-btn">新しいゲーム</button>
+  </div>
+</div>
+
+<!-- ポーズオーバーレイ -->
+<div class="overlay" id="pause-overlay">
+  <div class="emoji">⏸️</div>
+  <div class="ov-title" style="color:#f39c12;">一時停止中</div>
+  <div class="ov-buttons">
+    <button class="ov-btn green" id="resume-btn">再開</button>
+    <button class="ov-btn gray"  id="pause-reset-btn">最初から</button>
+  </div>
 </div>
 
 <script>
 const ROWS = 8, COLS = 8;
 
-// 左右対称グリッド生成
 function genSymmetric() {
   return Array.from({ length: ROWS }, () => {
     const half = Array.from({ length: COLS / 2 }, () => Math.random() < 0.5);
     return [...half, ...[...half].reverse()];
   });
 }
-
-// 非対称グリッド生成（初期タイル用）
 function genAsymmetric() {
-  while (true) {
-    const grid = Array.from({ length: ROWS }, () =>
-      Array.from({ length: COLS }, () => Math.random() < 0.5)
-    );
-    if (!isSymmetric(grid)) return grid;
+  for (;;) {
+    const g = Array.from({ length: ROWS }, () =>
+      Array.from({ length: COLS }, () => Math.random() < 0.5));
+    if (!isSymmetric(g)) return g;
   }
 }
-
-// シャッフル用：左右対称だが目標と一致しないグリッド
-function genShuffled(target) {
-  let tries = 0;
-  while (true) {
-    const grid = genSymmetric();
-    if (!matchesTarget(grid, target)) return grid;
-    if (++tries > 50) return grid; // 無限ループ防止
+function genShuffled(tgt) {
+  for (let i = 0; i < 100; i++) {
+    const g = genSymmetric();
+    if (!matchesTarget(g, tgt)) return g;
   }
+  return genSymmetric();
 }
-
-function isSymmetric(grid) {
-  return grid.every(row => row.every((v, c) => v === row[COLS - 1 - c]));
+function isSymmetric(g) {
+  return g.every(r => r.every((v, c) => v === r[COLS - 1 - c]));
 }
-
-function matchesTarget(grid, target) {
-  return grid.every((row, r) => row.every((v, c) => v === target[r][c]));
+function matchesTarget(g, tgt) {
+  return g.every((r, ri) => r.every((v, c) => v === tgt[ri][c]));
 }
-
 function fmt(ms) {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const ss = s % 60;
-  const cs = Math.floor((ms % 1000) / 10);
+  const s = Math.floor(ms / 1000), m = Math.floor(s / 60);
+  const ss = s % 60, cs = Math.floor((ms % 1000) / 10);
   return m > 0
     ? `${m}:${String(ss).padStart(2,'0')}.${String(cs).padStart(2,'0')}`
     : `${String(ss).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
 }
 
 // --- 状態 ---
-let target = genSymmetric();
-let tiles  = genAsymmetric();
-let startTime = Date.now();
-let elapsed = 0;
-let shuffleCount = 0;
-let bestTime = null;
-let phase = 'playing'; // 'playing' | 'clear'
-let rafId = null;
+let target, tiles, startTime, pauseStart, pausedMs, elapsed, shuffleCount, bestTime, phase, rafId;
+// phase: 'playing' | 'paused' | 'clear'
 
 // --- DOM ---
-const targetGrid  = document.getElementById('target-grid');
-const currentGrid = document.getElementById('current-grid');
-const shuffleBtn  = document.getElementById('shuffle-btn');
-const retryBtn    = document.getElementById('retry-btn');
-const overlay     = document.getElementById('overlay');
-const hudTime     = document.getElementById('hud-time');
-const hudMatch    = document.getElementById('hud-match');
-const hudBest     = document.getElementById('hud-best');
-const hudCount    = document.getElementById('hud-count');
-const overlayTime = document.getElementById('overlay-time');
-const overlayInfo = document.getElementById('overlay-info');
-const overlayBest = document.getElementById('overlay-best');
+const $  = id => document.getElementById(id);
+const targetGrid   = $('target-grid');
+const currentGrid  = $('current-grid');
+const shuffleBtn   = $('shuffle-btn');
+const pauseBtn     = $('pause-btn');
+const pauseIcon    = $('pause-icon');
+const resetBtn     = $('reset-btn');
+const clearOverlay = $('clear-overlay');
+const pauseOverlay = $('pause-overlay');
+const hudTime      = $('hud-time');
+const hudMatch     = $('hud-match');
+const hudBest      = $('hud-best');
+const hudCount     = $('hud-count');
+const ovTime       = $('ov-time');
+const ovInfo       = $('ov-info');
+const ovBest       = $('ov-best');
 
-// --- グリッド描画 ---
-function renderGrid(container, grid) {
-  container.innerHTML = '';
-  grid.forEach(row => {
-    row.forEach(isRed => {
-      const d = document.createElement('div');
-      d.className = 'tile ' + (isRed ? 'red' : 'blue');
-      container.appendChild(d);
-    });
+function renderGrid(el, grid) {
+  el.innerHTML = '';
+  grid.flat().forEach(isRed => {
+    const d = document.createElement('div');
+    d.className = 'tile ' + (isRed ? 'red' : 'blue');
+    el.appendChild(d);
   });
 }
 
+// 目標グリッドを小さくするためにCSS変数で制御
+function applyTargetSize() {
+  // target-gridのタイルを0.6倍に（gap・sectionで調整）
+  $('target-section').style.transform = 'scale(0.62)';
+  $('target-section').style.transformOrigin = 'top center';
+  $('target-section').style.marginBottom = `calc((0.62 - 1) * 100%)`;
+}
+
 function calcMatch() {
-  let match = 0;
-  tiles.forEach((row, r) => row.forEach((v, c) => { if (v === target[r][c]) match++; }));
-  return Math.round(match / (ROWS * COLS) * 100);
+  let m = 0;
+  tiles.forEach((r, ri) => r.forEach((v, c) => { if (v === target[ri][c]) m++; }));
+  return Math.round(m / (ROWS * COLS) * 100);
+}
+
+function getElapsed() {
+  if (phase === 'playing') return Date.now() - startTime - pausedMs;
+  return elapsed;
 }
 
 function updateHudTime() {
-  const ms = phase === 'playing' ? Date.now() - startTime : elapsed;
+  const ms = getElapsed();
   hudTime.textContent = fmt(ms);
-  const color = ms < 10000 ? 'green' : ms < 30000 ? 'yellow' : 'red';
-  hudTime.className = 'hud-value ' + color;
+  hudTime.className = 'hud-value ' + (ms < 10000 ? 'green' : ms < 30000 ? 'yellow' : 'red');
 }
 
 function loop() {
-  if (phase === 'playing') {
-    updateHudTime();
-    rafId = requestAnimationFrame(loop);
-  }
+  if (phase === 'playing') { updateHudTime(); rafId = requestAnimationFrame(loop); }
 }
 
-function startGame() {
+// 一時停止アイコン切り替え
+function setPauseIcon(playing) {
+  pauseIcon.innerHTML = playing
+    ? '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>'
+    : '<polygon points="5,3 19,12 5,21"/>';
+}
+
+function startGame(keepBest = true) {
+  if (!keepBest) bestTime = null;
   target = genSymmetric();
   tiles  = genAsymmetric();
   startTime = Date.now();
+  pausedMs = 0;
   elapsed = 0;
   shuffleCount = 0;
   phase = 'playing';
-  overlay.classList.remove('show');
+  clearOverlay.classList.remove('show');
+  pauseOverlay.classList.remove('show');
   shuffleBtn.disabled = false;
+  setPauseIcon(true);
 
   renderGrid(targetGrid, target);
   renderGrid(currentGrid, tiles);
   hudCount.textContent = '0';
   hudMatch.textContent = calcMatch() + '%';
-  hudBest.textContent = bestTime !== null ? fmt(bestTime) : '--.--.--';
+  hudBest.textContent = bestTime !== null ? fmt(bestTime) : '--:--';
   cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+  applyTargetSize();
+}
+
+function showClear() {
+  elapsed = getElapsed();
+  phase = 'clear';
+  cancelAnimationFrame(rafId);
+  updateHudTime();
+  const isNew = bestTime === null || elapsed < bestTime;
+  if (isNew) bestTime = elapsed;
+  hudBest.textContent = fmt(bestTime);
+  ovTime.textContent = fmt(elapsed);
+  ovTime.className = 'ov-time ' + (elapsed < 10000 ? 'green' : elapsed < 30000 ? 'yellow' : 'red');
+  ovInfo.textContent = `シャッフル ${shuffleCount} 回`;
+  ovBest.textContent = isNew ? '🏆 ベスト更新！' : '';
+  clearOverlay.classList.add('show');
+  shuffleBtn.disabled = true;
+  setPauseIcon(true);
+}
+
+function pause() {
+  if (phase !== 'playing') return;
+  pauseStart = Date.now();
+  phase = 'paused';
+  cancelAnimationFrame(rafId);
+  pauseOverlay.classList.add('show');
+  shuffleBtn.disabled = true;
+  setPauseIcon(false);
+}
+
+function resume() {
+  if (phase !== 'paused') return;
+  pausedMs += Date.now() - pauseStart;
+  phase = 'playing';
+  pauseOverlay.classList.remove('show');
+  shuffleBtn.disabled = false;
+  setPauseIcon(true);
   rafId = requestAnimationFrame(loop);
 }
 
-function checkClear() {
-  if (matchesTarget(tiles, target)) {
-    elapsed = Date.now() - startTime;
-    phase = 'clear';
-    cancelAnimationFrame(rafId);
-    updateHudTime();
-
-    const isNewBest = bestTime === null || elapsed < bestTime;
-    if (isNewBest) bestTime = elapsed;
-    hudBest.textContent = fmt(bestTime);
-
-    overlayTime.textContent = fmt(elapsed);
-    overlayTime.className = 'clear-time ' + (elapsed < 10000 ? 'green' : elapsed < 30000 ? 'yellow' : 'red');
-    overlayInfo.textContent = `シャッフル ${shuffleCount} 回`;
-    overlayBest.textContent = isNewBest ? '🏆 ベスト更新！' : '';
-    overlay.classList.add('show');
-    shuffleBtn.disabled = true;
-  }
-}
-
+// --- イベント ---
 shuffleBtn.addEventListener('click', () => {
   if (phase !== 'playing') return;
   tiles = genShuffled(target);
@@ -368,12 +428,22 @@ shuffleBtn.addEventListener('click', () => {
   shuffleCount++;
   hudCount.textContent = shuffleCount;
   hudMatch.textContent = calcMatch() + '%';
-  checkClear();
+  if (matchesTarget(tiles, target)) showClear();
 });
 
-retryBtn.addEventListener('click', startGame);
+pauseBtn.addEventListener('click', () => {
+  if (phase === 'playing') pause();
+  else if (phase === 'paused') resume();
+});
 
-startGame();
+resetBtn.addEventListener('click', () => startGame(true));
+
+$('retry-btn').addEventListener('click', () => startGame(true));   // ベスト維持・新パターン
+$('new-btn').addEventListener('click',   () => startGame(true));   // 同上（同じ動作）
+$('resume-btn').addEventListener('click', resume);
+$('pause-reset-btn').addEventListener('click', () => startGame(true));
+
+startGame(false);
 </script>
 
 <script>
