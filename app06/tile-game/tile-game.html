@@ -34,9 +34,10 @@
     flex-direction: column;
     align-items: center;
     padding:
-      calc(env(safe-area-inset-top) + 8px)
+      calc(env(safe-area-inset-top) + 6px)
       12px
-      calc(env(safe-area-inset-bottom) + 8px);
+      calc(env(safe-area-inset-bottom) + 6px);
+    gap: 0;
   }
 
   /* ── ヘッダー ── */
@@ -46,7 +47,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     flex-shrink: 0;
   }
   #home-btn {
@@ -110,19 +111,22 @@
     box-shadow: inset 1px 1px 0 #333, inset -1px -1px 0 #000, inset 0 0 0 1px #111;
   }
 
-  /* 目標グリッドは小さめ：gap・タイル高さを固定で小さく */
-  #target-section { max-width: 420px; }
+  /* 目標グリッドは幅50%・正方形タイル維持で小さく */
+  #target-section {
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
   #target-grid {
+    width: 50%;   /* ← 幅を半分にすることでタイルが半分サイズになる */
     gap: 1px;
     grid-template-columns: repeat(8, 1fr);
   }
   #target-grid .tile {
     border-radius: 2px;
-    aspect-ratio: unset;
-    height: 20px;   /* ← 固定高さで小さく */
-    /* ボックスシャドウはより薄く */
-    box-shadow: none !important;
-    outline: 1px solid rgba(0,0,0,0.3);
+    aspect-ratio: 1;  /* 正方形を維持 */
+    box-shadow: none;
   }
   #target-grid .tile.red  { background: #d8d8d8; }
   #target-grid .tile.blue { background: #2a2a2a; }
@@ -131,7 +135,7 @@
   .divider {
     width: 100%; max-width: 420px;
     border: none; border-top: 1px solid #00ff5033;
-    margin: 5px 0;
+    margin: 4px 0;
     flex-shrink: 0;
   }
 
@@ -145,11 +149,11 @@
     border-radius: 4px;
     cursor: pointer; letter-spacing: 3px;
     box-shadow: 0 0 12px #00ff5055, inset 0 0 8px #00ff5011;
-    height: 48px;
+    height: 44px;
     width: 100%; max-width: 420px;
     transition: transform .1s, box-shadow .1s, background .1s;
     flex-shrink: 0;
-    margin: 5px 0;
+    margin: 4px 0;
     font-family: "Courier New", Courier, monospace;
     text-shadow: 0 0 8px #00ff50;
   }
@@ -165,11 +169,11 @@
     width: 100%; max-width: 420px;
     display: flex; justify-content: space-around;
     flex-shrink: 0;
-    margin-top: 2px;
+    margin-top: 4px;
   }
   .hud-item { text-align: center; }
   .hud-label { font-size: 10px; color: #00883a; letter-spacing: 1px; }
-  .hud-value { font-size: 20px; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1.3; font-family: "Courier New", Courier, monospace; }
+  .hud-value { font-size: 18px; font-weight: bold; font-variant-numeric: tabular-nums; line-height: 1.2; font-family: "Courier New", Courier, monospace; }
   .hud-value.green  { color: #00ff50; text-shadow: 0 0 8px #00ff5088; }
   .hud-value.yellow { color: #ffe000; text-shadow: 0 0 8px #ffe00088; }
   .hud-value.red    { color: #ff4040; text-shadow: 0 0 8px #ff404088; }
