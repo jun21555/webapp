@@ -102,18 +102,30 @@
     transition: background 0.12s;
   }
   .tile.red  {
-    background: #f0f0f0;
-    box-shadow: inset 0 0 0 1.5px #bbb, inset 2px 2px 0 #fff, inset -2px -2px 0 #999;
-    image-rendering: pixelated;
+    background: #efefef;
+    box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #aaa, inset 0 0 0 1px #ccc;
   }
   .tile.blue {
-    background: #1a1a1a;
-    box-shadow: inset 0 0 0 1.5px #000, inset 2px 2px 0 #333, inset -2px -2px 0 #000;
-    image-rendering: pixelated;
+    background: #181818;
+    box-shadow: inset 1px 1px 0 #333, inset -1px -1px 0 #000, inset 0 0 0 1px #111;
   }
 
-  /* 目標グリッドは小さめ */
-  #target-grid .tile { border-radius: 2px; }
+  /* 目標グリッドは小さめ：gap・タイル高さを固定で小さく */
+  #target-section { max-width: 420px; }
+  #target-grid {
+    gap: 1px;
+    grid-template-columns: repeat(8, 1fr);
+  }
+  #target-grid .tile {
+    border-radius: 2px;
+    aspect-ratio: unset;
+    height: 20px;   /* ← 固定高さで小さく */
+    /* ボックスシャドウはより薄く */
+    box-shadow: none !important;
+    outline: 1px solid rgba(0,0,0,0.3);
+  }
+  #target-grid .tile.red  { background: #d8d8d8; }
+  #target-grid .tile.blue { background: #2a2a2a; }
 
   /* ── 仕切り ── */
   .divider {
@@ -356,14 +368,6 @@ function renderGrid(el, grid) {
   });
 }
 
-// 目標グリッドを小さくするためにCSS変数で制御
-function applyTargetSize() {
-  // target-gridのタイルを0.6倍に（gap・sectionで調整）
-  $('target-section').style.transform = 'scale(0.62)';
-  $('target-section').style.transformOrigin = 'top center';
-  $('target-section').style.marginBottom = `calc((0.62 - 1) * 100%)`;
-}
-
 function calcMatch() {
   let m = 0;
   tiles.forEach((r, ri) => r.forEach((v, c) => { if (v === target[ri][c]) m++; }));
@@ -413,7 +417,6 @@ function startGame(keepBest = true) {
   hudBest.textContent = bestTime !== null ? fmt(bestTime) : '--:--';
   cancelAnimationFrame(rafId);
   rafId = requestAnimationFrame(loop);
-  applyTargetSize();
 }
 
 function showClear() {
